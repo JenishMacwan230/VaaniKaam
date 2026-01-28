@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Menu, X, Search } from "lucide-react";
+import { Menu, X, Search,LogIn } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import Logo from "./ui/logo";
@@ -81,10 +81,12 @@ const BlogHeader = () => {
                 <Search className="h-5 w-5" />
               </button>
               <button
-                onClick={() => router.push("/subscribe")}
-                className="px-4 py-2 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 shadow-sm"
+                onClick={() => router.push("/login")}
+                className="px-4 py-2 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 shadow-sm flex gap-1"
               >
-                Subscribe
+                  
+                Log In
+                <LogIn className="h-5 w-5" />
               </button>
 
             </div>
@@ -155,11 +157,12 @@ const BlogHeader = () => {
                 <button
                   onClick={() => {
                     setIsMenuOpen(false);
-                    router.push("/subscribe");
+                    router.push("/login");
                   }}
                   className="block w-full text-center px-4 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
                 >
-                  Subscribe
+                   <LogIn className="h-5 w-5" />
+                  Log In 
                 </button>
 
               </div>
