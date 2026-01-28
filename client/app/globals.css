@@ -55,105 +55,110 @@
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
-  --radius-4xl: calc(var(--radius) + 16px);
 }
 
 /* ===============================
-   LIGHT MODE (PRIMARY TARGET)
-   Trust + Safety theme
+   LIGHT MODE – Logo Theme
    =============================== */
 :root {
   --radius: 0.75rem;
 
   /* Backgrounds */
-  --background: oklch(0.99 0.01 250);        /* #F8FAFC */
-  --foreground: oklch(0.22 0.03 255);        /* #0F172A */
+  --background: oklch(0.99 0.01 210);
+  --foreground: oklch(0.22 0.03 235);
 
-  --card: oklch(1 0 0);                      /* White */
-  --card-foreground: oklch(0.22 0.03 255);
+  --card: oklch(1 0 0);
+  --card-foreground: var(--foreground);
 
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.22 0.03 255);
+  --popover-foreground: var(--foreground);
 
-  /* Primary (Trust Blue) */
-  --primary: oklch(0.53 0.22 264);           /* #2563EB */
+  /* 🔵 Primary – Logo Blue */
+  --primary: oklch(0.55 0.20 235);       /* ≈ Deep Blue */
   --primary-foreground: oklch(0.98 0 0);
 
-  /* Secondary (Success Green) */
-  --secondary: oklch(0.65 0.18 145);         /* #22C55E */
-  --secondary-foreground: oklch(0.15 0.02 145);
+  /* 🟢 Secondary – Logo Green */
+  --secondary: oklch(0.68 0.17 145);     /* ≈ Growth Green */
+  --secondary-foreground: oklch(0.18 0.03 145);
 
   /* Muted */
-  --muted: oklch(0.96 0.01 250);
-  --muted-foreground: oklch(0.55 0.02 255);
+  --muted: oklch(0.96 0.01 220);
+  --muted-foreground: oklch(0.55 0.02 230);
 
-  /* Accent */
-  --accent: oklch(0.93 0.05 250);
-  --accent-foreground: oklch(0.22 0.03 255);
+  /* 🟦 Accent – Teal (Voice / Tech) */
+  --accent: oklch(0.92 0.06 200);
+  --accent-foreground: oklch(0.22 0.03 235);
 
   /* Destructive */
   --destructive: oklch(0.62 0.23 27);
 
   /* Borders & Inputs */
-  --border: oklch(0.9 0.01 250);
-  --input: oklch(0.9 0.01 250);
-  --ring: oklch(0.53 0.22 264);
+  --border: oklch(0.90 0.01 220);
+  --input: oklch(0.90 0.01 220);
+  --ring: oklch(0.55 0.20 235);
 
-  /* Charts (safe + readable) */
-  --chart-1: oklch(0.53 0.22 264);  /* Blue */
-  --chart-2: oklch(0.65 0.18 145);  /* Green */
-  --chart-3: oklch(0.6 0.15 200);
-  --chart-4: oklch(0.75 0.15 90);
-  --chart-5: oklch(0.7 0.18 60);
+  /* 📊 Charts – Logo Gradient Flow */
+  --chart-1: oklch(0.55 0.20 235); /* Blue */
+  --chart-2: oklch(0.60 0.18 200); /* Teal */
+  --chart-3: oklch(0.68 0.17 145); /* Green */
+  --chart-4: oklch(0.75 0.14 90);
+  --chart-5: oklch(0.72 0.18 60);
 
   /* Sidebar */
-  --sidebar: oklch(0.98 0.01 250);
-  --sidebar-foreground: oklch(0.22 0.03 255);
-  --sidebar-primary: oklch(0.53 0.22 264);
+  --sidebar: oklch(0.98 0.01 210);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent: oklch(0.93 0.05 250);
-  --sidebar-accent-foreground: oklch(0.22 0.03 255);
-  --sidebar-border: oklch(0.9 0.01 250);
-  --sidebar-ring: oklch(0.53 0.22 264);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+
+   --brand-gradient: linear-gradient(
+    135deg,
+    oklch(0.55 0.20 235),
+    oklch(0.60 0.18 200),
+    oklch(0.68 0.17 145)
+  );
 }
 
 /* ===============================
-   DARK MODE (Optional but clean)
+   DARK MODE – Clean + Professional
    =============================== */
 .dark {
-  --background: oklch(0.18 0.02 255);
+  --background: oklch(0.17 0.02 235);
   --foreground: oklch(0.98 0 0);
 
-  --card: oklch(0.22 0.02 255);
-  --card-foreground: oklch(0.98 0 0);
+  --card: oklch(0.21 0.02 235);
+  --card-foreground: var(--foreground);
 
-  --popover: oklch(0.22 0.02 255);
-  --popover-foreground: oklch(0.98 0 0);
+  --popover: oklch(0.21 0.02 235);
+  --popover-foreground: var(--foreground);
 
-  --primary: oklch(0.7 0.2 264);
-  --primary-foreground: oklch(0.15 0.02 255);
+  --primary: oklch(0.72 0.18 235);
+  --primary-foreground: oklch(0.15 0.02 235);
 
-  --secondary: oklch(0.6 0.18 145);
+  --secondary: oklch(0.65 0.17 145);
   --secondary-foreground: oklch(0.98 0 0);
 
-  --muted: oklch(0.25 0.02 255);
-  --muted-foreground: oklch(0.7 0.02 255);
+  --muted: oklch(0.26 0.02 235);
+  --muted-foreground: oklch(0.70 0.02 235);
 
-  --accent: oklch(0.25 0.02 255);
+  --accent: oklch(0.26 0.04 200);
   --accent-foreground: oklch(0.98 0 0);
 
-  --border: oklch(1 0 0 / 10%);
+  --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.7 0.2 264);
+  --ring: oklch(0.72 0.18 235);
 
-  --sidebar: oklch(0.22 0.02 255);
-  --sidebar-foreground: oklch(0.98 0 0);
-  --sidebar-primary: oklch(0.7 0.2 264);
+  --sidebar: oklch(0.21 0.02 235);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent: oklch(0.25 0.02 255);
-  --sidebar-accent-foreground: oklch(0.98 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.7 0.2 264);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
 }
 
 /* ===============================
@@ -167,45 +172,3 @@
     @apply bg-background text-foreground;
   }
 }
-
-
-/* ===============================
-   MOBILE SIDEBAR BLUR OVERLAY
-   =============================== */
-
-.mobile-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-
-  background: rgba(0, 0, 0, 0.45);
-
-  backdrop-filter: blur(50px);
-  -webkit-backdrop-filter: blur(50px);
-
-  transition: opacity 0.3s ease;
-}
-
-.mobile-overlay-hidden {
-  opacity: 0;
-  pointer-events: none;
-}
-
-.mobile-overlay-visible {
-  opacity: 1;
-}
-
-/* ===============================
-   REAL BACKGROUND BLUR (WORKS EVERYWHERE)
-/* Real blur that works everywhere */
-body.menu-open #app-content {
-  filter: blur(10px);
-  transform: scale(0.98);
-  transition: filter 0.3s ease, transform 0.3s ease;
-}
-
-/* Sidebar must stay sharp */
-.mobile-sidebar {
-  filter: none !important;
-}
-
