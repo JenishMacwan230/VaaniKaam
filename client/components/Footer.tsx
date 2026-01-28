@@ -1,5 +1,6 @@
 "use client";
-import React from "react";
+// import React from "react";
+import Logo from "./ui/logo";
 
 const Footer = () => {
   const footerLinks = {
@@ -113,39 +114,7 @@ const Footer = () => {
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-8 py-10 max-sm:max-w-sm max-sm:mx-auto gap-y-8">
           <div className="col-span-full mb-10 lg:col-span-2 lg:mb-0">
             <a href="#" className="flex justify-center lg:justify-start">
-              <svg
-                width="180"
-                height="40"
-                viewBox="0 0 180 40"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <defs>
-                  <linearGradient id="logoGradient" x1="0" y1="0" x2="1" y2="1">
-                    <stop stopColor="#8B5CF6" />
-                    <stop offset="1" stopColor="#EC4899" />
-                  </linearGradient>
-                </defs>
-                {/* Icon */}
-                <g>
-                  <path
-                    d="M20 0C8.95431 0 0 8.95431 0 20C0 31.0457 8.95431 40 20 40C31.0457 40 40 31.0457 40 20C40 8.95431 31.0457 0 20 0ZM20 35C11.7157 35 5 28.2843 5 20C5 11.7157 11.7157 5 20 5V35Z"
-                    fill="url(#logoGradient)"
-                  />
-                </g>
-                {/* Text */}
-                <text
-                  x="50"
-                  y="28"
-                  fontFamily="'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
-                  fontSize="24"
-                  fontWeight="bold"
-                  fill="currentColor"
-                  className="fill-gray-700 dark:fill-white"
-                >
-                  DemoLogo
-                </text>
-              </svg>
+              <Logo size={70} />
             </a>
             <p className="py-8 text-sm text-gray-500 dark:text-gray-400 lg:max-w-xs text-center lg:text-left">
               Trusted in more than 100 countries & 5 million customers. Have any

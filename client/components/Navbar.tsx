@@ -3,19 +3,25 @@
 import { useState, useEffect } from "react";
 import { Menu, X, Search } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
 import Logo from "./ui/logo";
 
 const BlogHeader = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const router = useRouter();
+
 
   const navLinks = [
-    { href: "#", text: "Home" },
-    { href: "#", text: "About Us" },
-    { href: "#", text: "Tutorials" },
-    { href: "#", text: "Reviews" },
-    { href: "#", text: "About" },
+    { href: "/", text: "Home" },
+    { href: "/about", text: "About Us" },
+    { href: "/workers", text: "Workers" },
+    { href: "/Business", text: "Business" },
+    { href: "/projects", text: "Projects" },
+    { href: "/shopes", text: "Shopes" },
+    { href: "/contact", text: "Contact us" },
   ];
+
 
   /* ---------- SCROLL SHRINK ---------- */
   useEffect(() => {
@@ -59,29 +65,28 @@ const BlogHeader = () => {
             {/* DESKTOP NAV */}
             <nav className="hidden md:flex items-center space-x-8">
               {navLinks.map((link) => (
-                <a
+                <button
                   key={link.text}
-                  href={link.href}
-                  className="text-md font-medium text-gray-600 dark:text-gray-300
-                  hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
-                >
+                  onClick={() => router.push(link.href)}
+                  className="text-md font-medium text-gray-600 dark:text-gray-300 hover:text-secondary dark:hover:text-emerald-400 transition-colors">
                   {link.text}
-                </a>
+                </button>
               ))}
             </nav>
+
 
             {/* DESKTOP ACTIONS */}
             <div className="hidden md:flex items-center space-x-3">
               <button className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
                 <Search className="h-5 w-5" />
               </button>
-              <a
-                href="#"
-                className="px-4 py-2 text-sm font-medium bg-emerald-600
-                text-white rounded-lg hover:bg-emerald-700 shadow-sm"
+              <button
+                onClick={() => router.push("/subscribe")}
+                className="px-4 py-2 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 shadow-sm"
               >
                 Subscribe
-              </a>
+              </button>
+
             </div>
 
             {/* MOBILE MENU BUTTON */}
@@ -131,27 +136,32 @@ const BlogHeader = () => {
               {/* LINKS */}
               <nav className="flex flex-col gap-3">
                 {navLinks.map((link) => (
-                  <a
+                  <button
                     key={link.text}
-                    href={link.href}
-                    onClick={() => setIsMenuOpen(false)}
-                    className="px-4 py-3 rounded-lg text-lg
-                    hover:bg-gray-100 dark:hover:bg-gray-800"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      router.push(link.href);
+                    }}
+                    className="px-4 py-3 rounded-lg text-lg text-left hover:bg-gray-100 dark:hover:bg-gray-800"
                   >
                     {link.text}
-                  </a>
+                  </button>
                 ))}
               </nav>
 
+
               {/* FOOTER */}
               <div className="mt-auto pt-6">
-                <a
-                  href="#"
-                  className="block text-center px-4 py-3 bg-emerald-600
-                  text-white rounded-lg hover:bg-emerald-700"
+                <button
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    router.push("/subscribe");
+                  }}
+                  className="block w-full text-center px-4 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
                 >
                   Subscribe
-                </a>
+                </button>
+
               </div>
             </motion.aside>
           </>
