@@ -1,5 +1,5 @@
 import ShowcasePanel from "@/components/ShowcasePanel";
-import SignupCard from "@/components/SignupCard";
+import PhoneAuthCard from "@/components/PhoneAuthCard";
 
 export default function CreateAccountPage() {
   return (
@@ -9,7 +9,7 @@ export default function CreateAccountPage() {
           <ShowcasePanel />
         </div>
         <div className="order-1 lg:order-2">
-          <SignupCard />
+          <PhoneAuthCard />
         </div>
       </div>
     </div>
