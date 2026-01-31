@@ -28,11 +28,11 @@ export default function SignupCard() {
   const disabled = phone.length !== 10 || isSending;
 
   return (
-    <section className="relative rounded-[32px] border border-border/80 bg-card/95 p-10 shadow-2xl">
+    <section className="relative rounded-[32px] border border-border/80 bg-card/95 p-6 shadow-2xl sm:p-8">
       <div className="absolute inset-x-12 top-6 h-1 rounded-full bg-linear-to-r from-primary via-secondary to-accent opacity-60" />
       <div className="relative space-y-8">
         <header className="space-y-4">
-          <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/60 px-3 py-1.5 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+          <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/60 px-3 py-1.5 text-sm font-medium text-primary">
             Secure Access
             <Lock className="h-3 w-3" />
           </div>
@@ -42,8 +42,8 @@ export default function SignupCard() {
           </p>
         </header>
 
-        <form onSubmit={handleSubmit} className="space-y-10">
-          <label className="space-y-3 text-sm font-medium">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <label className="space-y-2 text-sm font-medium">
             <span>Mobile number</span>
             <div className="relative">
               <Phone className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -56,7 +56,7 @@ export default function SignupCard() {
                 placeholder="10 digit number"
                 value={phone}
                 onChange={handlePhoneChange}
-                className="w-full rounded-3xl border border-input bg-background/40 py-4 my-2 pl-11 pr-4 text-base outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                className="w-full rounded-2xl border border-input bg-background/40 px-4 py-3 text-base shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
               />
             </div>
           </label>
@@ -64,7 +64,7 @@ export default function SignupCard() {
           <button
             type="submit"
             disabled={disabled}
-            className="flex w-full items-center justify-center gap-2 rounded-3xl bg-primary px-4 py-4 my-2 text-base font-semibold text-primary-foreground shadow-lg transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-linear-to-r from-primary via-secondary to-accent px-4 py-3 text-base font-semibold text-white shadow-lg transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSending ? "Sending code" : "Send verification code"}
             {!isSending && <ArrowRight className="h-4 w-4" />}

@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale, getMessages } from "next-intl/server";
+
 import "./globals.css";
 import BlogHeader from "@/components/Navbar";
 import Footer from "@/components/Footer";
+// import { locales } from "@/i18n";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -19,13 +23,16 @@ export const metadata: Metadata = {
   description: "Daily wage worker job platform",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const locale = await getLocale();
+  const messages = await getMessages();
+
   return (
-    <html lang="en">
+    <html lang={locale}>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
@@ -36,7 +43,9 @@ export default function RootLayout({
 
         {/* Page Content */}
         <main className="pt-16 min-h-screen">
-          {children}
+          <NextIntlClientProvider locale={locale} messages={messages}>
+            {children}
+          </NextIntlClientProvider>
         </main>
 
         {/* Footer */}
