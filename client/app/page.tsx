@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import {Separator} from '../components/ui/separator'
+import {Separator} from '@/components/ui/separator'
 
 const ArrowRightIcon = ({ className }: { className?: string }) => (
   <svg
