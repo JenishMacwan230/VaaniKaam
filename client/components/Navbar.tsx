@@ -1,46 +1,83 @@
 "use client";
 
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
-import { Menu, X, Search, LogIn, Globe } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import {
+  Search,
+  LogIn,
+  Globe,
+  Check,
+  Home,
+  Info,
+  Users,
+  Briefcase,
+  FolderKanban,
+  Phone,
+} from "lucide-react";
+import { motion } from "framer-motion";
 import { useRouter, usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import Logo from "./ui/logo";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 
 const BlogHeader = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [language, setLanguage] = useState<"EN" | "HI" | "GU">("EN");
-  const languages = [
-    { code: "EN" as const, label: "English" },
-    { code: "HI" as const, label: "Hindi" },
-    { code: "GU" as const, label: "Gujarati" },
-  ];
-
-  const handleLanguageChange = (value: "EN" | "HI" | "GU") => {
-    setLanguage(value);
-  };
-
+  const t = useTranslations("nav");
   const router = useRouter();
   const pathname = usePathname();
+  
+  const locales = ["en", "hi", "gu"];
+  
+  // Extract current locale from pathname
+  const pathSegments = pathname.split("/").filter(Boolean);
+  const currentLocale = locales.includes(pathSegments[0]) ? pathSegments[0] : "en";
+  
+  const languages = [
+    { code: "en", label: "English" },
+    { code: "hi", label: "हिन्दी" },
+    { code: "gu", label: "ગુજરાતી" },
+  ];
+
+  const handleLanguageChange = (value: string) => {
+    const newLocale = value.toLowerCase();
+    const segments = pathname.split("/").filter(Boolean);
+    
+    // Remove old locale if present
+    if (locales.includes(segments[0])) {
+      segments.shift();
+    }
+    
+    // Create new path with new locale
+    const newPath = `/${newLocale}${segments.length > 0 ? "/" + segments.join("/") : "/"}`;
+    router.push(newPath);
+  };
+
   const navContainerRef = useRef<HTMLElement | null>(null);
   const linkRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const [indicatorStyle, setIndicatorStyle] = useState({ width: 0, left: 0 });
 
 
   const navLinks = [
-    { href: "/", text: "Home" },
-    { href: "/about", text: "About Us" },
-    { href: "/workers", text: "Workers" },
-    { href: "/business", text: "Business" },
-    { href: "/projects", text: "Projects" },
-    { href: "/shops", text: "Shops" },
-    { href: "/contact", text: "Contact us" },
+    { href: "/", text: t("home"), icon: Home },
+    { href: "/about", text: t("about"), icon: Info },
+    { href: "/workers", text: t("workers"), icon: Users },
+    { href: "/business", text: t("business"), icon: Briefcase },
+    { href: "/projects", text: t("projects"), icon: FolderKanban },
+    { href: "/contact", text: t("contact"), icon: Phone },
   ];
 
   const isLinkActive = (href: string) => {
     if (!pathname) return false;
-    if (href === "/") return pathname === "/";
-    return pathname.startsWith(href);
+    const normalizedPath = pathname.replace(/^\/(en|hi|gu)(?=\/|$)/
+      , "") || "/";
+    const pathToCheck = normalizedPath === "" ? "/" : normalizedPath;
+    if (href === "/") return pathToCheck === "/";
+    return pathToCheck === href || pathToCheck.startsWith(`${href}/`);
   };
   const activeIndex = navLinks.findIndex((link) => isLinkActive(link.href));
 
@@ -83,27 +120,11 @@ const BlogHeader = () => {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  /* ---------- BODY BLUR + SCROLL LOCK ---------- */
-  useEffect(() => {
-    if (isMenuOpen) {
-      document.body.classList.add("menu-open");
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.classList.remove("menu-open");
-      document.body.style.overflow = "auto";
-    }
-
-    return () => {
-      document.body.classList.remove("menu-open");
-      document.body.style.overflow = "auto";
-    };
-  }, [isMenuOpen]);
-
   return (
     <>
       {/* ================= NAVBAR ================= */}
       <header
-        className={`sticky top-0 z-50 w-full border-b
+        className={`hidden md:block sticky top-0 z-50 w-full border-b
         bg-white/80 dark:bg-gray-900/80 backdrop-blur-md
         transition-all duration-300
         ${isScrolled ? "py-2" : "py-5"}`}
@@ -131,7 +152,7 @@ const BlogHeader = () => {
               {navLinks.map((link, index) => (
                 <button
                   key={link.text}
-                  onClick={() => router.push(link.href)}
+                  onClick={() => router.push(`/${currentLocale}${link.href === "/" ? "" : link.href}`)}
                   ref={(node) => {
                     linkRefs.current[index] = node;
                   }}
@@ -148,137 +169,87 @@ const BlogHeader = () => {
 
             {/* DESKTOP ACTIONS */}
             <div className="hidden md:flex items-center space-x-3">
-              <div className="relative">
-                <Globe className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-                <select
-                  value={language}
-                  aria-label="Select language"
-                  onChange={(event) => handleLanguageChange(event.target.value as "EN" | "HI" | "GU")}
-                  className="appearance-none rounded-full border border-border/70 bg-white/80 pl-9 pr-8 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition hover:border-secondary focus:border-secondary focus:outline-none dark:bg-gray-900/80 dark:text-gray-200"
-                >
+              <Select value={currentLocale} onValueChange={handleLanguageChange}>
+                <SelectTrigger className="w-40 rounded-full border border-border/70 bg-white/80 px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm dark:bg-gray-900/80 dark:text-gray-200">
+                  <Globe className="mr-2 h-4 w-4 text-gray-500" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="min-w-40">
                   {languages.map((lang) => (
-                    <option key={lang.code} value={lang.code}>
-                      {lang.label}
-                    </option>
+                    <SelectItem key={lang.code} value={lang.code}>
+                      <div className="flex items-center gap-2">
+                        <span>{lang.label}</span>
+                        {currentLocale === lang.code && (
+                          <Check className="h-4 w-4 text-secondary dark:text-emerald-400" />
+                        )}
+                      </div>
+                    </SelectItem>
                   ))}
-                </select>
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500">▼</span>
-              </div>
+                </SelectContent>
+              </Select>
               <button className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
                 <Search className="h-5 w-5" />
               </button>
               <button
-                onClick={() => router.push("/login")}
+                onClick={() => router.push(`/${currentLocale}/login`)}
                 className="px-4 py-2 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 shadow-sm flex gap-1"
               >
                   
-                Log In
+                {t("login")}
                 <LogIn className="h-5 w-5" />
               </button>
 
             </div>
 
-            {/* MOBILE MENU BUTTON */}
-            <button
-              onClick={() => setIsMenuOpen(true)}
-              className="md:hidden p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
-            >
-              <Menu className="h-6 w-6" />
-            </button>
+            {/* MOBILE TOP ACTIONS */}
+            <div className="md:hidden flex items-center gap-2">
+              <Select value={currentLocale} onValueChange={handleLanguageChange}>
+                <SelectTrigger className="w-28 rounded-full border border-border/70 bg-white/80 px-2 py-1.5 text-xs font-medium text-gray-700 shadow-sm dark:bg-gray-900/80 dark:text-gray-200">
+                  <Globe className="mr-1 h-3.5 w-3.5 text-gray-500" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="min-w-28">
+                  {languages.map((lang) => (
+                    <SelectItem key={lang.code} value={lang.code}>
+                      <div className="flex items-center gap-2">
+                        <span>{lang.label}</span>
+                        {currentLocale === lang.code && (
+                          <Check className="h-4 w-4 text-secondary dark:text-emerald-400" />
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
       </header>
 
-      {/* ================= MOBILE DRAWER ================= */}
-      <AnimatePresence>
-        {isMenuOpen && (
-          <>
-            {/* BACKDROP */}
-            <motion.div
-              className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-xl md:hidden"
-
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsMenuOpen(false)}
-            />
-
-            {/* SIDEBAR */}
-            <motion.aside
-              className="mobile-sidebar fixed top-0 right-0 z-[70] h-full w-4/5 max-w-sm
-              bg-white dark:bg-gray-900 shadow-xl p-6"
-              initial={{ x: 300 }}
-              animate={{ x: 0 }}
-              exit={{ x: 300 }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            >
-              {/* HEADER */}
-              <div className="flex items-center justify-between mb-8">
-                <Logo size={60} />
-                <button
-                  onClick={() => setIsMenuOpen(false)}
-                  className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800"
-                >
-                  <X className="h-6 w-6" />
-                </button>
-              </div>
-
-              {/* LINKS */}
-              <nav className="flex flex-col gap-3">
-                {navLinks.map((link) => (
-                  <button
-                    key={link.text}
-                    onClick={() => {
-                      setIsMenuOpen(false);
-                      router.push(link.href);
-                    }}
-                    className={`px-4 py-3 rounded-lg text-lg text-left transition-colors duration-300
-                    ${isLinkActive(link.href)
-                        ? "bg-gray-100 dark:bg-gray-800 text-secondary dark:text-emerald-400"
-                        : "text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"}`}
-                  >
-                    {link.text}
-                  </button>
-                ))}
-              </nav>
-
-
-              {/* FOOTER */}
-              <div className="mt-auto pt-6">
-                <div className="mb-4">
-                  <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
-                    <Globe className="h-4 w-4" />
-                    Language
-                  </label>
-                  <select
-                    value={language}
-                    aria-label="Select language"
-                    onChange={(event) => handleLanguageChange(event.target.value as "EN" | "HI" | "GU")}
-                    className="w-full rounded-lg border border-border/70 bg-white/80 px-4 py-2 text-sm font-medium text-gray-700 shadow-sm focus:border-secondary focus:outline-none dark:bg-gray-900/80 dark:text-gray-200"
-                  >
-                    {languages.map((lang) => (
-                      <option key={lang.code} value={lang.code}>
-                        {lang.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <button
-                  onClick={() => {
-                    setIsMenuOpen(false);
-                    router.push("/login");
-                  }}
-                  className="w-full flex gap-1 items-center justify-center  px-4 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
-                >
-                   <LogIn className="h-5 w-5" />
-                  Log In 
-                </button>
-
-              </div>
-            </motion.aside>
-          </>
-        )}
-      </AnimatePresence>
+      {/* ================= MOBILE BOTTOM NAV ================= */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden">
+        <div className="mx-auto mb-3 w-[calc(100%-1.5rem)] max-w-md rounded-2xl border border-border/60 bg-white/90 shadow-[0_14px_36px_-18px_rgba(0,0,0,0.45)] backdrop-blur-md dark:bg-gray-900/90">
+          <div className="grid grid-cols-6 items-stretch gap-1 px-1.5 py-2">
+          {navLinks.map((link) => {
+            const Icon = link.icon;
+            const isActive = isLinkActive(link.href);
+            return (
+              <button
+                key={link.text}
+                onClick={() => router.push(`/${currentLocale}${link.href === "/" ? "" : link.href}`)}
+                className={`relative flex flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[11px] font-medium transition-all
+                ${isActive
+                    ? "bg-secondary/15 text-secondary shadow-sm ring-1 ring-secondary/35"
+                    : "text-gray-600 hover:bg-gray-100/80 dark:text-gray-300 dark:hover:bg-gray-800/60"}`}
+              >
+                <Icon className="h-5 w-5" />
+                <span className="leading-none">{link.text}</span>
+              </button>
+            );
+          })}
+          </div>
+        </div>
+      </nav>
     </>
   );
 };

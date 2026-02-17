@@ -6,8 +6,13 @@ import { auth } from "@/lib/firebase";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Phone, Lock, Mail, User, Shield } from "lucide-react";
 
-export default function PhoneAuthCard() {
+interface PhoneAuthCardProps {
+  onStepChange?: (step: "phone" | "otp" | "details") => void;
+}
+
+export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otp, setOtp] = useState("");
   const [name, setName] = useState("");
@@ -40,6 +45,7 @@ export default function PhoneAuthCard() {
       
       setConfirmationResult(confirmation);
       setStep("otp");
+      onStepChange?.("otp");
       setError(null);
     } catch (err: any) {
       console.error("Send OTP error:", err);
@@ -47,7 +53,7 @@ export default function PhoneAuthCard() {
       if (err.code === "auth/billing-not-enabled") {
         setError("Firebase Phone Auth requires Blaze plan. Please upgrade or use test numbers.");
       } else if (err.code === "auth/invalid-phone-number") {
-        setError("Invalid phone number format. Use +91XXXXXXXXXX");
+        setError("Invalid phone number format. Use +91 XXXXXXXXXX");
       } else if (err.code === "auth/too-many-requests") {
         setError("Too many requests. Please try again later.");
       } else {
@@ -72,6 +78,7 @@ export default function PhoneAuthCard() {
       const idToken = await result.user.getIdToken();
       
       setStep("details");
+      onStepChange?.("details");
       setError(null);
     } catch (err: any) {
       console.error("Verify OTP error:", err);
@@ -163,21 +170,22 @@ export default function PhoneAuthCard() {
 
         {step === "phone" && (
           <div className="space-y-5">
-            <label className="space-y-2 text-sm font-medium">
-              <span>Mobile number</span>
-              <input
-                type="tel"
-                placeholder="Enter 10 digit number"
-                value={phoneNumber}
-                onChange={(e) => {
-                  const digitsOnly = e.target.value.replace(/\D/g, "").slice(0, 10);
-                  setPhoneNumber(digitsOnly);
-                }}
-                disabled={loading}
-                maxLength={10}
-                className="w-full rounded-2xl border border-input bg-background/40 px-4 py-3 text-base shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
-              />
-            </label>
+            <div className="flex items-center gap-2">
+              <Phone className="w-4 h-4 text-primary" />
+              <Label className="text-sm font-medium">Mobile number</Label>
+            </div>
+            <Input
+              type="tel"
+              placeholder="Enter 10 digit number"
+              value={phoneNumber}
+              onChange={(e) => {
+                const digitsOnly = e.target.value.replace(/\D/g, "").slice(0, 10);
+                setPhoneNumber(digitsOnly);
+              }}
+              disabled={loading}
+              maxLength={10}
+              className="rounded-2xl border border-input bg-background/40 px-4 py-6 text-base font-semibold shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+            />
             
             {error && (
               <div className="rounded-lg bg-red-50 border border-red-200 p-3">
@@ -185,34 +193,35 @@ export default function PhoneAuthCard() {
               </div>
             )}
 
-            <button 
+            <Button 
               onClick={sendOTP} 
               disabled={loading || phoneNumber.length !== 10}
               className="w-full rounded-2xl bg-linear-to-r from-primary via-secondary to-accent py-3 text-base font-semibold text-white shadow-lg transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? "Sending..." : "Send OTP"}
-            </button>
+            </Button>
           </div>
         )}
 
         {step === "otp" && (
           <div className="space-y-5">
             <div className="rounded-lg bg-green-50 border border-green-200 p-3">
-              <p className="text-sm text-green-700">OTP sent to +91{phoneNumber}</p>
+              <p className="text-sm text-green-700">OTP sent to +91 {phoneNumber}</p>
             </div>
 
-            <label className="space-y-2 text-sm font-medium">
-              <span>Enter OTP</span>
-              <input
-                type="text"
-                placeholder="Enter 6-digit OTP"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                maxLength={6}
-                disabled={loading}
-                className="w-full rounded-2xl border border-input bg-background/40 px-4 py-3 text-base shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
-              />
-            </label>
+            <div className="flex items-center gap-2">
+              <Shield className="w-4 h-4 text-primary" />
+              <Label className="text-sm font-medium">Enter OTP</Label>
+            </div>
+            <Input
+              type="text"
+              placeholder="Enter 6-digit OTP"
+              value={otp}
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              maxLength={6}
+              disabled={loading}
+              className="rounded-2xl border border-input bg-background/40 px-4 py-6 text-base font-semibold shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+            />
 
             {error && (
               <div className="rounded-lg bg-red-50 border border-red-200 p-3">
@@ -220,13 +229,13 @@ export default function PhoneAuthCard() {
               </div>
             )}
 
-            <button 
+            <Button 
               onClick={verifyOTP} 
               disabled={loading || otp.length !== 6}
               className="w-full rounded-2xl bg-linear-to-r from-primary via-secondary to-accent py-3 text-base font-semibold text-white shadow-lg transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? "Verifying..." : "Verify OTP"}
-            </button>
+            </Button>
           </div>
         )}
 
@@ -236,53 +245,57 @@ export default function PhoneAuthCard() {
               <p className="text-sm text-green-700">✓ Phone verified! Complete your profile.</p>
             </div>
 
-            <label className="space-y-2 text-sm font-medium">
-              <span>Name</span>
-              <input
-                type="text"
-                placeholder="Your name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                disabled={loading}
-                className="w-full rounded-2xl border border-input bg-background/40 px-4 py-3 text-base shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
-              />
-            </label>
+            <div className="flex items-center gap-2">
+              <User className="w-4 h-4 text-primary" />
+              <Label className="text-sm font-medium">Name</Label>
+            </div>
+            <Input
+              type="text"
+              placeholder="Your name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={loading}
+              className="rounded-2xl border border-input bg-background/40 px-4 py-3 text-base font-semibold shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+            />
 
-            <label className="space-y-2 text-sm font-medium">
-              <span>Email (optional)</span>
-              <input
-                type="email"
-                placeholder="your@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={loading}
-                className="w-full rounded-2xl border border-input bg-background/40 px-4 py-3 text-base shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
-              />
-            </label>
+            <div className="flex items-center gap-2">
+              <Mail className="w-4 h-4 text-primary" />
+              <Label className="text-sm font-medium">Email (optional)</Label>
+            </div>
+            <Input
+              type="email"
+              placeholder="your@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={loading}
+              className="rounded-2xl border border-input bg-background/40 px-4 py-3 text-base font-semibold shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+            />
 
-            <label className="space-y-2 text-sm font-medium">
-              <span>Password</span>
-              <input
-                type="password"
-                placeholder="Min. 6 characters"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={loading}
-                className="w-full rounded-2xl border border-input bg-background/40 px-4 py-3 text-base shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-2 focus-visible:ring-primary/20"
-              />
-            </label>
+            <div className="flex items-center gap-2">
+              <Lock className="w-4 h-4 text-primary" />
+              <Label className="text-sm font-medium">Password</Label>
+            </div>
+            <Input
+              type="password"
+              placeholder="Min. 6 characters"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              disabled={loading}
+              className="rounded-2xl border border-input bg-background/40 px-4 py-3 text-base font-semibold shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+            />
 
-            <label className="space-y-2 text-sm font-medium">
-              <span>Confirm Password</span>
-              <input
-                type="password"
-                placeholder="Re-enter password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                disabled={loading}
-                className="w-full rounded-2xl border border-input bg-background/40 px-4 py-3 text-base shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
-              />
-            </label>
+            <div className="flex items-center gap-2">
+              <Lock className="w-4 h-4 text-primary" />
+              <Label className="text-sm font-medium">Confirm Password</Label>
+            </div>
+            <Input
+              type="password"
+              placeholder="Re-enter password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              disabled={loading}
+              className="rounded-2xl border border-input bg-background/40 px-4 py-3 text-base font-semibold shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+            />
 
             {error && (
               <div className="rounded-lg bg-red-50 border border-red-200 p-3">
@@ -290,13 +303,13 @@ export default function PhoneAuthCard() {
               </div>
             )}
 
-            <button 
+            <Button 
               onClick={completeRegistration} 
               disabled={loading || !password || !name}
               className="w-full rounded-2xl bg-linear-to-r from-primary via-secondary to-accent py-3 text-base font-semibold text-white shadow-lg transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? "Creating account..." : "Create account"}
-            </button>
+            </Button>
           </div>
         )}
 

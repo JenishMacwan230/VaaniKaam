@@ -1,5 +1,99 @@
 {
-  "app": {
-    "title": "VaaniKaam"
+  "nav": {
+    "home": "Home",
+    "about": "About Us",
+    "workers": "Workers",
+    "business": "Business",
+    "projects": "Projects",
+    "shops": "Shops",
+    "contact": "Contact us",
+    "language": "Language",
+    "login": "Log In",
+    "search": "Search"
+  },
+  "hero": {
+    "title": "Simple. Clean.",
+    "subtitle": "Effective.",
+    "description": "The minimalist approach to building great products. Focus on what matters most with our clean, distraction-free platform.",
+    "feature1": "No credit card required",
+    "feature2": "Free 14-day trial",
+    "feature3": "Cancel anytime",
+    "cta1": "Get Started Free",
+    "cta2": "View Demo",
+    "users": "Active Users",
+    "companies": "Partner Companies",
+    "ratings": "Average Rating"
+  },
+  "footer": {
+    "company": "Company",
+    "product": "Product",
+    "resources": "Resources",
+    "legal": "Legal",
+    "about": "About",
+    "pricing": "Pricing",
+    "blog": "Blog",
+    "careers": "Careers",
+    "docs": "Documentation",
+    "api": "API",
+    "community": "Community",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service",
+    "copyright": "© 2026 VaaniKaam. All rights reserved."
+  },
+  "workers": {
+    "title": "Find Your Next Job",
+    "subtitle": "Connect with employers looking for skilled workers like you",
+    "description": "Browse thousands of job opportunities across various industries. Create your profile and let employers find you.",
+    "feature1Title": "Voice Search",
+    "feature1Desc": "Search for jobs using your voice in your preferred language",
+    "feature2Title": "Quick Apply",
+    "feature2Desc": "Apply to multiple jobs with a single tap",
+    "feature3Title": "Direct Contact",
+    "feature3Desc": "Connect directly with employers via phone or WhatsApp",
+    "ctaTitle": "Ready to Start Working?",
+    "ctaDesc": "Join thousands of workers who have found their dream jobs",
+    "ctaButton": "Create Worker Profile"
+  },
+  "business": {
+    "title": "Hire Skilled Workers Fast",
+    "subtitle": "Find reliable workers for your business needs",
+    "description": "Access a pool of verified skilled workers ready to work. Post jobs and receive applications within hours.",
+    "feature1Title": "Verified Workers",
+    "feature1Desc": "All workers are verified with background checks",
+    "feature2Title": "Fast Hiring",
+    "feature2Desc": "Post a job and start receiving applications instantly",
+    "feature3Title": "Easy Management",
+    "feature3Desc": "Manage all your workers and jobs from one dashboard",
+    "ctaTitle": "Start Hiring Today",
+    "ctaDesc": "Join thousands of businesses that trust VaaniKaam",
+    "ctaButton": "Create Business Account"
+  },
+  "shops": {
+    "title": "Grow Your Local Shop",
+    "subtitle": "Find workers for your shop or store",
+    "description": "Whether you need salespeople, helpers, or specialized staff, find the right people for your shop.",
+    "feature1Title": "Local Workers",
+    "feature1Desc": "Find workers in your neighborhood",
+    "feature2Title": "Flexible Hiring",
+    "feature2Desc": "Hire full-time, part-time, or temporary workers",
+    "feature3Title": "Trusted Platform",
+    "feature3Desc": "Ratings and reviews help you make the right choice",
+    "ctaTitle": "Find Shop Workers",
+    "ctaDesc": "Get started with your first hire today",
+    "ctaButton": "Post a Job"
+  },
+  "projects": {
+    "title": "Find Workers for Your Project",
+    "subtitle": "Get skilled workers for short-term or long-term projects",
+    "description": "From construction to events, find experienced workers for any type of project. Post your project requirements and get bids.",
+    "feature1Title": "Project Based",
+    "feature1Desc": "Hire workers for specific projects with clear timelines",
+    "feature2Title": "Multiple Skills",
+    "feature2Desc": "Find workers with various skills for complex projects",
+    "feature3Title": "Milestone Payments",
+    "feature3Desc": "Pay as work progresses with milestone-based payments",
+    "ctaTitle": "Start Your Project",
+    "ctaDesc": "Post your project and receive quotes from workers",
+    "ctaButton": "Post a Project"
   }
 }

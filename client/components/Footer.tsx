@@ -1,32 +1,28 @@
 "use client";
-// import React from "react";
+import { useTranslations } from "next-intl";
 import Logo from "./ui/logo";
 
 const Footer = () => {
+  const t = useTranslations("footer");
+  
   const footerLinks = {
-    pagedone: [
-      { name: "Home", href: "#" },
-      { name: "About", href: "#" },
-      { name: "Pricing", href: "#" },
-      { name: "Features", href: "#" },
+    company: [
+      { name: t("about"), href: "#" },
+      { name: t("careers"), href: "#" },
+      { name: t("blog"), href: "#" },
+      { name: t("privacy"), href: "#" },
     ],
-    products: [
-      { name: "Figma UI System", href: "#" },
-      { name: "Icons Assets", href: "#" },
-      { name: "Responsive Blocks", href: "#" },
-      { name: "Components Library", href: "#" },
+    product: [
+      { name: t("pricing"), href: "#" },
+      { name: t("docs"), href: "#" },
+      { name: t("api"), href: "#" },
+      { name: t("terms"), href: "#" },
     ],
     resources: [
-      { name: "FAQs", href: "#" },
-      { name: "Quick Start", href: "#" },
-      { name: "Documentation", href: "#" },
-      { name: "User Guide", href: "#" },
-    ],
-    blogs: [
-      { name: "News", href: "#" },
-      { name: "Tips & Tricks", href: "#" },
-      { name: "New Updates", href: "#" },
-      { name: "Events", href: "#" },
+      { name: t("resources"), href: "#" },
+      { name: t("community"), href: "#" },
+      { name: t("docs"), href: "#" },
+      { name: t("blog"), href: "#" },
     ],
   };
 
@@ -157,14 +153,7 @@ const Footer = () => {
         <div className="py-7 border-t border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-center flex-col lg:justify-between lg:flex-row">
             <span className="text-sm text-gray-500 dark:text-gray-400">
-              ©{" "}
-              <a
-                href="#"
-                className="hover:text-indigo-600 dark:hover:text-indigo-400"
-              >
-                pagedone
-              </a>{" "}
-              2024, All rights reserved.
+              {t("copyright")}
             </span>
             <div className="flex mt-4 space-x-4 sm:justify-center lg:mt-0">
               {socialLinks.map((link) => (
