@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User, { allowedRoles } from "../models/User";
+import OtpCode from "../models/OtpCode";
 import { verifyFirebaseToken } from "../config/firebase";
 
 const createToken = (user: any) => {
@@ -250,6 +251,27 @@ export const getMe = async (req: Request & any, res: Response) => {
     return res.json({ user: req.user });
   } catch (error) {
     return res.status(500).json({ message: "Failed to fetch user" });
+  }
+};
+
+// CHECK IF PHONE EXISTS
+export const checkPhoneExists = async (req: Request, res: Response) => {
+  try {
+    const { phone } = req.body || {};
+    
+    if (!phone) {
+      return res.status(400).json({ message: "Phone number is required" });
+    }
+
+    const user = await User.findOne({ phone });
+    
+    return res.json({ 
+      exists: !!user,
+      message: user ? "Phone number already registered. Please login with password." : "Phone number available"
+    });
+  } catch (error) {
+    console.error("Check phone exists error:", error);
+    return res.status(500).json({ message: "Failed to check phone number" });
   }
 };
 

@@ -8,9 +8,13 @@ import {
   addRole,
   switchRole,
   getMe,
+  checkPhoneExists,
 } from "../controllers/userController";
 
 const router = express.Router();
+
+// CHECK IF PHONE EXISTS (before sending OTP)
+router.post("/check-phone", checkPhoneExists);
 
 // FIRST TIME: Firebase Phone Authentication + Set password
 // Firebase handles SMS sending, client sends verified Firebase token

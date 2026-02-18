@@ -34,72 +34,19 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
   const [step, setStep] = useState<"phone" | "otp" | "details">("phone");
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
 
-  // Initialize Firebase RecaptchaVerifier ONCE on mount
+  // Cleanup RecaptchaVerifier on unmount
   useEffect(() => {
-    console.log("useEffect: Setting up RecaptchaVerifier");
-    
-    // RecaptchaVerifier automatically loads the reCAPTCHA script
-    const initializeRecaptcha = async () => {
-      try {
-        if (!window.recaptchaVerifier) {
-          console.log("useEffect: Creating new RecaptchaVerifier (Firebase will load reCAPTCHA automatically)");
-          
-          const verifier = new RecaptchaVerifier(
-            auth,
-            "recaptcha-container",
-            { 
-              size: "invisible",
-              callback: (response: string) => {
-                console.log("RecaptchaVerifier: Success - reCAPTCHA verified");
-              },
-              "expired-callback": () => {
-                console.log("RecaptchaVerifier: Token expired, clearing...");
-                if (window.recaptchaVerifier) {
-                  try {
-                    window.recaptchaVerifier.clear();
-                    delete window.recaptchaVerifier;
-                  } catch (e) {
-                    console.error("Error clearing expired verifier:", e);
-                  }
-                }
-              },
-              "error-callback": (error: any) => {
-                console.error("RecaptchaVerifier: Error -", error);
-              }
-            }
-          );
-          
-          // CRITICAL: Render the reCAPTCHA widget before use
-          await verifier.render();
-          console.log("useEffect: RecaptchaVerifier rendered successfully");
-          
-          window.recaptchaVerifier = verifier;
-        } else {
-          console.log("useEffect: RecaptchaVerifier already exists");
-        }
-      } catch (error) {
-        console.error("useEffect: Failed to create/render RecaptchaVerifier:", error);
-      }
-    };
-
-    // Initialize on mount
-    if (typeof window !== 'undefined') {
-      initializeRecaptcha();
-    }
-
-    // Cleanup on unmount
     return () => {
-      console.log("useEffect cleanup: Clearing RecaptchaVerifier");
       if (window.recaptchaVerifier) {
         try {
           window.recaptchaVerifier.clear();
           delete window.recaptchaVerifier;
         } catch (error) {
-          console.error("useEffect cleanup: Error clearing verifier:", error);
+          // Silently ignore cleanup errors
         }
       }
     };
-  }, [auth]);
+  }, []);
 
   const sendOTP = async () => {
     console.log("sendOTP: Starting Firebase phone sign in");
@@ -127,9 +74,31 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
       const formattedPhone = phoneNumber.startsWith("+") ? phoneNumber : `+91${phoneNumber}`;
       console.log("sendOTP: Formatted phone:", formattedPhone);
 
-      // Check if RecaptchaVerifier is initialized, if not create and render it
+      // Check if phone number already exists BEFORE sending OTP
+      console.log("sendOTP: Checking if phone number is already registered");
+      const checkResponse = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/users/check-phone`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: formattedPhone }),
+        }
+      );
+
+      const checkData = await checkResponse.json();
+
+      if (checkData.exists) {
+        console.log("sendOTP: Phone number already registered");
+        setError("Phone number already registered. Please login with password.");
+        setLoading(false);
+        return;
+      }
+
+      console.log("sendOTP: Phone number available, proceeding with OTP");
+
+      // Check if RecaptchaVerifier is initialized, if not create it
       if (!window.recaptchaVerifier) {
-        console.log("sendOTP: RecaptchaVerifier not initialized, creating and rendering now");
+        console.log("sendOTP: RecaptchaVerifier not initialized, creating now");
         try {
           const verifier = new RecaptchaVerifier(
             auth,
@@ -142,13 +111,13 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
             }
           );
           
-          // Render before using
-          await verifier.render();
-          console.log("sendOTP: RecaptchaVerifier rendered successfully");
+          // For invisible reCAPTCHA, Firebase handles rendering automatically
+          // No need to call render() explicitly
+          console.log("sendOTP: RecaptchaVerifier created successfully");
           
           window.recaptchaVerifier = verifier;
         } catch (e) {
-          console.error("sendOTP: Failed to create/render RecaptchaVerifier:", e);
+          console.error("sendOTP: Failed to create RecaptchaVerifier:", e);
           setError("reCAPTCHA initialization failed. Please reload the page.");
           setLoading(false);
           return;
