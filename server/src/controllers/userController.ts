@@ -2,7 +2,6 @@ import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User, { allowedRoles } from "../models/User";
-import OtpCode from "../models/OtpCode";
 import { verifyFirebaseToken } from "../config/firebase";
 
 const createToken = (user: any) => {
@@ -253,4 +252,8 @@ export const getMe = async (req: Request & any, res: Response) => {
     return res.status(500).json({ message: "Failed to fetch user" });
   }
 };
+
+// VERIFY RECAPTCHA TOKEN
+// Firebase Phone Authentication is handled client-side
+// Client receives SMS via Firebase, verifies code, then sends token to /register endpoint
 

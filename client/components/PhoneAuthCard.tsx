@@ -1,18 +1,27 @@
 "use client";
 
-import { useState } from "react";
-import { signInWithPhoneNumber, ConfirmationResult, RecaptchaVerifier } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Phone, Lock, Mail, User, Shield } from "lucide-react";
+import { Phone, Lock, Mail, User, Shield, AlertCircle, CheckCircle } from "lucide-react";
+import { getAuth, signInWithPhoneNumber, RecaptchaVerifier, ConfirmationResult } from "firebase/auth";
+import { app } from "@/lib/firebase";
+
+// Extend Window interface for RecaptchaVerifier
+declare global {
+  interface Window {
+    recaptchaVerifier?: RecaptchaVerifier;
+    grecaptcha?: any;
+  }
+}
 
 interface PhoneAuthCardProps {
   onStepChange?: (step: "phone" | "otp" | "details") => void;
 }
 
 export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
+  const auth = getAuth(app);
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otp, setOtp] = useState("");
   const [name, setName] = useState("");
@@ -21,43 +30,196 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [step, setStep] = useState<"phone" | "otp" | "details">("phone");
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
 
-  const setupRecaptcha = () => {
-    if (!(window as any).recaptchaVerifier) {
-      (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha-container", {
-        size: "invisible",
-        callback: () => {},
-      });
+  // Initialize Firebase RecaptchaVerifier ONCE on mount
+  useEffect(() => {
+    console.log("useEffect: Setting up RecaptchaVerifier");
+    
+    // RecaptchaVerifier automatically loads the reCAPTCHA script
+    const initializeRecaptcha = async () => {
+      try {
+        if (!window.recaptchaVerifier) {
+          console.log("useEffect: Creating new RecaptchaVerifier (Firebase will load reCAPTCHA automatically)");
+          
+          const verifier = new RecaptchaVerifier(
+            auth,
+            "recaptcha-container",
+            { 
+              size: "invisible",
+              callback: (response: string) => {
+                console.log("RecaptchaVerifier: Success - reCAPTCHA verified");
+              },
+              "expired-callback": () => {
+                console.log("RecaptchaVerifier: Token expired, clearing...");
+                if (window.recaptchaVerifier) {
+                  try {
+                    window.recaptchaVerifier.clear();
+                    delete window.recaptchaVerifier;
+                  } catch (e) {
+                    console.error("Error clearing expired verifier:", e);
+                  }
+                }
+              },
+              "error-callback": (error: any) => {
+                console.error("RecaptchaVerifier: Error -", error);
+              }
+            }
+          );
+          
+          // CRITICAL: Render the reCAPTCHA widget before use
+          await verifier.render();
+          console.log("useEffect: RecaptchaVerifier rendered successfully");
+          
+          window.recaptchaVerifier = verifier;
+        } else {
+          console.log("useEffect: RecaptchaVerifier already exists");
+        }
+      } catch (error) {
+        console.error("useEffect: Failed to create/render RecaptchaVerifier:", error);
+      }
+    };
+
+    // Initialize on mount
+    if (typeof window !== 'undefined') {
+      initializeRecaptcha();
     }
-    return (window as any).recaptchaVerifier;
-  };
+
+    // Cleanup on unmount
+    return () => {
+      console.log("useEffect cleanup: Clearing RecaptchaVerifier");
+      if (window.recaptchaVerifier) {
+        try {
+          window.recaptchaVerifier.clear();
+          delete window.recaptchaVerifier;
+        } catch (error) {
+          console.error("useEffect cleanup: Error clearing verifier:", error);
+        }
+      }
+    };
+  }, [auth]);
 
   const sendOTP = async () => {
+    console.log("sendOTP: Starting Firebase phone sign in");
+    console.log("sendOTP: Phone number:", phoneNumber);
+
+    // Prevent double submission
+    if (loading) {
+      console.warn("sendOTP: Already in progress");
+      return;
+    }
+
     setLoading(true);
     setError(null);
+    setSuccess(null);
 
     try {
+      if (!phoneNumber) {
+        console.warn("sendOTP: No phone number");
+        setError("Please enter a valid phone number");
+        setLoading(false);
+        return;
+      }
+
+      // Format phone number with +91 prefix for India
       const formattedPhone = phoneNumber.startsWith("+") ? phoneNumber : `+91${phoneNumber}`;
-      const recaptchaVerifier = setupRecaptcha();
-      const confirmation = await signInWithPhoneNumber(auth, formattedPhone, recaptchaVerifier);
-      
-      setConfirmationResult(confirmation);
+      console.log("sendOTP: Formatted phone:", formattedPhone);
+
+      // Check if RecaptchaVerifier is initialized, if not create and render it
+      if (!window.recaptchaVerifier) {
+        console.log("sendOTP: RecaptchaVerifier not initialized, creating and rendering now");
+        try {
+          const verifier = new RecaptchaVerifier(
+            auth,
+            "recaptcha-container",
+            { 
+              size: "invisible",
+              callback: (response: string) => {
+                console.log("RecaptchaVerifier: Success");
+              }
+            }
+          );
+          
+          // Render before using
+          await verifier.render();
+          console.log("sendOTP: RecaptchaVerifier rendered successfully");
+          
+          window.recaptchaVerifier = verifier;
+        } catch (e) {
+          console.error("sendOTP: Failed to create/render RecaptchaVerifier:", e);
+          setError("reCAPTCHA initialization failed. Please reload the page.");
+          setLoading(false);
+          return;
+        }
+      }
+
+      console.log("sendOTP: Using RecaptchaVerifier for Firebase authentication");
+
+      // Sign in with phone number - Firebase will send SMS automatically with reCAPTCHA verification
+      console.log("sendOTP: Calling Firebase signInWithPhoneNumber");
+      const result = await signInWithPhoneNumber(
+        auth,
+        formattedPhone,
+        window.recaptchaVerifier
+      );
+
+      console.log("sendOTP: Firebase sent SMS successfully");
+      setConfirmationResult(result);
+      setSuccess("SMS sent! Enter the code sent to your phone.");
       setStep("otp");
       onStepChange?.("otp");
-      setError(null);
+
+      // Clear the verifier after successful use so a new one is created on retry
+      // This prevents reuse issues and expired token problems
+      try {
+        window.recaptchaVerifier?.clear();
+        delete window.recaptchaVerifier;
+        console.log("sendOTP: Cleared verifier after successful send");
+      } catch (e) {
+        console.log("sendOTP: Couldn't clear verifier (already cleared)");
+      }
     } catch (err: any) {
-      console.error("Send OTP error:", err);
-      
-      if (err.code === "auth/billing-not-enabled") {
-        setError("Firebase Phone Auth requires Blaze plan. Please upgrade or use test numbers.");
-      } else if (err.code === "auth/invalid-phone-number") {
-        setError("Invalid phone number format. Use +91 XXXXXXXXXX");
+      console.error("sendOTP: Firebase error:", err);
+      console.error("sendOTP: Error code:", err.code);
+      console.error("sendOTP: Error message:", err.message);
+
+      // Handle specific Firebase errors
+      if (err.code === "auth/invalid-phone-number") {
+        setError("Invalid phone number. Please check the number and try again.");
       } else if (err.code === "auth/too-many-requests") {
-        setError("Too many requests. Please try again later.");
+        setError("Too many requests. You've exceeded the SMS limit (10 per day). Please try again tomorrow or use test numbers for development.");
+      } else if (err.code === "auth/invalid-app-credential") {
+        setError("reCAPTCHA verification failed. This might be a domain authorization issue. Please check: 1) Firebase Console > Authentication > Sign-in method > Phone is enabled, 2) Your domain is authorized in Firebase Console.");
+        // Clear invalid verifier so it can be recreated
+        try {
+          window.recaptchaVerifier?.clear();
+          delete window.recaptchaVerifier;
+        } catch (e) {
+          console.log("Could not clear verifier");
+        }
+      } else if (err.code === "auth/missing-app-credential") {
+        setError("Missing reCAPTCHA credential. Ensure reCAPTCHA script is loaded.");
+        try {
+          window.recaptchaVerifier?.clear();
+          delete window.recaptchaVerifier;
+        } catch (e) {
+          console.log("Could not clear verifier");
+        }
+      } else if (err.code === "auth/quota-exceeded") {
+        setError("Daily quota exceeded. Please try again tomorrow or contact support.");
       } else {
-        setError(err.message || "Failed to send OTP");
+        setError(err.message || "Failed to send SMS. Please try again.");
+      }
+
+      // Clear the verifier on error too, so next attempt uses a fresh one
+      try {
+        window.recaptchaVerifier?.clear();
+        delete window.recaptchaVerifier;
+        console.log("sendOTP: Cleared verifier after error");
+      } catch (e) {
+        console.log("sendOTP: Couldn't clear verifier on error");
       }
     } finally {
       setLoading(false);
@@ -65,30 +227,45 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
   };
 
   const verifyOTP = async () => {
-    if (!confirmationResult) {
-      setError("Please request OTP first");
-      return;
-    }
-
     setLoading(true);
     setError(null);
+    setSuccess(null);
 
     try {
-      const result = await confirmationResult.confirm(otp);
-      const idToken = await result.user.getIdToken();
-      
+      if (!otp || otp.length !== 6) {
+        setError("Please enter a valid 6-digit code");
+        setLoading(false);
+        return;
+      }
+
+      if (!confirmationResult) {
+        setError("Please request a new SMS code");
+        setLoading(false);
+        return;
+      }
+
+      console.log("verifyOTP: Verifying code with Firebase");
+
+      // Confirm the code with Firebase
+      const userCredential = await confirmationResult.confirm(otp);
+      const idToken = await userCredential.user.getIdToken();
+
+      console.log("verifyOTP: Firebase verification successful");
+      setSuccess("Code verified! Please enter your details.");
       setStep("details");
       onStepChange?.("details");
-      setError(null);
+
+      // Store Firebase token for later use
+      localStorage.setItem("firebaseToken", idToken);
     } catch (err: any) {
-      console.error("Verify OTP error:", err);
+      console.error("verifyOTP: Firebase error:", err);
 
       if (err.code === "auth/invalid-verification-code") {
-        setError("Invalid OTP. Please try again.");
+        setError("Invalid code. Please check and try again.");
       } else if (err.code === "auth/code-expired") {
-        setError("OTP expired. Please request a new one.");
+        setError("Code expired. Please request a new SMS.");
       } else {
-        setError(err.message || "Failed to verify OTP");
+        setError(err.message || "Failed to verify code");
       }
     } finally {
       setLoading(false);
@@ -96,61 +273,87 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
   };
 
   const completeRegistration = async () => {
-    if (password !== confirmPassword) {
-      setError("Passwords do not match");
-      return;
-    }
-
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters");
-      return;
-    }
-
     setLoading(true);
     setError(null);
+    setSuccess(null);
 
     try {
-      const user = auth.currentUser;
-      if (!user) {
-        setError("Authentication failed");
+      if (!name || !password) {
+        setError("Please fill in all required fields");
+        setLoading(false);
         return;
       }
 
-      const firebaseToken = await user.getIdToken();
+      if (password !== confirmPassword) {
+        setError("Passwords do not match");
+        setLoading(false);
+        return;
+      }
 
-      const response = await fetch("http://localhost:5000/api/users/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          firebaseToken,
-          name,
-          email,
-          password
-        }),
-      });
+      if (password.length < 6) {
+        setError("Password must be at least 6 characters");
+        setLoading(false);
+        return;
+      }
+
+      const firebaseToken = localStorage.getItem("firebaseToken");
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/users/register`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            phoneNumber: phoneNumber.startsWith("+") ? phoneNumber : `+91${phoneNumber}`,
+            firebaseToken, // Firebase verification token
+            name,
+            email,
+            password,
+          }),
+        }
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
-        if (data.shouldUsePasswordLogin) {
-          // Phone already registered, redirect to login
-          window.location.href = "/login";
-          return;
+        if (data.shouldLogin) {
+          throw new Error("Phone already registered. Please login instead.");
         }
-        setError(data.message || "Registration failed");
-        return;
+        throw new Error(data.message || "Registration failed");
       }
 
-      // Store token
+      // Store token and user info
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
-      
-      // Redirect to home
-      window.location.href = "/";
+      localStorage.removeItem("firebaseToken"); // Clean up
+
+      setSuccess("Registration successful! Redirecting...");
+      setTimeout(() => {
+        window.location.href = "/";
+      }, 2000);
     } catch (err: any) {
-      setError(err.message || "Network error");
+      console.error("Registration error:", err);
+      setError(err.message || "Registration failed");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const resetVerification = () => {
+    console.log("resetVerification: Resetting to phone step");
+    setConfirmationResult(null);
+    setOtp("");
+    setError(null);
+    
+    // Clear verifier so a fresh one is created on next send attempt
+    if (window.recaptchaVerifier) {
+      try {
+        window.recaptchaVerifier.clear();
+        delete window.recaptchaVerifier;
+        console.log("resetVerification: Cleared verifier for next attempt");
+      } catch (e) {
+        console.log("resetVerification: Could not clear verifier");
+      }
     }
   };
 
@@ -166,7 +369,21 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
           </p>
         </div>
 
-        <div id="recaptcha-container"></div>
+        {/* Error Alert */}
+        {error && (
+          <div className="rounded-lg bg-red-50 border border-red-200 p-4 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <p className="text-red-800 text-sm">{error}</p>
+          </div>
+        )}
+
+        {/* Success Alert */}
+        {success && (
+          <div className="rounded-lg bg-green-50 border border-green-200 p-4 flex items-start gap-3">
+            <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+            <p className="text-green-800 text-sm">{success}</p>
+          </div>
+        )}
 
         {step === "phone" && (
           <div className="space-y-5">
@@ -186,19 +403,16 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
               maxLength={10}
               className="rounded-2xl border border-input bg-background/40 px-4 py-6 text-base font-semibold shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
             />
-            
-            {error && (
-              <div className="rounded-lg bg-red-50 border border-red-200 p-3">
-                <p className="text-sm text-red-700">{error}</p>
-              </div>
-            )}
 
-            <Button 
-              onClick={sendOTP} 
+            {/* Firebase RecaptchaVerifier Container - Empty for invisible mode */}
+            <div id="recaptcha-container"></div>
+
+            <Button
+              onClick={sendOTP}
               disabled={loading || phoneNumber.length !== 10}
               className="w-full rounded-2xl bg-linear-to-r from-primary via-secondary to-accent py-3 text-base font-semibold text-white shadow-lg transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? "Sending..." : "Send OTP"}
+              {loading ? "Sending SMS..." : "Send SMS"}
             </Button>
           </div>
         )}
@@ -206,16 +420,16 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
         {step === "otp" && (
           <div className="space-y-5">
             <div className="rounded-lg bg-green-50 border border-green-200 p-3">
-              <p className="text-sm text-green-700">OTP sent to +91 {phoneNumber}</p>
+              <p className="text-sm text-green-700">SMS code sent to +91 {phoneNumber}</p>
             </div>
 
             <div className="flex items-center gap-2">
               <Shield className="w-4 h-4 text-primary" />
-              <Label className="text-sm font-medium">Enter OTP</Label>
+              <Label className="text-sm font-medium">Enter verification code</Label>
             </div>
             <Input
               type="text"
-              placeholder="Enter 6-digit OTP"
+              placeholder="Enter 6-digit code from SMS"
               value={otp}
               onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
               maxLength={6}
@@ -223,19 +437,24 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
               className="rounded-2xl border border-input bg-background/40 px-4 py-6 text-base font-semibold shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
             />
 
-            {error && (
-              <div className="rounded-lg bg-red-50 border border-red-200 p-3">
-                <p className="text-sm text-red-700">{error}</p>
-              </div>
-            )}
-
-            <Button 
-              onClick={verifyOTP} 
+            <Button
+              onClick={verifyOTP}
               disabled={loading || otp.length !== 6}
               className="w-full rounded-2xl bg-linear-to-r from-primary via-secondary to-accent py-3 text-base font-semibold text-white shadow-lg transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? "Verifying..." : "Verify OTP"}
+              {loading ? "Verifying..." : "Verify Code"}
             </Button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setStep("phone");
+                resetVerification();
+              }}
+              className="w-full text-primary hover:underline text-sm font-medium"
+            >
+              Back to phone number
+            </button>
           </div>
         )}
 
@@ -297,14 +516,8 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
               className="rounded-2xl border border-input bg-background/40 px-4 py-3 text-base font-semibold shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
             />
 
-            {error && (
-              <div className="rounded-lg bg-red-50 border border-red-200 p-3">
-                <p className="text-sm text-red-700">{error}</p>
-              </div>
-            )}
-
-            <Button 
-              onClick={completeRegistration} 
+            <Button
+              onClick={completeRegistration}
               disabled={loading || !password || !name}
               className="w-full rounded-2xl bg-linear-to-r from-primary via-secondary to-accent py-3 text-base font-semibold text-white shadow-lg transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
             >

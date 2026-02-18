@@ -1,18 +1,19 @@
 import express from "express";
 import verifyAuthToken from "../middleware/verifyAuthToken";
-import { 
-  firebaseAuth, 
-  loginWithPassword, 
-  requestPasswordResetOtp, 
+import {
+  firebaseAuth,
+  loginWithPassword,
+  requestPasswordResetOtp,
   resetPasswordWithOtp,
-  addRole, 
-  switchRole, 
-  getMe 
+  addRole,
+  switchRole,
+  getMe,
 } from "../controllers/userController";
 
 const router = express.Router();
 
-// FIRST TIME: Phone verification + Set password
+// FIRST TIME: Firebase Phone Authentication + Set password
+// Firebase handles SMS sending, client sends verified Firebase token
 router.post("/register", firebaseAuth);
 
 // RETURNING USERS: Password login
