@@ -2,8 +2,13 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { getCurrentLocale, resolveAccountType } from "@/lib/authClient";
 
 export default function LoginCard() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const locale = getCurrentLocale(pathname);
   const [showPassword, setShowPassword] = useState(false);
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
@@ -11,7 +16,7 @@ export default function LoginCard() {
   const [error, setError] = useState("");
 
   const handlePhoneChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const digitsOnly = event.target.value.replace(/\D/g, "").slice(0, 10);
+    const digitsOnly = event.target.value.replaceAll(/\D/g, "").slice(0, 10);
     setPhone(digitsOnly);
   };
 
@@ -21,9 +26,10 @@ export default function LoginCard() {
     setLoading(true);
 
     try {
-      const response = await fetch("http://localhost:5000/api/users/login", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ 
           phone: `+91${phone}`, 
           password 
@@ -37,13 +43,14 @@ export default function LoginCard() {
         return;
       }
 
-      // Store token
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
-      
-      // Redirect to home or dashboard
-      window.location.href = "/";
-    } catch (err) {
+      const accountType = resolveAccountType(data.user);
+      const homePath = `/${locale}`;
+
+      // Keep account type normalization in local storage for home role sections.
+      localStorage.setItem("user", JSON.stringify({ ...data.user, accountType }));
+      globalThis.window.dispatchEvent(new Event("auth-changed"));
+      router.replace(homePath);
+    } catch {
       setError("Network error. Please try again.");
     } finally {
       setLoading(false);
@@ -62,15 +69,13 @@ export default function LoginCard() {
           </p>
         </div>
 
-        <form className="space-y-5" onSubmit={handleSubmit}>
+        <form className="space-y-5" onSubmit={handleSubmit} noValidate>
           <label className="space-y-2 text-sm font-medium">
             <span>Mobile number</span>
             <input
               type="tel"
               inputMode="numeric"
-              pattern="^\\d{10}$"
               maxLength={10}
-              title="Enter exactly 10 digits"
               placeholder="Enter 10 digit number"
               value={phone}
               onChange={handlePhoneChange}
@@ -107,11 +112,8 @@ export default function LoginCard() {
           )}
 
           <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <label className="flex items-center gap-2">
-              <input type="checkbox" className="h-4 w-4 rounded border-border text-primary focus:ring-primary" />
-              Remember device
-            </label>
-            <Link href="/forgot-password" className="font-medium text-primary hover:text-primary/80">
+            <p className="font-medium text-muted-foreground">Remember this device</p>
+            <Link href={`/${locale}/forgot-password`} className="font-medium text-primary hover:text-primary/80">
               Forgot password?
             </Link>
           </div>
@@ -127,7 +129,7 @@ export default function LoginCard() {
 
         <p className="text-center text-sm text-muted-foreground">
           New user?{" "}
-          <Link href="/create-account" className="text-primary underline-offset-4 hover:underline">
+          <Link href={`/${locale}/create-account`} className="text-primary underline-offset-4 hover:underline">
             Create account
           </Link>
         </p>

@@ -6,6 +6,8 @@ export interface IUser extends Document {
   name?: string;
   email?: string;
   phone: string;
+  location?: string;
+  accountType?: "worker" | "contractor";
   passwordHash?: string;
   roles: string[];
   activeRole?: string;
@@ -18,6 +20,8 @@ const userSchema: Schema = new Schema(
     name: { type: String, trim: true },
     email: { type: String, lowercase: true, trim: true },
     phone: { type: String, trim: true, required: true, unique: true },
+    location: { type: String, trim: true },
+    accountType: { type: String, enum: ["worker", "contractor"] },
     passwordHash: { type: String },
     roles: { type: [String], enum: allowedRoles as any, default: [] },
     activeRole: { type: String, enum: allowedRoles as any },

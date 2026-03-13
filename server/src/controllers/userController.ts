@@ -5,16 +5,37 @@ import User, { allowedRoles } from "../models/User";
 import OtpCode from "../models/OtpCode";
 import { verifyFirebaseToken } from "../config/firebase";
 
+const AUTH_COOKIE_NAME = "authToken";
+const AUTH_COOKIE_MAX_AGE_MS = 15 * 24 * 60 * 60 * 1000;
+
 const createToken = (user: any) => {
   const secret = process.env.JWT_SECRET;
   if (!secret) throw new Error("JWT_SECRET is not set");
-  return jwt.sign({ userId: user._id.toString(), activeRole: user.activeRole }, secret, { expiresIn: "7d" });
+  return jwt.sign({ userId: user._id.toString(), activeRole: user.activeRole }, secret, { expiresIn: "15d" });
+};
+
+const setAuthCookie = (res: Response, token: string) => {
+  res.cookie(AUTH_COOKIE_NAME, token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: AUTH_COOKIE_MAX_AGE_MS,
+    path: "/",
+  });
+};
+
+const clearAuthCookie = (res: Response) => {
+  res.clearCookie(AUTH_COOKIE_NAME, {
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+  });
 };
 
 // FIRST TIME: Firebase Phone Verification + Set Password
 export const firebaseAuth = async (req: Request, res: Response) => {
   try {
-    const { firebaseToken, name, email, password } = req.body || {};
+    const { firebaseToken, name, email, password, location, accountType } = req.body || {};
     
     if (!firebaseToken) {
       return res.status(400).json({ message: "Firebase token is required" });
@@ -22,6 +43,14 @@ export const firebaseAuth = async (req: Request, res: Response) => {
 
     if (!password || password.length < 6) {
       return res.status(400).json({ message: "Password is required and must be at least 6 characters" });
+    }
+
+    if (!location || typeof location !== "string" || !location.trim()) {
+      return res.status(400).json({ message: "Location is required" });
+    }
+
+    if (accountType !== "worker" && accountType !== "contractor") {
+      return res.status(400).json({ message: "Valid account type is required" });
     }
 
     const decodedToken = await verifyFirebaseToken(firebaseToken);
@@ -48,18 +77,22 @@ export const firebaseAuth = async (req: Request, res: Response) => {
 
     // Create new user with password
     const passwordHash = await bcrypt.hash(password, 10);
+    const initialRole = accountType === "contractor" ? "individual" : "worker";
     
     user = await User.create({
       name: name || decodedToken.name,
       email: email || decodedToken.email,
       phone,
+      location: location.trim(),
+      accountType,
       passwordHash,
-      roles: ["worker"],
-      activeRole: "worker",
+      roles: [initialRole],
+      activeRole: initialRole,
       isPhoneVerified: true,
     });
 
     const token = createToken(user);
+    setAuthCookie(res, token);
 
     return res.json({
       message: "Registration successful",
@@ -115,6 +148,7 @@ export const loginWithPassword = async (req: Request, res: Response) => {
     }
 
     const token = createToken(user);
+    setAuthCookie(res, token);
     return res.json({ user, token });
   } catch (error) {
     console.error("Login error:", error);
@@ -203,6 +237,7 @@ export const resetPasswordWithOtp = async (req: Request, res: Response) => {
     await OtpCode.deleteMany({ phone, purpose: "password-reset" });
 
     const token = createToken(user);
+    setAuthCookie(res, token);
     
     return res.json({ 
       message: "Password reset successful",
@@ -252,6 +287,11 @@ export const getMe = async (req: Request & any, res: Response) => {
   } catch (error) {
     return res.status(500).json({ message: "Failed to fetch user" });
   }
+};
+
+export const logout = async (_req: Request, res: Response) => {
+  clearAuthCookie(res);
+  return res.json({ message: "Logged out" });
 };
 
 // CHECK IF PHONE EXISTS

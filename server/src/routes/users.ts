@@ -8,6 +8,7 @@ import {
   addRole,
   switchRole,
   getMe,
+  logout,
   checkPhoneExists,
 } from "../controllers/userController";
 
@@ -28,6 +29,7 @@ router.post("/forgot-password", requestPasswordResetOtp);
 
 // FORGOT PASSWORD: Verify OTP and reset
 router.post("/reset-password", resetPasswordWithOtp);
+router.post("/logout", logout);
 
 router.post("/add-role", verifyAuthToken, addRole as any);
 router.post("/switch-role", verifyAuthToken, switchRole as any);

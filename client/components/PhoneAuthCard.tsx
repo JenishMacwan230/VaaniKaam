@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Phone, Lock, Mail, User, Shield, AlertCircle, CheckCircle } from "lucide-react";
+import { Phone, Lock, Mail, User, Shield, AlertCircle, CheckCircle, Building2, Hammer, MapPin } from "lucide-react";
 import { getAuth, signInWithPhoneNumber, RecaptchaVerifier, ConfirmationResult } from "firebase/auth";
 import { app } from "@/lib/firebase";
 
@@ -20,14 +21,44 @@ interface PhoneAuthCardProps {
   onStepChange?: (step: "phone" | "otp" | "details") => void;
 }
 
+type AccountType = "worker" | "contractor";
+
+const accountTypeOptions: Array<{
+  value: AccountType;
+  title: string;
+  description: string;
+  badge: string;
+  Icon: typeof Hammer;
+  accentClassName: string;
+}> = [
+  {
+    value: "worker",
+    title: "Worker",
+    description: "I want to find jobs and offer my skills.",
+    badge: "Find work",
+    Icon: Hammer,
+    accentClassName: "from-sky-500/20 via-sky-500/10 to-transparent text-sky-700",
+  },
+  {
+    value: "contractor",
+    title: "Contractor",
+    description: "I want to hire workers and manage projects.",
+    badge: "Hire talent",
+    Icon: Building2,
+    accentClassName: "from-emerald-500/20 via-emerald-500/10 to-transparent text-emerald-700",
+  },
+];
+
 export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
   const auth = getAuth(app);
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otp, setOtp] = useState("");
   const [name, setName] = useState("");
+  const [location, setLocation] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [accountType, setAccountType] = useState<AccountType>("worker");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -247,7 +278,7 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
     setSuccess(null);
 
     try {
-      if (!name || !password) {
+      if (!name || !location || !password) {
         setError("Please fill in all required fields");
         setLoading(false);
         return;
@@ -272,10 +303,13 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({
             phoneNumber: phoneNumber.startsWith("+") ? phoneNumber : `+91${phoneNumber}`,
             firebaseToken, // Firebase verification token
             name,
+            location,
+            accountType,
             email,
             password,
           }),
@@ -291,9 +325,9 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
         throw new Error(data.message || "Registration failed");
       }
 
-      // Store token and user info
-      localStorage.setItem("token", data.token);
+      // Store user info (JWT session is in httpOnly cookie)
       localStorage.setItem("user", JSON.stringify(data.user));
+      globalThis.window.dispatchEvent(new Event("auth-changed"));
       localStorage.removeItem("firebaseToken"); // Clean up
 
       setSuccess("Registration successful! Redirecting...");
@@ -433,6 +467,52 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
               <p className="text-sm text-green-700">✓ Phone verified! Complete your profile.</p>
             </div>
 
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-primary" />
+                <Label className="text-sm font-medium">Account type</Label>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {accountTypeOptions.map(({ value, title, description, badge, Icon, accentClassName }) => {
+                  const selected = accountType === value;
+
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setAccountType(value)}
+                      disabled={loading}
+                      className={cn(
+                        "group relative overflow-hidden rounded-3xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-60",
+                        selected
+                          ? "border-primary bg-primary/5 shadow-lg shadow-primary/10"
+                          : "border-border bg-background/70 hover:border-primary/40 hover:bg-accent/20"
+                      )}
+                    >
+                      <div className={cn("absolute inset-0 bg-linear-to-br opacity-90", accentClassName)} />
+                      <div className="relative flex h-full flex-col gap-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <span className="rounded-full bg-background/85 px-3 py-1 text-xs font-semibold text-foreground shadow-sm">
+                            {badge}
+                          </span>
+                          {selected && <CheckCircle className="h-5 w-5 text-primary" />}
+                        </div>
+                        <div className="flex items-end justify-between gap-3">
+                          <div>
+                            <p className="text-lg font-semibold text-foreground">{title}</p>
+                            <p className="mt-1 text-sm leading-5 text-muted-foreground">{description}</p>
+                          </div>
+                          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-background/80 shadow-sm ring-1 ring-black/5">
+                            <Icon className="h-8 w-8 text-foreground" />
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="flex items-center gap-2">
               <User className="w-4 h-4 text-primary" />
               <Label className="text-sm font-medium">Name</Label>
@@ -442,6 +522,19 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
               placeholder="Your name"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              disabled={loading}
+              className="rounded-2xl border border-input bg-background/40 px-4 py-3 text-base font-semibold shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+            />
+
+            <div className="flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-primary" />
+              <Label className="text-sm font-medium">Location</Label>
+            </div>
+            <Input
+              type="text"
+              placeholder="City or area"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
               disabled={loading}
               className="rounded-2xl border border-input bg-background/40 px-4 py-3 text-base font-semibold shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
             />
@@ -487,7 +580,7 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
 
             <Button
               onClick={completeRegistration}
-              disabled={loading || !password || !name}
+              disabled={loading || !password || !name || !location}
               className="w-full rounded-2xl bg-linear-to-r from-primary via-secondary to-accent py-3 text-base font-semibold text-white shadow-lg transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? "Creating account..." : "Create account"}

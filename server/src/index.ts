@@ -1,7 +1,8 @@
 import express from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
-import path from "path";
+import path from "node:path";
 import connectDB from "./config/db";
 import { initializeFirebase } from "./config/firebase";
 import userRoutes from "./routes/users";
@@ -11,7 +12,10 @@ import adminRoutes from "./routes/admin";
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const app = express();
-app.use(cors());
+
+const clientOrigin = process.env.CLIENT_URL || "http://localhost:3000";
+app.use(cors({ origin: clientOrigin, credentials: true }));
+app.use(cookieParser());
 app.use(express.json());
 
 app.get("/", (req, res) => {

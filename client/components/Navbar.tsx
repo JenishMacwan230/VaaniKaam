@@ -4,18 +4,19 @@ import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import {
   Search,
   LogIn,
+  LogOut,
   Globe,
   Check,
   Home,
   Info,
   Users,
-  Briefcase,
   FolderKanban,
   Phone,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useRouter, usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { fetchSessionUser, logoutSession } from "@/lib/authClient";
 import Logo from "./ui/logo";
 import {
   Select,
@@ -27,15 +28,16 @@ import {
 
 const BlogHeader = () => {
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const t = useTranslations("nav");
   const router = useRouter();
   const pathname = usePathname();
   
-  const locales = ["en", "hi", "gu"];
+  const localeSet = new Set(["en", "hi", "gu"]);
   
   // Extract current locale from pathname
-  const pathSegments = pathname.split("/").filter(Boolean);
-  const currentLocale = locales.includes(pathSegments[0]) ? pathSegments[0] : "en";
+  const currentLocaleSegment = pathname.split("/")[1] ?? "";
+  const currentLocale = localeSet.has(currentLocaleSegment) ? currentLocaleSegment : "en";
   
   const languages = [
     { code: "en", label: "English" },
@@ -48,7 +50,7 @@ const BlogHeader = () => {
     const segments = pathname.split("/").filter(Boolean);
     
     // Remove old locale if present
-    if (locales.includes(segments[0])) {
+    if (localeSet.has(segments[0])) {
       segments.shift();
     }
     
@@ -66,7 +68,6 @@ const BlogHeader = () => {
     { href: "/", text: t("home"), icon: Home },
     { href: "/about", text: t("about"), icon: Info },
     { href: "/workers", text: t("workers"), icon: Users },
-    { href: "/business", text: t("business"), icon: Briefcase },
     { href: "/projects", text: t("projects"), icon: FolderKanban },
     { href: "/contact", text: t("contact"), icon: Phone },
   ];
@@ -119,6 +120,41 @@ const BlogHeader = () => {
     window.addEventListener("scroll", onScroll);
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  useEffect(() => {
+    const syncAuthState = async () => {
+      const user = await fetchSessionUser();
+      setIsLoggedIn(Boolean(user));
+    };
+
+    void syncAuthState();
+    const onStorage = () => {
+      void syncAuthState();
+    };
+    const onAuthChanged = () => {
+      void syncAuthState();
+    };
+    globalThis.window.addEventListener("storage", onStorage);
+    globalThis.window.addEventListener("auth-changed", onAuthChanged);
+    return () => {
+      globalThis.window.removeEventListener("storage", onStorage);
+      globalThis.window.removeEventListener("auth-changed", onAuthChanged);
+    };
+  }, [pathname]);
+
+  const handleAuthAction = async () => {
+    if (isLoggedIn) {
+      await logoutSession();
+      localStorage.removeItem("user");
+      localStorage.removeItem("firebaseToken");
+      globalThis.window.dispatchEvent(new Event("auth-changed"));
+      setIsLoggedIn(false);
+      router.push(`/${currentLocale}`);
+      return;
+    }
+
+    router.push(`/${currentLocale}/login`);
+  };
 
   return (
     <>
@@ -191,12 +227,11 @@ const BlogHeader = () => {
                 <Search className="h-5 w-5" />
               </button>
               <button
-                onClick={() => router.push(`/${currentLocale}/login`)}
+                onClick={handleAuthAction}
                 className="px-4 py-2 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 shadow-sm flex gap-1"
               >
-                  
-                {t("login")}
-                <LogIn className="h-5 w-5" />
+                {isLoggedIn ? "Log out" : t("login")}
+                {isLoggedIn ? <LogOut className="h-5 w-5" /> : <LogIn className="h-5 w-5" />}
               </button>
 
             </div>
@@ -229,7 +264,7 @@ const BlogHeader = () => {
       {/* ================= MOBILE BOTTOM NAV ================= */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden">
         <div className="mx-auto mb-3 w-[calc(100%-1.5rem)] max-w-md rounded-2xl border border-border/60 bg-white/90 shadow-[0_14px_36px_-18px_rgba(0,0,0,0.45)] backdrop-blur-md dark:bg-gray-900/90">
-          <div className="grid grid-cols-6 items-stretch gap-1 px-1.5 py-2">
+          <div className="grid grid-cols-5 items-stretch gap-1 px-1.5 py-2">
           {navLinks.map((link) => {
             const Icon = link.icon;
             const isActive = isLinkActive(link.href);
