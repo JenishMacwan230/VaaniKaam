@@ -1,12 +1,22 @@
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 import User, { allowedRoles } from "../models/User";
 import OtpCode from "../models/OtpCode";
 import { verifyFirebaseToken } from "../config/firebase";
 
 const AUTH_COOKIE_NAME = "authToken";
 const AUTH_COOKIE_MAX_AGE_MS = 15 * 24 * 60 * 60 * 1000;
+
+// Helper function to format user response with id field
+const formatUserResponse = (user: any) => {
+  const userObj = user.toObject ? user.toObject() : { ...user };
+  if (userObj._id && !userObj.id) {
+    userObj.id = userObj._id.toString();
+  }
+  return userObj;
+};
 
 const createToken = (user: any) => {
   const secret = process.env.JWT_SECRET;
@@ -96,7 +106,7 @@ export const firebaseAuth = async (req: Request, res: Response) => {
 
     return res.json({
       message: "Registration successful",
-      user,
+      user: formatUserResponse(user),
       token,
     });
   } catch (error) {
@@ -149,7 +159,7 @@ export const loginWithPassword = async (req: Request, res: Response) => {
 
     const token = createToken(user);
     setAuthCookie(res, token);
-    return res.json({ user, token });
+    return res.json({ user: formatUserResponse(user), token });
   } catch (error) {
     console.error("Login error:", error);
     return res.status(500).json({ message: "Failed to login" });
@@ -241,7 +251,7 @@ export const resetPasswordWithOtp = async (req: Request, res: Response) => {
     
     return res.json({ 
       message: "Password reset successful",
-      user,
+      user: formatUserResponse(user),
       token 
     });
   } catch (error) {
@@ -259,7 +269,7 @@ export const addRole = async (req: Request & any, res: Response) => {
     if (!user.roles.includes(role)) user.roles.push(role);
     if (!user.activeRole) user.activeRole = role;
     await user.save();
-    return res.json({ user });
+    return res.json({ user: formatUserResponse(user) });
   } catch (error) {
     return res.status(500).json({ message: "Failed to add role" });
   }
@@ -274,7 +284,7 @@ export const switchRole = async (req: Request & any, res: Response) => {
     if (!user.roles.includes(role)) return res.status(403).json({ message: "Role not assigned" });
     user.activeRole = role;
     await user.save();
-    return res.json({ user });
+    return res.json({ user: formatUserResponse(user) });
   } catch (error) {
     return res.status(500).json({ message: "Failed to switch role" });
   }
@@ -283,7 +293,7 @@ export const switchRole = async (req: Request & any, res: Response) => {
 export const getMe = async (req: Request & any, res: Response) => {
   try {
     if (!req.user) return res.status(401).json({ message: "Unauthorized" });
-    return res.json({ user: req.user });
+    return res.json({ user: formatUserResponse(req.user) });
   } catch (error) {
     return res.status(500).json({ message: "Failed to fetch user" });
   }
@@ -318,4 +328,91 @@ export const checkPhoneExists = async (req: Request, res: Response) => {
 // VERIFY RECAPTCHA TOKEN
 // Firebase Phone Authentication is handled client-side
 // Client receives SMS via Firebase, verifies code, then sends token to /register endpoint
+
+// SAVE PROFILE PICTURE URL
+export const saveProfilePicture = async (req: Request & any, res: Response) => {
+  try {
+    const { profilePictureUrl, publicId } = req.body || {};
+    const user = req.user;
+
+    if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+    if (!profilePictureUrl) {
+      return res.status(400).json({ message: "Profile picture URL is required" });
+    }
+
+    // Update user with new profile picture
+    user.profilePictureUrl = profilePictureUrl;
+    user.profilePicturePublicId = publicId || null;
+    await user.save();
+
+    return res.json({ 
+      message: "Profile picture saved successfully",
+      user: formatUserResponse(user)
+    });
+  } catch (error) {
+    console.error("Save profile picture error:", error);
+    return res.status(500).json({ message: "Failed to save profile picture" });
+  }
+};
+
+// DELETE PROFILE PICTURE
+export const deleteProfilePicture = async (req: Request & any, res: Response) => {
+  try {
+    const { publicId } = req.body || {};
+    const user = req.user;
+
+    if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+    if (!publicId) {
+      return res.status(400).json({ message: "Public ID is required" });
+    }
+
+    // Delete from Cloudinary using backend API
+    try {
+      const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+      const apiKey = process.env.CLOUDINARY_API_KEY;
+      const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
+      if (!cloudName || !apiKey || !apiSecret) {
+        console.warn("Cloudinary credentials not configured for deletion");
+      } else {
+        const timestamp = Math.floor(Date.now() / 1000);
+        const signature = crypto
+          .createHash("sha1")
+          .update(`public_id=${publicId}&timestamp=${timestamp}${apiSecret}`)
+          .digest("hex");
+
+        await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/destroy`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: new URLSearchParams({
+            public_id: publicId,
+            api_key: apiKey,
+            timestamp: timestamp.toString(),
+            signature,
+          }).toString(),
+        });
+      }
+    } catch (error) {
+      console.warn("Failed to delete from Cloudinary:", error);
+      // Continue anyway - remove from database
+    }
+
+    // Remove from user profile
+    user.profilePictureUrl = undefined;
+    user.profilePicturePublicId = undefined;
+    await user.save();
+
+    return res.json({ 
+      message: "Profile picture deleted successfully",
+      user: formatUserResponse(user)
+    });
+  } catch (error) {
+    console.error("Delete profile picture error:", error);
+    return res.status(500).json({ message: "Failed to delete profile picture" });
+  }
+};
 

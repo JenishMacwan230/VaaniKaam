@@ -4,9 +4,7 @@ import { getMessages } from "next-intl/server";
 import { notFound } from "next/navigation";
 
 import "../globals.css";
-import BlogHeader from "@/components/Navbar";
-import Footer from "@/components/Footer";
-import MobilePageHeader from "@/components/MobilePageHeader";
+import LayoutWrapper from "@/components/LayoutWrapper";
 import { locales } from "@/i18n";
 
 const geistSans = Geist({
@@ -44,18 +42,9 @@ export default async function LocaleLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <NextIntlClientProvider locale={locale} messages={messages}>
-          <BlogHeader />
-
-          {/* Page Content */}
-          <main className="min-h-screen">
-            <MobilePageHeader />
+          <LayoutWrapper>
             {children}
-          </main>
-
-          {/* Footer */}
-          <footer className="border-t">
-            <Footer />
-          </footer>
+          </LayoutWrapper>
         </NextIntlClientProvider>
       </body>
     </html>

@@ -13,6 +13,8 @@ export interface IUser extends Document {
   activeRole?: string;
   isActive: boolean;
   isPhoneVerified: boolean;
+  profilePictureUrl?: string;
+  profilePicturePublicId?: string;
 }
 
 const userSchema: Schema = new Schema(
@@ -27,6 +29,8 @@ const userSchema: Schema = new Schema(
     activeRole: { type: String, enum: allowedRoles as any },
     isActive: { type: Boolean, default: true },
     isPhoneVerified: { type: Boolean, default: false },
+    profilePictureUrl: { type: String, trim: true },
+    profilePicturePublicId: { type: String, trim: true },
   },
   { timestamps: true }
 );

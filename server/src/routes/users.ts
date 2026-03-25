@@ -10,6 +10,8 @@ import {
   getMe,
   logout,
   checkPhoneExists,
+  saveProfilePicture,
+  deleteProfilePicture,
 } from "../controllers/userController";
 
 const router = express.Router();
@@ -34,5 +36,9 @@ router.post("/logout", logout);
 router.post("/add-role", verifyAuthToken, addRole as any);
 router.post("/switch-role", verifyAuthToken, switchRole as any);
 router.get("/me", verifyAuthToken, getMe as any);
+
+// PROFILE PICTURE MANAGEMENT
+router.post("/profile-picture", verifyAuthToken, saveProfilePicture as any);
+router.delete("/profile-picture", verifyAuthToken, deleteProfilePicture as any);
 
 export default router;

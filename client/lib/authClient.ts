@@ -4,12 +4,17 @@ export type AccountType = "worker" | "contractor";
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export interface AuthUser {
+  id?: string;
   name?: string;
+  email?: string;
+  phone?: string;
   location?: string;
   city?: string;
   workCategory?: string;
   accountType?: AccountType;
   activeRole?: string;
+  profilePictureUrl?: string;
+  profilePicturePublicId?: string;
 }
 
 export function resolveAccountType(user: AuthUser | null | undefined): AccountType {

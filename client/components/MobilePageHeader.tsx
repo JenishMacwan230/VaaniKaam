@@ -11,6 +11,8 @@ import {
   SelectValue,
 } from "./ui/select";
 import { locales } from "@/i18n";
+import { UserAvatar } from "./UserAvatar";
+import { AuthUser } from "@/lib/authClient";
 
 const PAGE_TITLES: Record<string, string> = {
   "": "Home",
@@ -37,7 +39,7 @@ function toTitleCase(value: string) {
 export default function MobilePageHeader() {
   const pathname = usePathname();
   const router = useRouter();
-  const [userName, setUserName] = useState("Guest");
+  const [user, setUser] = useState<AuthUser | null>(null);
   const firstPathSegment = pathname.split("/").at(1) || "";
   const currentLocale = locales.includes(firstPathSegment as (typeof locales)[number])
     ? firstPathSegment
@@ -61,23 +63,23 @@ export default function MobilePageHeader() {
   };
 
   useEffect(() => {
-    const savedUser = localStorage.getItem("user");
-    if (!savedUser) return;
+    const checkUser = () => {
+      const savedUser = localStorage.getItem("user");
+      if (savedUser) {
+        try {
+          const parsedUser = JSON.parse(savedUser);
+          setUser(parsedUser);
+        } catch {
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
+    };
 
-    try {
-      const parsedUser = JSON.parse(savedUser) as {
-        name?: string;
-        fullName?: string;
-        displayName?: string;
-      };
-
-      const resolvedName =
-        parsedUser.name || parsedUser.fullName || parsedUser.displayName || "Guest";
-
-      setUserName(resolvedName);
-    } catch {
-      setUserName("Guest");
-    }
+    checkUser();
+    window.addEventListener("auth-changed", checkUser);
+    return () => window.removeEventListener("auth-changed", checkUser);
   }, []);
 
   const pageTitle = useMemo(() => {
@@ -116,12 +118,21 @@ export default function MobilePageHeader() {
         <div className="container mx-auto px-4 py-3">
           <div className="mx-auto flex w-full max-w-sm items-center justify-between gap-3 px-4 py-1">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-secondary/20 text-secondary">
-                <User className="h-6 w-6" />
-              </span>
+              <div 
+                onClick={() => user ? router.push(`/${currentLocale}/dashboard`) : router.push(`/${currentLocale}/login`)}
+                className="cursor-pointer"
+              >
+                  {user ? (
+                    <UserAvatar user={user} className="h-11 w-11" />
+                  ) : (
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-secondary/20 text-secondary">
+                        <User className="h-6 w-6" />
+                    </span>
+                  )}
+              </div>
               <div className="min-w-0">
                 <p className="text-sm font-medium text-muted-foreground">{greetingText}</p>
-                <p className="truncate text-lg font-semibold text-foreground">{userName}</p>
+                <p className="truncate text-lg font-semibold text-foreground">{user?.name || "Guest"}</p>
               </div>
             </div>
 
@@ -152,22 +163,32 @@ export default function MobilePageHeader() {
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">VaaniKaam</p>
-          <Select value={currentLocale} onValueChange={handleLanguageChange}>
-            <SelectTrigger className="h-9 w-28 rounded-full border border-border/70 bg-background px-2 py-1.5 text-xs font-medium text-foreground shadow-sm">
-              <Globe className="mr-1 h-3.5 w-3.5" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent align="end" className="min-w-32">
-              {languages.map((lang) => (
-                <SelectItem key={lang.code} value={lang.code}>
-                  <div className="flex items-center gap-2">
-                    <span>{lang.label}</span>
-                    {currentLocale === lang.code && <Check className="h-4 w-4 text-secondary" />}
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+             {user && (
+                <div 
+                  onClick={() => router.push(`/${currentLocale}/dashboard`)}
+                  className="cursor-pointer"
+                >
+                  <UserAvatar user={user} className="h-8 w-8" />
+                </div>
+             )}
+            <Select value={currentLocale} onValueChange={handleLanguageChange}>
+              <SelectTrigger className="h-9 w-28 rounded-full border border-border/70 bg-background px-2 py-1.5 text-xs font-medium text-foreground shadow-sm">
+                <Globe className="mr-1 h-3.5 w-3.5" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent align="end" className="min-w-32">
+                {languages.map((lang) => (
+                  <SelectItem key={lang.code} value={lang.code}>
+                    <div className="flex items-center gap-2">
+                      <span>{lang.label}</span>
+                      {currentLocale === lang.code && <Check className="h-4 w-4 text-secondary" />}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <h1 className="mt-1 text-xl font-semibold leading-tight text-foreground">{pageTitle}</h1>
       </div>

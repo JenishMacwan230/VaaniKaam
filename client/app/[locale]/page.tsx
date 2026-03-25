@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
+import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useTranslations } from "next-intl";
 import { Separator } from "@/components/ui/separator";
 import { fetchSessionUser, resolveAccountType } from "@/lib/authClient";
+import Logo from "@/components/ui/logo";
 
 const ArrowRightIcon = ({ className }: { className?: string }) => (
   <svg
@@ -44,8 +46,9 @@ const CheckIcon = ({ className }: { className?: string }) => (
 
 const Hero3: React.FC = () => {
   const t = useTranslations("hero");
+  const router = useRouter();
+  const params = useParams();
   const [sessionChecked, setSessionChecked] = useState(false);
-  const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [user, setUser] = useState<{
     name?: string;
@@ -95,8 +98,9 @@ const Hero3: React.FC = () => {
         localStorage.removeItem("user");
         setUser(null);
         setIsEditing(false);
-        setIsSummaryOpen(false);
-        setSessionChecked(true);
+        // Redirect to login if not authenticated
+        const locale = params.locale as string || "en";
+        router.push(`/${locale}/login`);
         return;
       }
 
@@ -151,14 +155,9 @@ const Hero3: React.FC = () => {
 
   if (!sessionChecked) {
     return (
-      <div className="bg-white dark:bg-black w-full">
-        <Separator />
-        <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8">
-          <p className="rounded-2xl border border-border bg-card px-6 py-4 text-sm text-muted-foreground shadow-sm">
-            Checking your session...
-          </p>
-        </div>
-        <Separator />
+      <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background">
+        <Logo size={80} showText={true} />
+        <p className="mt-4 text-muted-foreground animate-pulse">Loading...</p>
       </div>
     );
   }
@@ -167,150 +166,6 @@ const Hero3: React.FC = () => {
     <div className="bg-white dark:bg-black w-full">
       <Separator />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {user && (
-          <section className="pt-10 space-y-5">
-            <Card className="rounded-3xl border-primary/20 bg-primary/5 cursor-pointer" onClick={() => setIsSummaryOpen((prev) => !prev)}>
-              <CardHeader>
-                <CardTitle>Welcome, {user.name || "User"}</CardTitle>
-                <CardDescription>
-                  {user.accountType === "contractor" ? "Contractor" : "Worker"} account in {user.location || "your city"}.
-                  Click to {isSummaryOpen ? "hide" : "open"} your summary.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button type="button" variant="outline" className="rounded-xl">
-                  {isSummaryOpen ? "Hide Summary" : "Open Summary"}
-                </Button>
-              </CardContent>
-            </Card>
-
-            {isSummaryOpen && (
-              <div className="grid gap-6 lg:grid-cols-2">
-                <Card className="rounded-3xl">
-                  <CardHeader>
-                    <CardTitle>Profile</CardTitle>
-                    <CardDescription>View and edit your details directly from Home.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label>Name</Label>
-                        <Input
-                          value={isEditing ? draft.name : user.name || ""}
-                          onChange={(e) => setDraft((prev) => ({ ...prev, name: e.target.value }))}
-                          disabled={!isEditing}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>City</Label>
-                        <Input
-                          value={isEditing ? draft.location : user.location || ""}
-                          onChange={(e) => setDraft((prev) => ({ ...prev, location: e.target.value }))}
-                          disabled={!isEditing}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label>Work category</Label>
-                        <Input
-                          value={isEditing ? draft.workCategory : user.workCategory || ""}
-                          onChange={(e) => setDraft((prev) => ({ ...prev, workCategory: e.target.value }))}
-                          disabled={!isEditing}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Email</Label>
-                        <Input
-                          value={isEditing ? draft.email : user.email || ""}
-                          onChange={(e) => setDraft((prev) => ({ ...prev, email: e.target.value }))}
-                          disabled={!isEditing}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex gap-3">
-                      {!isEditing && (
-                        <Button type="button" onClick={() => setIsEditing(true)}>
-                          Edit profile
-                        </Button>
-                      )}
-                      {isEditing && (
-                        <>
-                          <Button type="button" onClick={handleSaveProfile}>Save</Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => {
-                              setIsEditing(false);
-                              setDraft({
-                                name: user.name || "",
-                                location: user.location || "",
-                                workCategory: user.workCategory || "",
-                                email: user.email || "",
-                              });
-                            }}
-                          >
-                            Cancel
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="rounded-3xl">
-                  <CardHeader>
-                    <CardTitle>{roleTitle}</CardTitle>
-                    <CardDescription>Quick overview managed from the home page.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {user.accountType === "contractor" ? (
-                      <>
-                        <Button className="w-full">Post Job</Button>
-                        {contractorPostedJobs.map((job) => (
-                          <div key={job.id} className="rounded-xl border border-border p-3">
-                            <p className="font-semibold">{job.title}</p>
-                            <p className="text-sm text-muted-foreground">Status: {job.status}</p>
-                          </div>
-                        ))}
-                        <div className="rounded-xl border border-border p-3">
-                          <p className="mb-2 text-sm font-semibold">Applicants</p>
-                          {contractorApplicants.map((applicant) => (
-                            <p key={applicant.id} className="text-sm text-muted-foreground">
-                              {applicant.name} - {applicant.role}
-                            </p>
-                          ))}
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="rounded-xl border border-border p-3">
-                          <p className="mb-2 text-sm font-semibold">Nearby jobs</p>
-                          {workerJobs.map((job) => (
-                            <p key={job.id} className="text-sm text-muted-foreground">
-                              {job.title} • {job.city} • {job.pay}
-                            </p>
-                          ))}
-                        </div>
-                        <div className="rounded-xl border border-border p-3">
-                          <p className="mb-2 text-sm font-semibold">Applications</p>
-                          {workerApplications.map((application) => (
-                            <p key={application.id} className="text-sm text-muted-foreground">
-                              {application.title} - {application.status}
-                            </p>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-          </section>
-        )}
-
         <main className="py-20 lg:py-32">
           <div className="text-center">
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-black dark:text-white leading-tight">
