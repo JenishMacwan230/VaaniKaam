@@ -1,93 +1,52 @@
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useTranslations } from "next-intl";
-import { Separator } from "@/components/ui/separator";
-import { fetchSessionUser, resolveAccountType } from "@/lib/authClient";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { fetchSessionUser, resolveAccountType, logoutSession, updateSessionProfile } from "@/lib/authClient";
+import { UserAvatar } from "@/components/UserAvatar";
 import Logo from "@/components/ui/logo";
+import { MapPin, Bell, BriefcaseBusiness, IndianRupee, Star, LogOut, CheckCircle2 } from "lucide-react";
 
-const ArrowRightIcon = ({ className }: { className?: string }) => (
-  <svg
-    className={className}
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M17 8l4 4m0 0l-4 4m4-4H3"
-    />
-  </svg>
-);
-
-const CheckIcon = ({ className }: { className?: string }) => (
-  <svg
-    className={className}
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M5 13l4 4L19 7"
-    />
-  </svg>
-);
-
-const Hero3: React.FC = () => {
-  const t = useTranslations("hero");
+const WorkerHomePage: React.FC = () => {
   const router = useRouter();
   const params = useParams();
   const [sessionChecked, setSessionChecked] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
+  const [isAvailable, setIsAvailable] = useState(true);
   const [user, setUser] = useState<{
+    id?: string;
     name?: string;
     location?: string;
     accountType?: "worker" | "contractor";
+    activeRole?: string;
     workCategory?: string;
-    email?: string;
+    profession?: string;
+    skills?: string[];
+    experienceYears?: number;
+    pricingType?: "hour" | "day" | "job";
+    pricingAmount?: string | number;
+    languages?: string[] | string;
+    about?: string;
+    availability?: boolean;
+    profilePictureUrl?: string;
   } | null>(null);
-  const [draft, setDraft] = useState({
-    name: "",
-    location: "",
-    workCategory: "",
-    email: "",
-  });
-  
-  const features = [
-    t("feature1"),
-    t("feature2"),
-    t("feature3"),
+
+  const liveJobs = [
+    { id: "job-1", title: "Tile fitting helper", distance: "1.2 km", pay: "INR 1,200/day", urgency: "Urgent" },
+    { id: "job-2", title: "Painter for interior work", distance: "2.8 km", pay: "INR 950/day", urgency: "Today" },
+    { id: "job-3", title: "Plumbing assistant", distance: "3.4 km", pay: "INR 1,100/day", urgency: "High" },
   ];
 
-  const workerJobs = [
-    { id: "WJ-01", title: "Tiles helper needed", city: "Surat", pay: "INR 1000/day" },
-    { id: "WJ-02", title: "Painter for 2 days", city: "Surat", pay: "INR 900/day" },
+  const recommendedJobs = [
+    "Masonry helper - 5 day contract",
+    "Electric line support - 2 shifts",
+    "Waterproofing crew assistant",
   ];
 
-  const workerApplications = [
-    { id: "WA-11", title: "Pipe fitting helper", status: "Pending" },
-    { id: "WA-12", title: "Site cleaning", status: "Shortlisted" },
-  ];
-
-  const contractorPostedJobs = [
-    { id: "CJ-21", title: "Need 3 Mason Helpers", status: "Open" },
-    { id: "CJ-22", title: "Site Cleaning Crew", status: "Open" },
-  ];
-
-  const contractorApplicants = [
-    { id: "CA-1", name: "Ravi Kumar", role: "Electric helper" },
-    { id: "CA-2", name: "Asha Patel", role: "Painter" },
+  const alerts = [
+    "2 new urgent jobs posted in your area",
+    "One contractor viewed your profile today",
+    "Complete one more job to unlock top worker badge",
   ];
 
   useEffect(() => {
@@ -97,8 +56,6 @@ const Hero3: React.FC = () => {
       if (!sessionUser) {
         localStorage.removeItem("user");
         setUser(null);
-        setIsEditing(false);
-        // Redirect to login if not authenticated
         const locale = params.locale as string || "en";
         router.push(`/${locale}/login`);
         return;
@@ -108,12 +65,9 @@ const Hero3: React.FC = () => {
       const normalizedUser = { ...sessionUser, accountType };
       localStorage.setItem("user", JSON.stringify(normalizedUser));
       setUser(normalizedUser);
-      setDraft({
-        name: normalizedUser.name || "",
-        location: normalizedUser.location || "",
-        workCategory: normalizedUser.workCategory || "",
-        email: normalizedUser.email || "",
-      });
+      if (typeof normalizedUser.availability === "boolean") {
+        setIsAvailable(normalizedUser.availability);
+      }
       setSessionChecked(true);
     };
 
@@ -130,112 +84,177 @@ const Hero3: React.FC = () => {
       globalThis.window.removeEventListener("auth-changed", onAuthChanged);
       globalThis.window.removeEventListener("storage", onAuthChanged);
     };
-  }, []);
+  }, [params.locale, router]);
 
-  const handleSaveProfile = () => {
-    if (!user) return;
-
-    const updated = {
-      ...user,
-      name: draft.name.trim(),
-      location: draft.location.trim(),
-      workCategory: draft.workCategory.trim(),
-      email: draft.email.trim(),
-    };
-
-    localStorage.setItem("user", JSON.stringify(updated));
-    setUser(updated);
-    setIsEditing(false);
+  const handleLogout = async () => {
+    await logoutSession();
+    localStorage.removeItem("user");
+    globalThis.window.dispatchEvent(new Event("auth-changed"));
+    const locale = params.locale as string || "en";
+    router.push(`/${locale}/login`);
   };
 
-  const roleTitle = useMemo(() => {
-    if (user?.accountType === "contractor") return "Contractor workspace";
-    return "Worker workspace";
-  }, [user?.accountType]);
+  const handleAvailabilityToggle = async () => {
+    const nextValue = !isAvailable;
+    setIsAvailable(nextValue);
+
+    const updatedUser = await updateSessionProfile({ availability: nextValue });
+    if (!updatedUser) {
+      setIsAvailable(!nextValue);
+      return;
+    }
+
+    const accountType = resolveAccountType(updatedUser);
+    const normalizedUser = { ...updatedUser, accountType };
+    localStorage.setItem("user", JSON.stringify(normalizedUser));
+    setUser(normalizedUser);
+  };
 
   if (!sessionChecked) {
     return (
-      <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background">
+      <div className="fixed inset-0 z-100 flex flex-col items-center justify-center bg-background">
         <Logo size={80} showText={true} />
         <p className="mt-4 text-muted-foreground animate-pulse">Loading...</p>
       </div>
     );
   }
 
+  if (user?.accountType !== "worker") {
+    return null;
+  }
+
   return (
-    <div className="bg-white dark:bg-black w-full">
-      <Separator />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <main className="py-20 lg:py-32">
-          <div className="text-center">
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-black dark:text-white leading-tight">
-              {t("title")}
-              <br />
-              <span className="text-gray-600 dark:text-gray-400">
-                {t("subtitle")}
-              </span>
-            </h1>
-
-            <p className="mt-6 text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto">
-              {t("description")}
-            </p>
-
-            <div className="mt-8 flex flex-wrap justify-center gap-6">
-              {features.map((feature) => (
-                <div
-                  key={feature}
-                  className="flex items-center gap-2 text-gray-600 dark:text-gray-400"
-                >
-                  <CheckIcon className="h-5 w-5 text-black dark:text-white" />
-                  <span>{feature}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
-              <button className="bg-black dark:bg-white text-white dark:text-black px-8 py-4 rounded-md font-semibold hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors flex items-center justify-center gap-2">
-                {t("cta1")}
-                <ArrowRightIcon className="h-5 w-5" />
-              </button>
-              <button className="border-2 border-black dark:border-white text-black dark:text-white px-8 py-4 rounded-md font-semibold hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors">
-                {t("cta2")}
-              </button>
-            </div>
-
-            <div className="mt-16 pt-16 border-t border-gray-200 dark:border-gray-800">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-black dark:text-white">
-                    10K+
-                  </div>
-                  <div className="text-gray-600 dark:text-gray-400">
-                    {t("users")}
-                  </div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-black dark:text-white">
-                    500+
-                  </div>
-                  <div className="text-gray-600 dark:text-gray-400">
-                    {t("companies")}
-                  </div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-black dark:text-white">
-                    4.9/5
-                  </div>
-                  <div className="text-gray-600 dark:text-gray-400">
-                    {t("ratings")}
-                  </div>
+    <div className="min-h-screen bg-slate-50 pb-24">
+      <div className="mx-auto w-full max-w-md space-y-4 px-4 py-4">
+        <Card className="relative overflow-hidden border-0 bg-linear-to-br from-slate-950 via-slate-900 to-slate-800 text-white shadow-xl">
+          <div className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full bg-white/10 blur-2xl" />
+          <div className="pointer-events-none absolute -bottom-12 -left-6 h-32 w-32 rounded-full bg-emerald-300/15 blur-2xl" />
+          <CardContent className="relative space-y-4 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <UserAvatar user={user} className="h-14 w-14 ring-2 ring-white/30" />
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-slate-300">Worker Dashboard</p>
+                  <h1 className="mt-1 text-xl font-semibold leading-tight">{user.name || "Worker"}</h1>
+                  <p className="mt-1 text-xs text-slate-300">{user.profession || user.workCategory || "Skilled Worker"}</p>
+                  <p className="mt-1 flex items-center gap-1 text-xs text-slate-300">
+                    <MapPin className="h-3.5 w-3.5" />
+                    {user.location || "Location not set"}
+                  </p>
                 </div>
               </div>
+              <Button
+                variant={isAvailable ? "secondary" : "outline"}
+                size="sm"
+                className="rounded-full border-white/40 bg-white/20 px-3 text-xs text-white hover:bg-white/30"
+                onClick={handleAvailabilityToggle}
+              >
+                {isAvailable ? "Available" : "Unavailable"}
+              </Button>
             </div>
+
+            <div className="flex items-center justify-between gap-2">
+              <div className="inline-flex items-center gap-1 rounded-full border border-white/30 bg-white/10 px-2.5 py-1 text-[11px] font-medium text-slate-100">
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-300" />
+                {user.activeRole || "worker"}
+              </div>
+              <Button variant="ghost" size="sm" className="h-8 px-2 text-slate-200 hover:bg-white/10" onClick={handleLogout}>
+                <LogOut className="mr-1.5 h-4 w-4" />
+                Log out
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold text-slate-900">Live Jobs Near You</h2>
+            <BriefcaseBusiness className="h-4 w-4 text-slate-500" />
           </div>
-        </main>
+          <div className="space-y-3">
+            {liveJobs.map((job) => (
+              <Card key={job.id} className="border-slate-200">
+                <CardContent className="space-y-3 p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">{job.title}</p>
+                      <p className="text-xs text-slate-500">{job.distance} away</p>
+                    </div>
+                    <span className="rounded-full bg-red-100 px-2 py-1 text-[10px] font-medium text-red-800">
+                      {job.urgency}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <p className="flex items-center gap-1 text-sm font-medium text-emerald-700">
+                      <IndianRupee className="h-3.5 w-3.5" />
+                      {job.pay}
+                    </p>
+                    <Button size="sm">Accept</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Recommended Jobs</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {recommendedJobs.map((job) => (
+                <li key={job} className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  {job}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Work Summary</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-md bg-slate-100 p-2">
+              <p className="text-lg font-bold text-slate-900">28</p>
+              <p className="text-xs text-slate-600">Jobs done</p>
+            </div>
+            <div className="rounded-md bg-slate-100 p-2">
+              <p className="text-lg font-bold text-slate-900">INR 32K</p>
+              <p className="text-xs text-slate-600">Earnings</p>
+            </div>
+            <div className="rounded-md bg-slate-100 p-2">
+              <p className="flex items-center justify-center gap-1 text-lg font-bold text-slate-900">
+                4.8
+                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+              </p>
+              <p className="text-xs text-slate-600">Rating</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Bell className="h-4 w-4" />
+              Job Alerts
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {alerts.map((alert) => (
+                <li key={alert} className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  {alert}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
       </div>
-      <Separator />
     </div>
   );
 };
 
-export default Hero3;
+export default WorkerHomePage;

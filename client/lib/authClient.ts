@@ -15,6 +15,27 @@ export interface AuthUser {
   activeRole?: string;
   profilePictureUrl?: string;
   profilePicturePublicId?: string;
+  profession?: string;
+  skills?: string[];
+  experienceYears?: number;
+  pricingType?: "hour" | "day" | "job";
+  pricingAmount?: number;
+  availability?: boolean;
+  languages?: string[];
+  about?: string;
+}
+
+export interface ProfileUpdatePayload {
+  name?: string;
+  location?: string;
+  profession?: string;
+  skills?: string[];
+  experienceYears?: number;
+  pricingType?: "hour" | "day" | "job";
+  pricingAmount?: number | "";
+  availability?: boolean;
+  languages?: string[];
+  about?: string;
 }
 
 export function resolveAccountType(user: AuthUser | null | undefined): AccountType {
@@ -57,5 +78,27 @@ export async function logoutSession(): Promise<void> {
     });
   } catch {
     // Ignore network failures while clearing client state.
+  }
+}
+
+export async function updateSessionProfile(payload: ProfileUpdatePayload): Promise<AuthUser | null> {
+  if (!API_BASE_URL) return null;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/users/profile`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) return null;
+
+    const data = (await response.json()) as { user?: AuthUser };
+    return data.user ?? null;
+  } catch {
+    return null;
   }
 }

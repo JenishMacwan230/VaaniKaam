@@ -15,6 +15,14 @@ export interface IUser extends Document {
   isPhoneVerified: boolean;
   profilePictureUrl?: string;
   profilePicturePublicId?: string;
+  profession?: string;
+  skills?: string[];
+  experienceYears?: number;
+  pricingType?: "hour" | "day" | "job";
+  pricingAmount?: number;
+  availability?: boolean;
+  languages?: string[];
+  about?: string;
 }
 
 const userSchema: Schema = new Schema(
@@ -31,6 +39,14 @@ const userSchema: Schema = new Schema(
     isPhoneVerified: { type: Boolean, default: false },
     profilePictureUrl: { type: String, trim: true },
     profilePicturePublicId: { type: String, trim: true },
+    profession: { type: String, trim: true },
+    skills: { type: [String], default: [] },
+    experienceYears: { type: Number, default: 0 },
+    pricingType: { type: String, enum: ["hour", "day", "job"] },
+    pricingAmount: { type: Number },
+    availability: { type: Boolean, default: true },
+    languages: { type: [String], default: [] },
+    about: { type: String, trim: true, maxlength: 500 },
   },
   { timestamps: true }
 );

@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import crypto from "crypto";
+import crypto from "node:crypto";
 import User, { allowedRoles } from "../models/User";
 import OtpCode from "../models/OtpCode";
 import { verifyFirebaseToken } from "../config/firebase";
@@ -296,6 +296,74 @@ export const getMe = async (req: Request & any, res: Response) => {
     return res.json({ user: formatUserResponse(req.user) });
   } catch (error) {
     return res.status(500).json({ message: "Failed to fetch user" });
+  }
+};
+
+export const updateProfile = async (req: Request & any, res: Response) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+    const {
+      name,
+      location,
+      profession,
+      skills,
+      experienceYears,
+      pricingType,
+      pricingAmount,
+      availability,
+      languages,
+      about,
+    } = req.body || {};
+
+    if (typeof name === "string") user.name = name.trim();
+    if (typeof location === "string") user.location = location.trim();
+    if (typeof profession === "string") user.profession = profession.trim();
+
+    if (Array.isArray(skills)) {
+      user.skills = skills.filter((item) => typeof item === "string").map((item) => item.trim()).filter(Boolean);
+    }
+
+    if (typeof experienceYears === "number" && Number.isFinite(experienceYears)) {
+      user.experienceYears = Math.max(0, Math.min(40, Math.round(experienceYears)));
+    }
+
+    if (pricingType === "hour" || pricingType === "day" || pricingType === "job") {
+      user.pricingType = pricingType;
+    }
+
+    if (pricingAmount !== undefined && pricingAmount !== null && pricingAmount !== "") {
+      const parsedPrice = Number(pricingAmount);
+      if (Number.isNaN(parsedPrice) || parsedPrice < 0) {
+        return res.status(400).json({ message: "Invalid pricing amount" });
+      }
+      user.pricingAmount = parsedPrice;
+    } else if (pricingAmount === "") {
+      user.pricingAmount = undefined;
+    }
+
+    if (typeof availability === "boolean") {
+      user.availability = availability;
+    }
+
+    if (Array.isArray(languages)) {
+      user.languages = languages.filter((item) => typeof item === "string").map((item) => item.trim()).filter(Boolean);
+    }
+
+    if (typeof about === "string") {
+      user.about = about.trim().slice(0, 500);
+    }
+
+    await user.save();
+
+    return res.json({
+      message: "Profile updated successfully",
+      user: formatUserResponse(user),
+    });
+  } catch (error) {
+    console.error("Update profile error:", error);
+    return res.status(500).json({ message: "Failed to update profile" });
   }
 };
 
