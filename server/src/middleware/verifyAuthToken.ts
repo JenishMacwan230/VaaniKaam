@@ -5,7 +5,7 @@ import User from "../models/User";
 interface AuthenticatedRequest extends Request {
   auth?: { userId: string; activeRole?: string };
   user?: any;
-  cookies?: Record<string, string>;
+  cookies: Record<string, string>;
 }
 
 const verifyAuthToken = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {

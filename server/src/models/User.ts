@@ -25,7 +25,7 @@ export interface IUser extends Document {
   about?: string;
 }
 
-const userSchema: Schema = new Schema(
+const userSchema = new Schema<IUser>(
   {
     name: { type: String, trim: true },
     email: { type: String, lowercase: true, trim: true },

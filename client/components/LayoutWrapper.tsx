@@ -41,7 +41,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
         {children}
       </main>
       {/* Footer */}
-      <footer className="hidden md:block border-t">
+      <footer className="hidden lg:block border-t">
         <Footer />
       </footer>
     </>

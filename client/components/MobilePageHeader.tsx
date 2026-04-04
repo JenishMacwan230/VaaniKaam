@@ -13,6 +13,7 @@ import {
 import { locales } from "@/i18n";
 import { UserAvatar } from "./UserAvatar";
 import { AuthUser } from "@/lib/authClient";
+import { Volume2, VolumeX } from "lucide-react";
 
 const PAGE_TITLES: Record<string, string> = {
   "": "Home",
@@ -114,9 +115,9 @@ export default function MobilePageHeader() {
 
   if (isHomePage) {
     return (
-      <section className="md:hidden border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/75">
-        <div className="container mx-auto px-4 py-3">
-          <div className="mx-auto flex w-full max-w-sm items-center justify-between gap-3 px-4 py-1">
+      <section className="lg:hidden border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/75">
+        <div className="w-full px-4 py-3">
+          <div className="flex w-full items-center justify-between gap-3 py-1">
             <div className="flex min-w-0 items-center gap-3">
               <div 
                 onClick={() => user ? router.push(`/${currentLocale}/dashboard`) : router.push(`/${currentLocale}/login`)}
@@ -159,19 +160,20 @@ export default function MobilePageHeader() {
   }
 
   return (
-    <section className="md:hidden border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/75">
-      <div className="container mx-auto px-4 py-4">
+    <section className="lg:hidden border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/75">
+      <div className="w-full px-4 py-4">
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">VaaniKaam</p>
           <div className="flex items-center gap-2">
-             {user && (
+             {/* {user && (
                 <div 
                   onClick={() => router.push(`/${currentLocale}/dashboard`)}
                   className="cursor-pointer"
                 >
                   <UserAvatar user={user} className="h-8 w-8" />
                 </div>
-             )}
+             )} */}
+             <Volume2 />
             <Select value={currentLocale} onValueChange={handleLanguageChange}>
               <SelectTrigger className="h-9 w-28 rounded-full border border-border/70 bg-background px-2 py-1.5 text-xs font-medium text-foreground shadow-sm">
                 <Globe className="mr-1 h-3.5 w-3.5" />

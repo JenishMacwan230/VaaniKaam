@@ -1,12 +1,24 @@
 import express from "express";
 import verifyAuthToken from "../middleware/verifyAuthToken";
 import { requireRole, requireAnyRole } from "../middleware/requireRole";
-import { createJob, listJobs, applyToJob } from "../controllers/jobController";
+import { 
+  createJob, 
+  listJobs, 
+  applyToJob, 
+  getContractorJobs, 
+  getContractorStats, 
+  getRecentApplications 
+} from "../controllers/jobController";
 
 const router = express.Router();
 
 router.post("/", verifyAuthToken, requireAnyRole(["individual", "company"]) as any, createJob as any);
 router.get("/", listJobs as any);
 router.post("/apply", verifyAuthToken, requireRole("worker") as any, applyToJob as any);
+
+// Contractor routes
+router.get("/contractor/jobs", verifyAuthToken, requireAnyRole(["individual", "company"]) as any, getContractorJobs as any);
+router.get("/contractor/stats", verifyAuthToken, requireAnyRole(["individual", "company"]) as any, getContractorStats as any);
+router.get("/contractor/applications", verifyAuthToken, requireAnyRole(["individual", "company"]) as any, getRecentApplications as any);
 
 export default router;

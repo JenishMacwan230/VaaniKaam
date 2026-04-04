@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { fetchSessionUser, AuthUser, logoutSession, updateSessionProfile } from "@/lib/authClient";
+import { fetchSessionUser, AuthUser, logoutSession, updateSessionProfile, resolveAccountType, getCurrentLocale } from "@/lib/authClient";
 import { UserAvatar } from "@/components/UserAvatar";
 import { uploadProfilePicture, deleteProfilePicture } from "@/lib/cloudinaryUtils";
 import { Button } from "@/components/ui/button";
@@ -157,6 +157,15 @@ export default function DashboardPage() {
           router.push("/en/login");
           return;
         }
+
+        // Redirect contractors to their dashboard
+        const accountType = resolveAccountType(userData);
+        if (accountType === "contractor") {
+          const locale = getCurrentLocale(window.location.pathname);
+          router.push(`/${locale}/dashboard/contractor`);
+          return;
+        }
+
         setUser(userData);
         if (typeof userData.availability === "boolean") {
           setIsAvailable(userData.availability);

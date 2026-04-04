@@ -7,6 +7,9 @@ export interface IJob extends Document {
   location?: string;
   wage?: number;
   date?: Date;
+  category?: string;
+  pricingType?: "hour" | "day" | "job";
+  urgency?: "Immediate" | "Today" | "Flexible";
   status: string;
   postedBy: mongoose.Types.ObjectId;
 }
@@ -19,6 +22,17 @@ const jobSchema: Schema = new Schema(
     location: { type: String, trim: true },
     wage: { type: Number },
     date: { type: Date },
+    category: { type: String, trim: true },
+    pricingType: {
+      type: String,
+      enum: ["hour", "day", "job"],
+      default: "day",
+    },
+    urgency: {
+      type: String,
+      enum: ["Immediate", "Today", "Flexible"],
+      default: "Flexible",
+    },
     status: {
       type: String,
       enum: ["open", "assigned", "completed", "cancelled"],
