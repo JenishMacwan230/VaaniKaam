@@ -463,7 +463,16 @@ export default function DashboardPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 pb-24 md:pb-8 max-w-4xl">
-      <div className="mb-8">
+      <div className="mb-8 space-y-3">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent/40"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span>Back</span>
+        </button>
+
         <div>
           <h1 className="text-4xl font-bold text-foreground">Dashboard</h1>
           <p className="text-muted-foreground mt-1">Welcome back, {user.name}!</p>

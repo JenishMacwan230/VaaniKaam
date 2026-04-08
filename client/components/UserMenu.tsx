@@ -2,7 +2,8 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, User as UserIcon, LayoutDashboard, Bell } from "lucide-react";
+import { LogOut, LayoutDashboard, User as UserIcon } from "lucide-react";
+import Image from "next/image";
 
 import {
   DropdownMenu,
@@ -18,6 +19,8 @@ import { Button } from "./ui/button";
 interface UserMenuProps {
   user: AuthUser;
 }
+
+const DEFAULT_PROFILE_PICTURE = "/default-avatar.png";
 
 export function UserMenu({ user }: UserMenuProps) {
   const router = useRouter();
@@ -35,8 +38,13 @@ export function UserMenu({ user }: UserMenuProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 hover:bg-secondary/10">
-          <Bell className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+        <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 hover:bg-secondary/10 border border-gray-200 dark:border-gray-700">
+          <Image
+            src={user.profilePictureUrl || DEFAULT_PROFILE_PICTURE}
+            alt={user.name || "Profile"}
+            fill
+            className="rounded-full object-cover"
+          />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end" forceMount sideOffset={8}>

@@ -14,6 +14,7 @@ import {
   Phone,
   Briefcase,
   Bell,
+  User as UserIcon,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useRouter, usePathname } from "next/navigation";
@@ -101,7 +102,7 @@ const BlogHeader = () => {
       }
     }
 
-    baseLinks.push({ href: "/about", text: t("about"), icon: Info });
+    baseLinks.push({ href: "/user", text: t("user"), icon: UserIcon });
 
     return baseLinks;
   };
@@ -121,6 +122,23 @@ const BlogHeader = () => {
 
     const normalizedPath = "/" + segments.join("/");
     const pathToCheck = normalizedPath === "/" ? "/" : normalizedPath;
+
+    // Treat related account pages as part of the "User" section
+    if (href === "/user") {
+      const userSectionPrefixes = [
+        "/user",
+        "/profile",
+        "/contact",
+        "/about",
+        "/dashboard",
+        "/dashboard/worker",
+        "/dashboard/contractor",
+      ];
+
+      return userSectionPrefixes.some((base) =>
+        pathToCheck === base || pathToCheck.startsWith(`${base}/`),
+      );
+    }
 
     if (href === "/") {
       // For home, check if path is root

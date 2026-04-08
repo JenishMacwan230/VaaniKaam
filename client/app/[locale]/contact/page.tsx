@@ -1,7 +1,8 @@
-'use client';
+"use client";
 
 import React, { useState } from "react";
-import { Mail, MapPin, MessageSquare, Phone } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Mail, MapPin, MessageSquare, Phone, ArrowLeft } from "lucide-react";
 
 const reasons = [
   "General inquiry",
@@ -11,6 +12,7 @@ const reasons = [
 ];
 
 export default function ContactPage() {
+  const router = useRouter();
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -36,6 +38,17 @@ export default function ContactPage() {
 
   return (
     <main className="min-h-screen bg-background px-4 py-16">
+      <div className="mx-auto mb-4 flex w-full max-w-6xl justify-start">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent/40"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span>Back</span>
+        </button>
+      </div>
+
       <section className="mx-auto grid w-full max-w-6xl gap-10 rounded-[36px] border border-border/70 bg-card/95 p-10 shadow-2xl lg:grid-cols-[1fr_1.2fr]">
         <div className="space-y-8">
           <header className="space-y-4">

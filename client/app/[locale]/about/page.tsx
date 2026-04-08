@@ -1,10 +1,28 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
+
 export default function AboutUsPage() {
+  const router = useRouter();
+
   return (
     <main className="min-h-screen bg-background text-foreground">
       {/* ================= HERO ================= */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-[var(--brand-gradient)] opacity-15 blur-3xl" />
         <div className="relative container mx-auto px-6 py-24 text-center">
+          <div className="mb-4 flex justify-start">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent/40"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>Back</span>
+            </button>
+          </div>
+
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">
             About <span className="text-primary">Vaani</span>
             <span className="text-secondary inline-block ml-1 -skew-x-6">

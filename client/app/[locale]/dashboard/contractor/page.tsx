@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { fetchSessionUser, AuthUser, getCurrentLocale, resolveAccountType } from "@/lib/authClient";
-import { Bell, TrendingUp, Briefcase, CheckCircle, AlertCircle, Eye, Phone, MessageSquare } from "lucide-react";
+import { Bell, TrendingUp, Briefcase, CheckCircle, AlertCircle, Eye, Phone, MessageSquare, ArrowLeft } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -168,13 +168,24 @@ export default function ContractorDashboard() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Welcome back, {user?.name}! 👋
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Manage your projects and track applications
-          </p>
+        <div className="mb-8 space-y-3">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent/40"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span>Back</span>
+          </button>
+
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+              Welcome back, {user?.name}! 👋
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400">
+              Manage your projects and track applications
+            </p>
+          </div>
         </div>
 
         {/* Error Display */}

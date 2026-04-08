@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "./ui/select";
 import { locales } from "@/i18n";
-import { UserAvatar } from "./UserAvatar";
+import { UserMenu } from "./UserMenu";
 import { AuthUser } from "@/lib/authClient";
 import { Volume2, VolumeX } from "lucide-react";
 
@@ -119,18 +119,18 @@ export default function MobilePageHeader() {
         <div className="w-full px-4 py-3">
           <div className="flex w-full items-center justify-between gap-3 py-1">
             <div className="flex min-w-0 items-center gap-3">
-              <div 
-                onClick={() => user ? router.push(`/${currentLocale}/dashboard`) : router.push(`/${currentLocale}/login`)}
-                className="cursor-pointer"
-              >
-                  {user ? (
-                    <UserAvatar user={user} className="h-11 w-11" />
-                  ) : (
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-secondary/20 text-secondary">
-                        <User className="h-6 w-6" />
-                    </span>
-                  )}
-              </div>
+              {user ? (
+                <UserMenu user={user} />
+              ) : (
+                <div
+                  onClick={() => router.push(`/${currentLocale}/login`)}
+                  className="cursor-pointer"
+                >
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-secondary/20 text-secondary">
+                    <User className="h-6 w-6" />
+                  </span>
+                </div>
+              )}
               <div className="min-w-0">
                 <p className="text-sm font-medium text-muted-foreground">{greetingText}</p>
                 <p className="truncate text-lg font-semibold text-foreground">{user?.name || "Guest"}</p>
