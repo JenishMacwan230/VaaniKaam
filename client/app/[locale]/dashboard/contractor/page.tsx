@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { fetchSessionUser, AuthUser, getCurrentLocale, resolveAccountType } from "@/lib/authClient";
+import { fetchSessionUser, getCurrentLocale, resolveAccountType } from "@/lib/authClient";
 import { Bell, TrendingUp, Briefcase, CheckCircle, AlertCircle, Eye, Phone, MessageSquare, ArrowLeft } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,8 +15,8 @@ interface JobWithApplications {
   title: string;
   description?: string;
   location?: string;
-  wage?: number;
-  status: "open" | "assigned" | "completed" | "cancelled";
+  wage?: number | string;
+  status: "open" | "assigned" | "in_progress" | "completion_pending" | "completed" | "cancelled";
   applicationsCount: number;
   applications: JobApplication[];
   createdAt: string;
@@ -28,7 +28,7 @@ interface JobApplication {
     title: string;
     status: string;
   };
-  status: "applied" | "accepted" | "rejected";
+  status: "applied" | "accepted" | "rejected" | "completion_pending" | "completed";
   createdAt: string;
   workerId: {
     _id: string;
@@ -52,12 +52,25 @@ export default function ContractorDashboard() {
   const pathname = usePathname();
   const locale = getCurrentLocale(pathname);
 
-  const [user, setUser] = useState<AuthUser | null>(null);
   const [jobs, setJobs] = useState<JobWithApplications[]>([]);
   const [recentApplications, setRecentApplications] = useState<JobApplication[]>([]);
   const [stats, setStats] = useState<ContractorStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const formatWage = (value: number | string | undefined): string => {
+    if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+      return `₹${value.toLocaleString()}`;
+    }
+    if (typeof value === "string") {
+      const parsed = Number.parseFloat(value);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        return `₹${parsed.toLocaleString()}`;
+      }
+      return value.trim() || "POA";
+    }
+    return "POA";
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -75,8 +88,6 @@ export default function ContractorDashboard() {
           router.push(`/${locale}/dashboard/worker`);
           return;
         }
-
-        setUser(currentUser);
 
         // Only fetch if API_BASE_URL is defined
         if (!API_BASE_URL) {
@@ -119,7 +130,9 @@ export default function ContractorDashboard() {
 
           if (applicationsRes?.ok) {
             const data = await applicationsRes.json();
-            setRecentApplications((data.applications || []).slice(0, 5));
+            // Only show pending/applied applications (not accepted or rejected)
+            const pendingApps = (data.applications || []).filter((app: JobApplication) => app.status === "applied").slice(0, 5);
+            setRecentApplications(pendingApps);
           } else if (applicationsRes) {
             console.warn("Applications response not ok:", applicationsRes.status, await applicationsRes.text());
           }
@@ -138,21 +151,6 @@ export default function ContractorDashboard() {
     loadData();
   }, [pathname, router, locale]);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "open":
-        return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
-      case "assigned":
-        return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400";
-      case "completed":
-        return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
-      case "cancelled":
-        return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
-      default:
-        return "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400";
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
@@ -163,6 +161,15 @@ export default function ContractorDashboard() {
       </div>
     );
   }
+
+  const openJobs = jobs.filter(job => job.status === "open");
+  const inProgressJobs = jobs.filter(
+    job => job.status === "assigned" || job.status === "in_progress" || job.status === "completion_pending"
+  );
+  const completedJobs = jobs.filter(job => job.status === "completed");
+  const jobsWithApplications = jobs
+    .filter(job => job.applicationsCount > 0 && job.status !== "completed")
+    .sort((a, b) => b.applicationsCount - a.applicationsCount);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-8 px-4 sm:px-6 lg:px-8">
@@ -180,7 +187,7 @@ export default function ContractorDashboard() {
 
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-              Welcome back, {user?.name}! 👋
+              Welcome back! 👋
             </h1>
             <p className="text-gray-600 dark:text-gray-400">
               Manage your projects and track applications
@@ -197,7 +204,7 @@ export default function ContractorDashboard() {
           </Card>
         )}
 
-        {/* Notifications Section */}
+        {/* Notifications Section - Only show for jobs with pending applications */}
         {recentApplications.length > 0 && (
           <Card className="mb-8 border-l-4 border-l-amber-500">
             <CardHeader className="pb-3">
@@ -265,7 +272,7 @@ export default function ContractorDashboard() {
               <CardContent>
                 <div className="flex items-center justify-between">
                   <div className="text-3xl font-bold text-gray-900 dark:text-white">
-                    {stats.totalJobs}
+                    {jobs.length}
                   </div>
                   <Briefcase className="h-8 w-8 text-blue-500 opacity-50" />
                 </div>
@@ -281,7 +288,7 @@ export default function ContractorDashboard() {
               <CardContent>
                 <div className="flex items-center justify-between">
                   <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-                    {stats.openJobs}
+                    {openJobs.length}
                   </div>
                   <AlertCircle className="h-8 w-8 text-blue-500 opacity-50" />
                 </div>
@@ -297,7 +304,7 @@ export default function ContractorDashboard() {
               <CardContent>
                 <div className="flex items-center justify-between">
                   <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">
-                    {stats.assignedJobs}
+                    {inProgressJobs.length}
                   </div>
                   <TrendingUp className="h-8 w-8 text-amber-500 opacity-50" />
                 </div>
@@ -313,7 +320,7 @@ export default function ContractorDashboard() {
               <CardContent>
                 <div className="flex items-center justify-between">
                   <div className="text-3xl font-bold text-green-600 dark:text-green-400">
-                    {stats.completedJobs}
+                    {completedJobs.length}
                   </div>
                   <CheckCircle className="h-8 w-8 text-green-500 opacity-50" />
                 </div>
@@ -339,14 +346,7 @@ export default function ContractorDashboard() {
         )}
 
         {/* Current Projects Section */}
-        <div>
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Current Projects</h2>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">
-              Manage your ongoing and open projects
-            </p>
-          </div>
-
+        <div className="space-y-8">
           {jobs.length === 0 ? (
             <Card className="text-center py-12">
               <Briefcase className="h-12 w-12 text-gray-300 dark:text-gray-700 mx-auto mb-4" />
@@ -364,106 +364,270 @@ export default function ContractorDashboard() {
               </Button>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {jobs.map((job) => (
-                <Card key={job._id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <CardTitle className="text-lg text-gray-900 dark:text-white">
-                          {job.title}
-                        </CardTitle>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                          {job.location && `📍 ${job.location}`}
-                        </p>
-                      </div>
-                      <Badge className={getStatusColor(job.status)}>
-                        {job.status.charAt(0).toUpperCase() + job.status.slice(1)}
-                      </Badge>
-                    </div>
-                  </CardHeader>
+            <>
+              {/* Jobs With Applications */}
+              {jobsWithApplications.length > 0 && (
+                <div>
+                  <div className="mb-6">
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                      <Bell className="h-6 w-6 text-indigo-600" />
+                      Jobs With Applications
+                    </h2>
+                    <p className="text-gray-600 dark:text-gray-400 mt-1">
+                      Projects that currently have worker interest
+                    </p>
+                  </div>
 
-                  <CardContent>
-                    {job.description && (
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-2">
-                        {job.description}
-                      </p>
-                    )}
-
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        {job.wage && (
-                          <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                            ₹{job.wage.toLocaleString()}
-                          </p>
-                        )}
-                        <p className="text-xs text-gray-500 dark:text-gray-500">
-                          Posted on {new Date(job.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                          {job.applicationsCount}
-                        </p>
-                        <p className="text-xs text-gray-600 dark:text-gray-400">Applications</p>
-                      </div>
-                    </div>
-
-                    {/* Recent Applications Preview */}
-                    {job.applications.length > 0 && (
-                      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-800">
-                        <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
-                          Recent Applications
-                        </p>
-                        <div className="space-y-2">
-                          {job.applications.slice(0, 2).map((app) => (
-                            <div
-                              key={app._id}
-                              className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-900/50 rounded"
-                            >
-                              <div>
-                                <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                  {app.workerId.name}
-                                </p>
-                                <p className="text-xs text-gray-500 dark:text-gray-500">
-                                  {new Date(app.createdAt).toLocaleDateString()}
-                                </p>
-                              </div>
-                              <Badge variant="outline" className="text-xs">
-                                {app.status}
-                              </Badge>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                    {jobsWithApplications.map((job) => (
+                      <Card key={`applications-${job._id}`} className="overflow-hidden hover:shadow-lg transition-shadow border-indigo-200 dark:border-indigo-900/30">
+                        <CardHeader>
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <CardTitle className="text-lg text-gray-900 dark:text-white">
+                                {job.title}
+                              </CardTitle>
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                {job.location && `📍 ${job.location}`}
+                              </p>
                             </div>
-                          ))}
-                          {job.applicationsCount > 2 && (
-                            <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium pt-2">
-                              +{job.applicationsCount - 2} more applications
-                            </p>
-                          )}
+                            <Badge className="bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
+                              {job.applicationsCount} Applications
+                            </Badge>
+                          </div>
+                        </CardHeader>
+
+                        <CardContent>
+                          <div className="flex items-center justify-between mb-6">
+                            <div>
+                              <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                                {formatWage(job.wage)}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-500">
+                                Posted on {new Date(job.createdAt).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <Badge variant="outline" className="text-xs">
+                              {job.status.replace("_", " ")}
+                            </Badge>
+                          </div>
+
+                          <Button
+                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-sm"
+                            onClick={() =>
+                              router.push(`/${locale}/dashboard/contractor/${job._id}?tab=applications`)
+                            }
+                          >
+                            Manage Applications
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Open Projects */}
+              <div>
+                <div className="mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <AlertCircle className="h-6 w-6 text-blue-600" />
+                    Open Projects
+                  </h2>
+                  <p className="text-gray-600 dark:text-gray-400 mt-1">
+                    Waiting for workers to apply
+                  </p>
+                </div>
+
+                {openJobs.length === 0 ? (
+                  <Card className="text-center py-12">
+                    <Briefcase className="h-12 w-12 text-gray-300 dark:text-gray-700 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                      No open projects
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-400 mb-6">
+                      All your projects have been accepted or completed
+                    </p>
+                  </Card>
+                ) : (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                {openJobs.map((job) => (
+                  <Card key={job._id} className="overflow-hidden hover:shadow-lg transition-shadow border-blue-200 dark:border-blue-900/30">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <CardTitle className="text-lg text-gray-900 dark:text-white">
+                            {job.title}
+                          </CardTitle>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                            {job.location && `📍 ${job.location}`}
+                          </p>
+                        </div>
+                        <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                          Open
+                        </Badge>
+                      </div>
+                    </CardHeader>
+
+                    <CardContent>
+                      <div className="flex items-center justify-between mb-6">
+                        <div>
+                          <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                            {formatWage(job.wage)}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-500">
+                            Posted on {new Date(job.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                            {job.applicationsCount}
+                          </p>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">Applications</p>
                         </div>
                       </div>
-                    )}
 
-                    <div className="flex gap-2 mt-6">
                       <Button
-                        variant="outline"
-                        className="flex-1 text-xs"
-                        onClick={() => router.push(`/${locale}/projects/${job._id}`)}
-                      >
-                        View Details
-                      </Button>
-                      <Button
-                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-xs"
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-sm"
                         onClick={() =>
-                          router.push(`/${locale}/dashboard/contractor?jobId=${job._id}`)
+                          router.push(`/${locale}/dashboard/contractor/${job._id}?tab=applications`)
                         }
                       >
                         Manage Applications
                       </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+              </div>
+
+              {/* In Progress Projects */}
+          {inProgressJobs.length > 0 && (
+            <div>
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <TrendingUp className="h-6 w-6 text-amber-600" />
+                  In Progress
+                </h2>
+                <p className="text-gray-600 dark:text-gray-400 mt-1">
+                  Workers are actively working on these projects
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                {inProgressJobs.map((job) => (
+                  <Card key={job._id} className="overflow-hidden hover:shadow-lg transition-shadow border-amber-200 dark:border-amber-900/30">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <CardTitle className="text-lg text-gray-900 dark:text-white">
+                            {job.title}
+                          </CardTitle>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                            {job.location && `📍 ${job.location}`}
+                          </p>
+                        </div>
+                        <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                          {job.status === "completion_pending" ? "Awaiting Confirmation" : "In Progress"}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+
+                    <CardContent>
+                      <div className="flex items-center justify-between mb-6">
+                        <div>
+                          <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                            {formatWage(job.wage)}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-500">
+                            Posted on {new Date(job.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                            {job.applications?.filter(a => a.status === "accepted").length || 0}
+                          </p>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">Workers</p>
+                        </div>
+                      </div>
+
+                      <Button
+                        className="w-full bg-amber-600 hover:bg-amber-700 text-sm"
+                        onClick={() => router.push(`/${locale}/dashboard/contractor/${job._id}`)}
+                      >
+                        {job.status === "completion_pending" ? "View Status" : "Mark as Complete"}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             </div>
+          )}
+
+          {completedJobs.length > 0 && (
+            <div>
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <CheckCircle className="h-6 w-6 text-green-600" />
+                  Completed Projects ({completedJobs.length})
+                </h2>
+                <p className="text-gray-600 dark:text-gray-400 mt-1">
+                  Successfully finished projects
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                  {completedJobs.map((job) => (
+                    <Card key={job._id} className="overflow-hidden hover:shadow-lg transition-shadow border-green-200 dark:border-green-900/30">
+                      <CardHeader>
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <CardTitle className="text-lg text-gray-900 dark:text-white">
+                              {job.title}
+                            </CardTitle>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                              {job.location && `📍 ${job.location}`}
+                            </p>
+                          </div>
+                          <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                            Completed
+                          </Badge>
+                        </div>
+                      </CardHeader>
+
+                      <CardContent>
+                        <div className="flex items-center justify-between mb-6">
+                          <div>
+                            <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                              {formatWage(job.wage)}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-500">
+                              Completed on {new Date(job.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                              {job.applications?.filter(a => a.status === "accepted" || a.status === "completed").length || 0}
+                            </p>
+                            <p className="text-xs text-gray-600 dark:text-gray-400">Workers</p>
+                          </div>
+                        </div>
+
+                        <Button
+                          variant="outline"
+                          className="w-full text-sm"
+                          onClick={() => router.push(`/${locale}/dashboard/contractor/${job._id}`)}
+                        >
+                          View Details
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+              </div>
+            </div>
+          )}
+            </>
           )}
         </div>
 

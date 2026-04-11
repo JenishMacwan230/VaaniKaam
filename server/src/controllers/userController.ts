@@ -307,6 +307,9 @@ export const updateProfile = async (req: Request & any, res: Response) => {
     const {
       name,
       location,
+      normalizedLocation,
+      latitude,
+      longitude,
       profession,
       skills,
       experienceYears,
@@ -319,6 +322,24 @@ export const updateProfile = async (req: Request & any, res: Response) => {
 
     if (typeof name === "string") user.name = name.trim();
     if (typeof location === "string") user.location = location.trim();
+    if (typeof normalizedLocation === "string") user.normalizedLocation = normalizedLocation.trim();
+
+    if (latitude !== undefined && latitude !== null) {
+      const parsedLatitude = Number(latitude);
+      if (Number.isNaN(parsedLatitude) || parsedLatitude < -90 || parsedLatitude > 90) {
+        return res.status(400).json({ message: "Invalid latitude" });
+      }
+      user.latitude = parsedLatitude;
+    }
+
+    if (longitude !== undefined && longitude !== null) {
+      const parsedLongitude = Number(longitude);
+      if (Number.isNaN(parsedLongitude) || parsedLongitude < -180 || parsedLongitude > 180) {
+        return res.status(400).json({ message: "Invalid longitude" });
+      }
+      user.longitude = parsedLongitude;
+    }
+
     if (typeof profession === "string") user.profession = profession.trim();
 
     if (Array.isArray(skills)) {

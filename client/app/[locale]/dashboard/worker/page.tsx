@@ -2,19 +2,25 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { getCurrentLocale, fetchSessionUser, AuthUser, resolveAccountType } from "@/lib/authClient";
+import { getCurrentLocale, fetchSessionUser, resolveAccountType } from "@/lib/authClient";
+import { getWorkerApplications, getWorkerAcceptedJobs, getWorkerPendingCompletion, getWorkerCompletedJobs, confirmJobCompletion, rejectJobCompletion } from "@/lib/jobApplicationApi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Briefcase, CheckCircle, Clock, AlertCircle, MapPin, IndianRupee, ArrowRight } from "lucide-react";
 
 interface Job {
-  id: string;
+  _id: string;
   title: string;
-  location: string;
-  pay: number;
-  payType: "hour" | "day" | "job";
-  status: "applied" | "accepted" | "completed";
+  location?: string;
+  pricingAmount?: number | string;
+  pricingType?: string;
+  status: "applied" | "accepted" | "completion_pending" | "completed";
+  postedBy?: {
+    name: string;
+  };
+  createdAt?: string;
+  applicationId?: string;
 }
 
 export default function WorkerDashboardPage() {
@@ -22,29 +28,179 @@ export default function WorkerDashboardPage() {
   const pathname = usePathname();
   const locale = getCurrentLocale(pathname);
 
-  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [appliedJobs, setAppliedJobs] = useState<Job[]>([]);
+  const [activeJobs, setActiveJobs] = useState<Job[]>([]);
+  const [pendingCompletionJobs, setPendingCompletionJobs] = useState<Job[]>([]);
+  const [completedJobs, setCompletedJobs] = useState<Job[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const getNumericAmount = (value: number | string | undefined): number => {
+    if (typeof value === "number") return value;
+    if (typeof value === "string") {
+      const parsed = Number.parseFloat(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+    return 0;
+  };
+
+  const formatPricing = (amount: number | string | undefined, type?: string): string => {
+    const numericAmount = getNumericAmount(amount);
+    if (numericAmount > 0) {
+      return `₹${numericAmount.toLocaleString()}/${type || "job"}`;
+    }
+    return `POA/${type || "job"}`;
+  };
 
   useEffect(() => {
     const checkAuth = async () => {
-      const sessionUser = await fetchSessionUser();
-      if (!sessionUser) {
-        router.push(`/${locale}/login`);
-        return;
-      }
+      try {
+        const sessionUser = await fetchSessionUser();
+        if (!sessionUser) {
+          router.push(`/${locale}/login`);
+          return;
+        }
 
-      const accountType = resolveAccountType(sessionUser);
-      if (accountType !== "worker") {
-        router.push(`/${locale}`);
-        return;
-      }
+        const accountType = resolveAccountType(sessionUser);
+        if (accountType !== "worker") {
+          router.push(`/${locale}`);
+          return;
+        }
 
-      setUser(sessionUser);
-      setLoading(false);
+        // Fetch applied jobs
+        try {
+          const applicationsData = await getWorkerApplications();
+          const appliedJobsList = applicationsData
+            .filter((app: any) => app.status === "applied" && app.jobId)
+            .map((app: any) => ({
+              _id: app.jobId._id,
+              title: app.jobId.title,
+              location: app.jobId.location,
+              pricingAmount: app.jobId.pricingAmount,
+              pricingType: app.jobId.pricingType,
+              status: "applied" as const,
+              postedBy: app.jobId.postedBy,
+              createdAt: app.createdAt,
+            }));
+          setAppliedJobs(appliedJobsList);
+        } catch (err) {
+          console.error("Error fetching applied jobs:", err);
+        }
+
+        // Fetch accepted jobs (active work)
+        try {
+          const acceptedData = await getWorkerAcceptedJobs();
+          const acceptedJobsList = acceptedData
+            .map((app: any) => ({
+              _id: app.jobId._id,
+              title: app.jobId.title,
+              location: app.jobId.location,
+              pricingAmount: app.jobId.pricingAmount,
+              pricingType: app.jobId.pricingType,
+              status: "accepted" as const,
+              postedBy: app.jobId.postedBy,
+              createdAt: app.jobId.createdAt,
+            }));
+          setActiveJobs(acceptedJobsList);
+        } catch (err) {
+          console.error("Error fetching accepted jobs:", err);
+        }
+
+        // Fetch pending completion jobs
+        try {
+          const pendingData = await getWorkerPendingCompletion();
+          const pendingJobsList = pendingData
+            .map((app: any) => ({
+              _id: app.jobId._id,
+              title: app.jobId.title,
+              location: app.jobId.location,
+              pricingAmount: app.jobId.pricingAmount,
+              pricingType: app.jobId.pricingType,
+              status: "completion_pending" as const,
+              postedBy: app.jobId.postedBy,
+              createdAt: app.jobId.createdAt,
+              applicationId: app._id,
+            }));
+          setPendingCompletionJobs(pendingJobsList);
+        } catch (err) {
+          console.error("Error fetching pending completion jobs:", err);
+        }
+
+        // Fetch completed jobs
+        try {
+          const completedData = await getWorkerCompletedJobs();
+          const completedJobsList = completedData
+            .map((app: any) => ({
+              _id: app.jobId._id,
+              title: app.jobId.title,
+              location: app.jobId.location,
+              pricingAmount: app.jobId.pricingAmount,
+              pricingType: app.jobId.pricingType,
+              status: "completed" as const,
+              postedBy: app.jobId.postedBy,
+              createdAt: app.jobId.createdAt,
+            }));
+          setCompletedJobs(completedJobsList);
+        } catch (err) {
+          console.error("Error fetching completed jobs:", err);
+        }
+
+        setLoading(false);
+      } catch (err) {
+        console.error("Auth error:", err);
+        setError("Failed to load dashboard");
+        setLoading(false);
+      }
     };
 
     checkAuth();
   }, [locale, router]);
+
+  const handleConfirmCompletion = async (job: Job) => {
+    if (!job.applicationId) return;
+    try {
+      await confirmJobCompletion(job.applicationId);
+      // Refresh the data
+      const completedData = await getWorkerCompletedJobs();
+      const completedJobsList = completedData.map((app: any) => ({
+        _id: app.jobId._id,
+        title: app.jobId.title,
+        location: app.jobId.location,
+        pricingAmount: app.jobId.pricingAmount,
+        pricingType: app.jobId.pricingType,
+        status: "completed" as const,
+        postedBy: app.jobId.postedBy,
+        createdAt: app.jobId.createdAt,
+      }));
+      setCompletedJobs(completedJobsList);
+      setPendingCompletionJobs(pendingCompletionJobs.filter(j => j._id !== job._id));
+    } catch (err) {
+      console.error("Error confirming completion:", err);
+    }
+  };
+
+  const handleRejectCompletion = async (job: Job) => {
+    if (!job.applicationId) return;
+    try {
+      await rejectJobCompletion(job.applicationId);
+      // Refresh active jobs
+      const acceptedData = await getWorkerAcceptedJobs();
+      const acceptedJobsList = acceptedData.map((app: any) => ({
+        _id: app.jobId._id,
+        title: app.jobId.title,
+        location: app.jobId.location,
+        pricingAmount: app.jobId.pricingAmount,
+        pricingType: app.jobId.pricingType,
+        status: "accepted" as const,
+        postedBy: app.jobId.postedBy,
+        createdAt: app.jobId.createdAt,
+      }));
+      setActiveJobs(acceptedJobsList);
+      setPendingCompletionJobs(pendingCompletionJobs.filter(j => j._id !== job._id));
+    } catch (err) {
+      console.error("Error rejecting completion:", err);
+    }
+  };
 
   if (loading) {
     return (
@@ -57,55 +213,19 @@ export default function WorkerDashboardPage() {
     );
   }
 
-  // Sample data - replace with API calls
-  const appliedJobs: Job[] = [
-    {
-      id: "1",
-      title: "Plumbing Work",
-      location: "Bilimora",
-      pay: 1200,
-      payType: "day",
-      status: "applied"
-    },
-    {
-      id: "2",
-      title: "Electrical Wiring",
-      location: "Navsari",
-      pay: 2500,
-      payType: "job",
-      status: "applied"
-    }
-  ];
-
-  const activeJobs: Job[] = [
-    {
-      id: "3",
-      title: "House Renovation",
-      location: "Valsad",
-      pay: 15000,
-      payType: "job",
-      status: "accepted"
-    }
-  ];
-
-  const completedJobs: Job[] = [
-    {
-      id: "4",
-      title: "Tile Fitting",
-      location: "Bilimora",
-      pay: 3500,
-      payType: "day",
-      status: "completed"
-    },
-    {
-      id: "5",
-      title: "Painting Work",
-      location: "Navsari",
-      pay: 5000,
-      payType: "job",
-      status: "completed"
-    }
-  ];
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-8 px-4">
+        <div className="max-w-7xl mx-auto">
+          <Card className="border-red-200 bg-red-50">
+            <CardContent className="p-6 text-red-700">
+              {error}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-8 px-4 sm:px-6 lg:px-8">
@@ -147,7 +267,7 @@ export default function WorkerDashboardPage() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">
-                  {activeJobs.length}
+                  {activeJobs.length + pendingCompletionJobs.length}
                 </div>
                 <Clock className="h-8 w-8 text-amber-500 opacity-50" />
               </div>
@@ -179,7 +299,7 @@ export default function WorkerDashboardPage() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">
-                  ₹8.5K
+                  ₹{(completedJobs.reduce((sum, job) => sum + getNumericAmount(job.pricingAmount), 0) / 1000).toFixed(1)}K
                 </div>
                 <IndianRupee className="h-8 w-8 text-emerald-500 opacity-50" />
               </div>
@@ -200,7 +320,7 @@ export default function WorkerDashboardPage() {
           ) : (
             <div className="grid gap-4">
               {activeJobs.map((job) => (
-                <Card key={job.id} className="hover:shadow-lg transition-shadow">
+                <Card key={job._id} className="hover:shadow-lg transition-shadow">
                   <CardContent className="pt-6">
                     <div className="flex items-start justify-between mb-4">
                       <div>
@@ -209,7 +329,7 @@ export default function WorkerDashboardPage() {
                         </h3>
                         <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-1 mt-1">
                           <MapPin className="h-4 w-4" />
-                          {job.location}
+                          {job.location || "Location not specified"}
                         </p>
                       </div>
                       <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
@@ -218,7 +338,7 @@ export default function WorkerDashboardPage() {
                     </div>
                     <div className="flex items-center justify-between">
                       <p className="font-semibold text-lg text-emerald-600 dark:text-emerald-400">
-                        ₹{job.pay} <span className="text-sm text-gray-600 dark:text-gray-400">/{job.payType}</span>
+                        {formatPricing(job.pricingAmount, job.pricingType)}
                       </p>
                       <Button variant="outline" size="sm">
                         View Details
@@ -230,6 +350,56 @@ export default function WorkerDashboardPage() {
             </div>
           )}
         </div>
+
+        {/* Pending Completion Jobs */}
+        {pendingCompletionJobs.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Jobs Pending Confirmation</h2>
+            <div className="grid gap-4">
+              {pendingCompletionJobs.map((job) => (
+                <Card key={job._id} className="hover:shadow-lg transition-shadow border-orange-200 dark:border-orange-900/30">
+                  <CardContent className="pt-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <h3 className="font-semibold text-lg text-gray-900 dark:text-white">
+                          {job.title}
+                        </h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-1 mt-1">
+                          <MapPin className="h-4 w-4" />
+                          {job.location || "Location not specified"}
+                        </p>
+                      </div>
+                      <Badge className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                        Awaiting Confirmation
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <p className="font-semibold text-lg text-emerald-600 dark:text-emerald-400">
+                        {formatPricing(job.pricingAmount, job.pricingType)}
+                      </p>
+                    </div>
+                    <div className="mt-4 flex gap-3">
+                      <Button
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700"
+                        onClick={() => handleConfirmCompletion(job)}
+                      >
+                        Confirm Completion
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleRejectCompletion(job)}
+                      >
+                        Reject & Continue
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Applied Jobs */}
         <div className="mb-8">
@@ -244,7 +414,7 @@ export default function WorkerDashboardPage() {
           ) : (
             <div className="grid gap-4">
               {appliedJobs.map((job) => (
-                <Card key={job.id} className="hover:shadow-lg transition-shadow">
+                <Card key={job._id} className="hover:shadow-lg transition-shadow">
                   <CardContent className="pt-6">
                     <div className="flex items-start justify-between mb-4">
                       <div>
@@ -253,7 +423,7 @@ export default function WorkerDashboardPage() {
                         </h3>
                         <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-1 mt-1">
                           <MapPin className="h-4 w-4" />
-                          {job.location}
+                          {job.location || "Location not specified"}
                         </p>
                       </div>
                       <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
@@ -262,7 +432,7 @@ export default function WorkerDashboardPage() {
                     </div>
                     <div className="flex items-center justify-between">
                       <p className="font-semibold text-lg text-emerald-600 dark:text-emerald-400">
-                        ₹{job.pay} <span className="text-sm text-gray-600 dark:text-gray-400">/{job.payType}</span>
+                        {formatPricing(job.pricingAmount, job.pricingType)}
                       </p>
                       <Button variant="outline" size="sm">
                         View Details
@@ -288,7 +458,7 @@ export default function WorkerDashboardPage() {
           ) : (
             <div className="grid gap-4">
               {completedJobs.map((job) => (
-                <Card key={job.id} className="hover:shadow-lg transition-shadow">
+                <Card key={job._id} className="hover:shadow-lg transition-shadow">
                   <CardContent className="pt-6">
                     <div className="flex items-start justify-between mb-4">
                       <div>
@@ -297,7 +467,7 @@ export default function WorkerDashboardPage() {
                         </h3>
                         <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-1 mt-1">
                           <MapPin className="h-4 w-4" />
-                          {job.location}
+                          {job.location || "Location not specified"}
                         </p>
                       </div>
                       <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
@@ -306,7 +476,7 @@ export default function WorkerDashboardPage() {
                     </div>
                     <div className="flex items-center justify-between">
                       <p className="font-semibold text-lg text-emerald-600 dark:text-emerald-400">
-                        ₹{job.pay} <span className="text-sm text-gray-600 dark:text-gray-400">/{job.payType}</span>
+                        {formatPricing(job.pricingAmount, job.pricingType)}
                       </p>
                       <Button variant="outline" size="sm">
                         View Details

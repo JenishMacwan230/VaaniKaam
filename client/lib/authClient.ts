@@ -9,6 +9,9 @@ export interface AuthUser {
   email?: string;
   phone?: string;
   location?: string;
+  normalizedLocation?: string;
+  latitude?: number;
+  longitude?: number;
   city?: string;
   workCategory?: string;
   accountType?: AccountType;
@@ -28,6 +31,9 @@ export interface AuthUser {
 export interface ProfileUpdatePayload {
   name?: string;
   location?: string;
+  normalizedLocation?: string;
+  latitude?: number;
+  longitude?: number;
   profession?: string;
   skills?: string[];
   experienceYears?: number;

@@ -2,6 +2,29 @@ import { Request, Response } from "express";
 import Job from "../models/Job";
 import JobApplication from "../models/JobApplication";
 
+const syncJobStatusFromApplications = async (jobId: any) => {
+  const job = await Job.findById(jobId);
+  if (!job) return;
+
+  const applications = await JobApplication.find({ jobId: job._id });
+
+  const hasCompletionPending = applications.some((app) => app.status === "completion_pending");
+  const hasAccepted = applications.some((app) => app.status === "accepted");
+  const hasCompleted = applications.some((app) => app.status === "completed");
+
+  let nextStatus: "open" | "in_progress" | "completion_pending" | "completed" = "open";
+
+  if (hasCompletionPending) {
+    nextStatus = "completion_pending";
+  } else if (hasAccepted) {
+    nextStatus = "in_progress";
+  } else if (hasCompleted) {
+    nextStatus = "completed";
+  }
+
+  await Job.findByIdAndUpdate(job._id, { status: nextStatus });
+};
+
 export const createJob = async (req: Request & any, res: Response) => {
   try {
     // Support both field name formats
@@ -10,19 +33,27 @@ export const createJob = async (req: Request & any, res: Response) => {
       description,
       skillRequired,
       location,
+      normalizedLocation,
+      isLocationNormalized,
+      latitude,
+      longitude,
       wage,
       date,
-      // New format from add-works form
       category,
       pricingType,
       pricingAmount,
       urgency,
+      // Structured duration fields
+      duration_value,
+      duration_unit,
+      workersRequired,
+      jobDate,
+      selectedDate,
     } = req.body || {};
 
     const user = req.user;
     if (!user) return res.status(401).json({ message: "Unauthorized" });
 
-    // Map new field names to old ones if provided
     const finalWage = wage || pricingAmount;
     const finalSkills = skillRequired || (category ? [category] : []);
 
@@ -31,11 +62,22 @@ export const createJob = async (req: Request & any, res: Response) => {
       description,
       skillRequired: Array.isArray(finalSkills) ? finalSkills : [],
       location,
+      normalizedLocation,
+      isLocationNormalized: isLocationNormalized || false,
+      latitude,
+      longitude,
       wage: finalWage,
+      pricingAmount: pricingAmount || finalWage,
       date,
       category,
       pricingType,
       urgency,
+      // Structured duration fields
+      duration_value: duration_value || 1,
+      duration_unit: duration_unit || "day",
+      workersRequired: workersRequired || 1,
+      jobDate: jobDate || "today",
+      selectedDate,
       postedBy: user._id,
     });
 
@@ -54,7 +96,12 @@ export const listJobs = async (req: Request, res: Response) => {
     const jobs = await Job.find(filter).populate("postedBy", "name email activeRole").sort({ createdAt: -1 });
     return res.json({ jobs });
   } catch (error) {
-    return res.status(500).json({ message: "Failed to fetch jobs" });
+    console.error("Error fetching jobs:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return res.status(500).json({ 
+      message: "Failed to fetch jobs",
+      error: errorMessage,
+    });
   }
 };
 
@@ -152,5 +199,289 @@ export const getRecentApplications = async (req: Request & any, res: Response) =
     return res.json({ applications });
   } catch (error) {
     return res.status(500).json({ message: "Failed to fetch recent applications" });
+  }
+};
+
+export const getJobById = async (req: Request, res: Response) => {
+  try {
+    const { jobId } = req.params;
+    const job = await Job.findById(jobId)
+      .populate("postedBy", "name email");
+    
+    if (!job) {
+      return res.status(404).json({ message: "Job not found" });
+    }
+
+    // Get all applications for this job with worker details
+    const applications = await JobApplication.find({ jobId: job._id })
+      .populate("workerId", "name email phone proficiency location")
+      .sort({ createdAt: -1 });
+
+    return res.json({
+      job: {
+        ...job.toObject(),
+        applications: applications,
+      },
+    });
+  } catch (error) {
+    console.error("Get job error:", error);
+    return res.status(500).json({ message: "Failed to fetch job details" });
+  }
+};
+
+export const updateApplicationStatus = async (req: Request & any, res: Response) => {
+  try {
+    const { applicationId, action } = req.params;
+    const user = req.user;
+    if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+    // Get the application
+    const application = await JobApplication.findById(applicationId);
+    if (!application) {
+      return res.status(404).json({ message: "Application not found" });
+    }
+
+    // Verify the job belongs to the user
+    const job = await Job.findById(application.jobId);
+    const jobPostedById = job?.postedBy?.toString();
+    const userId = user._id?.toString();
+    if (!job || jobPostedById !== userId) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    // Update application status
+    let newStatus: any = "applied";
+    if (action === "accept") {
+      newStatus = "accepted";
+    } else if (action === "reject") {
+      newStatus = "rejected";
+    }
+    application.status = newStatus;
+    await application.save();
+
+    await syncJobStatusFromApplications(application.jobId);
+
+    return res.json({ application });
+  } catch (error) {
+    console.error("Update application error:", error);
+    return res.status(500).json({ message: "Failed to update application" });
+  }
+};
+
+export const deleteJob = async (req: Request & any, res: Response) => {
+  try {
+    const { jobId } = req.params;
+    const user = req.user;
+    if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+    // Get the job
+    const job = await Job.findById(jobId);
+    if (!job) {
+      return res.status(404).json({ message: "Job not found" });
+    }
+
+    // Verify job belongs to user
+    const jobPostedById = job.postedBy?.toString();
+    const userId = user._id?.toString();
+    if (jobPostedById !== userId) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    // Delete job and its applications
+    await Job.findByIdAndDelete(jobId);
+    await JobApplication.deleteMany({ jobId: jobId });
+
+    return res.json({ message: "Job deleted successfully" });
+  } catch (error) {
+    console.error("Delete job error:", error);
+    return res.status(500).json({ message: "Failed to delete job" });
+  }
+};
+
+export const getWorkerApplications = async (req: Request & any, res: Response) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+    // Get all applications by this worker with job details
+    const applications = await JobApplication.find({ workerId: user._id })
+      .populate("jobId", "_id title description location latitude longitude pricingAmount pricingType category urgency jobDate duration_value duration_unit workersRequired status postedBy")
+      .sort({ createdAt: -1 });
+
+    return res.json({ applications });
+  } catch (error) {
+    console.error("Get worker applications error:", error);
+    return res.status(500).json({ message: "Failed to fetch applications" });
+  }
+};
+
+export const getWorkerAcceptedJobs = async (req: Request & any, res: Response) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+    // Get all ACCEPTED applications by this worker with job details
+    const applications = await JobApplication.find({ 
+      workerId: user._id,
+      status: "accepted"
+    })
+      .populate("jobId", "_id title description location latitude longitude pricingAmount pricingType category urgency jobDate duration_value duration_unit workersRequired status postedBy createdAt")
+      .sort({ createdAt: -1 });
+
+    return res.json({ applications });
+  } catch (error) {
+    console.error("Get worker accepted jobs error:", error);
+    return res.status(500).json({ message: "Failed to fetch accepted jobs" });
+  }
+};
+
+export const markJobComplete = async (req: Request & any, res: Response) => {
+  try {
+    const { applicationId } = req.body;
+    const user = req.user;
+    if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+    // Get the application
+    const application = await JobApplication.findById(applicationId);
+    if (!application) {
+      return res.status(404).json({ message: "Application not found" });
+    }
+
+    // Verify the job belongs to the user (contractor)
+    const job = await Job.findById(application.jobId);
+    const jobPostedById = job?.postedBy?.toString();
+    const userId = user._id?.toString();
+    if (!job || jobPostedById !== userId) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    // Update status to completion_pending
+    if (application.status !== "accepted") {
+      return res.status(400).json({ message: "Only accepted jobs can be marked complete" });
+    }
+
+    application.status = "completion_pending";
+    await application.save();
+
+    await syncJobStatusFromApplications(application.jobId);
+
+    return res.json({ application });
+  } catch (error) {
+    console.error("Mark job complete error:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return res.status(500).json({ message: `Failed to mark job complete: ${errorMessage}` });
+  }
+};
+
+export const getWorkerPendingCompletion = async (req: Request & any, res: Response) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+    // Get all COMPLETION_PENDING applications by this worker with job details
+    const applications = await JobApplication.find({ 
+      workerId: user._id,
+      status: "completion_pending"
+    })
+      .populate("jobId", "_id title description location latitude longitude pricingAmount pricingType category urgency jobDate duration_value duration_unit workersRequired status postedBy createdAt")
+      .sort({ createdAt: -1 });
+
+    return res.json({ applications });
+  } catch (error) {
+    console.error("Get worker pending completion error:", error);
+    return res.status(500).json({ message: "Failed to fetch pending completion jobs" });
+  }
+};
+
+export const confirmJobCompletion = async (req: Request & any, res: Response) => {
+  try {
+    const { applicationId } = req.body;
+    const user = req.user;
+    if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+    // Get the application
+    const application = await JobApplication.findById(applicationId);
+    if (!application) {
+      return res.status(404).json({ message: "Application not found" });
+    }
+
+    // Verify the worker owns this application
+    const workerId = application.workerId?.toString();
+    const userId = user._id?.toString();
+    if (workerId !== userId) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    // Update status to completed
+    if (application.status !== "completion_pending") {
+      return res.status(400).json({ message: "Only completion_pending jobs can be confirmed" });
+    }
+
+    application.status = "completed";
+    await application.save();
+
+    await syncJobStatusFromApplications(application.jobId);
+
+    return res.json({ application });
+  } catch (error) {
+    console.error("Confirm job completion error:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return res.status(500).json({ message: `Failed to confirm completion: ${errorMessage}` });
+  }
+};
+
+export const rejectJobCompletion = async (req: Request & any, res: Response) => {
+  try {
+    const { applicationId } = req.body;
+    const user = req.user;
+    if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+    // Get the application
+    const application = await JobApplication.findById(applicationId);
+    if (!application) {
+      return res.status(404).json({ message: "Application not found" });
+    }
+
+    // Verify the worker owns this application
+    const workerId = application.workerId?.toString();
+    const userId = user._id?.toString();
+    if (workerId !== userId) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    // Update status back to accepted
+    if (application.status !== "completion_pending") {
+      return res.status(400).json({ message: "Only completion_pending jobs can be rejected" });
+    }
+
+    application.status = "accepted";
+    await application.save();
+
+    await syncJobStatusFromApplications(application.jobId);
+
+    return res.json({ application });
+  } catch (error) {
+    console.error("Reject job completion error:", error);
+    return res.status(500).json({ message: "Failed to reject job completion" });
+  }
+};
+
+export const getWorkerCompletedJobs = async (req: Request & any, res: Response) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+    // Get all COMPLETED applications by this worker with job details
+    const applications = await JobApplication.find({ 
+      workerId: user._id,
+      status: "completed"
+    })
+      .populate("jobId", "_id title description location latitude longitude pricingAmount pricingType category urgency jobDate duration_value duration_unit workersRequired status postedBy createdAt")
+      .sort({ createdAt: -1 });
+
+    return res.json({ applications });
+  } catch (error) {
+    console.error("Get worker completed jobs error:", error);
+    return res.status(500).json({ message: "Failed to fetch completed jobs" });
   }
 };

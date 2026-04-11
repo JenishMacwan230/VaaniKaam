@@ -3,8 +3,9 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { fetchSessionUser, AuthUser, updateSessionProfile, resolveAccountType, getCurrentLocale } from "@/lib/authClient";
+import { fetchSessionUser, AuthUser, updateSessionProfile, resolveAccountType } from "@/lib/authClient";
 import { uploadProfilePicture, deleteProfilePicture } from "@/lib/cloudinaryUtils";
+import { normalizeLocationWithCache } from "@/lib/locationNormalizer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -100,10 +101,15 @@ export default function ProfilePage() {
   const [showSkillDialog, setShowSkillDialog] = useState(false);
   const [showPicDialog, setShowPicDialog] = useState(false);
   const [newSkill, setNewSkill] = useState("");
+  const [isNormalizingLocation, setIsNormalizingLocation] = useState(false);
+  const [locationError, setLocationError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editFormData, setEditFormData] = useState({
     name: "",
     location: "",
+    normalizedLocation: "",
+    latitude: undefined as number | undefined,
+    longitude: undefined as number | undefined,
     profession: "",
     skills: [] as string[],
     languages: [] as string[],
@@ -140,8 +146,8 @@ export default function ProfilePage() {
       setUser(updatedUser);
       localStorage.setItem("user", JSON.stringify(updatedUser));
       // Notify other components (like Navbar) to refresh session user
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("auth-changed"));
+      if (globalThis.window !== undefined) {
+        globalThis.dispatchEvent(new Event("auth-changed"));
       }
       alert("Profile picture updated successfully!");
       setShowPicDialog(false);
@@ -170,8 +176,8 @@ export default function ProfilePage() {
       };
       setUser(updatedUser);
       localStorage.setItem("user", JSON.stringify(updatedUser));
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("auth-changed"));
+      if (globalThis.window !== undefined) {
+        globalThis.dispatchEvent(new Event("auth-changed"));
       }
       setShowPicDialog(false);
       alert("Profile picture removed successfully!");
@@ -200,6 +206,9 @@ export default function ProfilePage() {
         setEditFormData({
           name: userData.name || "",
           location: userData.location || "",
+          normalizedLocation: userData.normalizedLocation || "",
+          latitude: typeof userData.latitude === "number" ? userData.latitude : undefined,
+          longitude: typeof userData.longitude === "number" ? userData.longitude : undefined,
           profession: (userData as unknown as Record<string, string>).profession || "",
           skills: ((userData as unknown as Record<string, unknown>).skills as string[]) || [],
           languages: normalizedLanguages,
@@ -247,6 +256,42 @@ export default function ProfilePage() {
     });
   };
 
+  const normalizeProfileLocation = async (): Promise<boolean> => {
+    const locationInput = editFormData.location.trim();
+
+    if (!locationInput) {
+      setLocationError("City/Location is required");
+      return false;
+    }
+
+    try {
+      setIsNormalizingLocation(true);
+      const normalized = await normalizeLocationWithCache(locationInput);
+
+      if (!normalized.isValid) {
+        setLocationError(
+          normalized.error || `"${locationInput}" not found. Please enter a valid location.`
+        );
+        return false;
+      }
+
+      setEditFormData((prev) => ({
+        ...prev,
+        normalizedLocation: normalized.standardizedName,
+        latitude: normalized.latitude,
+        longitude: normalized.longitude,
+      }));
+      setLocationError("");
+      return true;
+    } catch (error) {
+      console.error("Failed to normalize profile location", error);
+      setLocationError("Location verification failed. Please try again.");
+      return false;
+    } finally {
+      setIsNormalizingLocation(false);
+    }
+  };
+
   const handleSaveProfile = async () => {
     if (!editFormData.name.trim()) {
       alert("Name is required");
@@ -255,6 +300,20 @@ export default function ProfilePage() {
     if (!editFormData.location.trim()) {
       alert("City/Location is required");
       return;
+    }
+
+    const hasLocationData = Boolean(
+      editFormData.normalizedLocation
+      && typeof editFormData.latitude === "number"
+      && typeof editFormData.longitude === "number"
+    );
+
+    if (!hasLocationData) {
+      const isLocationValid = await normalizeProfileLocation();
+      if (!isLocationValid) {
+        alert("Please enter a valid location before saving your profile.");
+        return;
+      }
     }
 
     setSaving(true);
@@ -272,6 +331,9 @@ export default function ProfilePage() {
       const payload = {
         name: editFormData.name.trim(),
         location: editFormData.location.trim(),
+        normalizedLocation: editFormData.normalizedLocation.trim(),
+        latitude: editFormData.latitude,
+        longitude: editFormData.longitude,
         profession: editFormData.profession.trim(),
         skills: editFormData.skills,
         languages: editFormData.languages,
@@ -302,6 +364,13 @@ export default function ProfilePage() {
         <Loader2 className="h-8 w-8 animate-spin text-secondary dark:text-emerald-400" />
       </div>
     );
+  }
+
+  let locationStatusText = "Location will be normalized and coordinates saved.";
+  if (isNormalizingLocation) {
+    locationStatusText = "Verifying location...";
+  } else if (editFormData.normalizedLocation) {
+    locationStatusText = `Normalized: ${editFormData.normalizedLocation}`;
   }
 
   return (
@@ -383,9 +452,34 @@ export default function ProfilePage() {
                 id="location"
                 placeholder="Enter your city"
                 value={editFormData.location}
-                onChange={(e) => setEditFormData({ ...editFormData, location: e.target.value })}
+                onChange={(e) => {
+                  setEditFormData({
+                    ...editFormData,
+                    location: e.target.value,
+                    normalizedLocation: "",
+                    latitude: undefined,
+                    longitude: undefined,
+                  });
+                  if (locationError) {
+                    setLocationError("");
+                  }
+                }}
+                onBlur={() => {
+                  void normalizeProfileLocation();
+                }}
                 className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               />
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {locationStatusText}
+              </p>
+              {typeof editFormData.latitude === "number" && typeof editFormData.longitude === "number" && (
+                <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">
+                  Coordinates: {editFormData.latitude.toFixed(4)}, {editFormData.longitude.toFixed(4)}
+                </p>
+              )}
+              {locationError && (
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{locationError}</p>
+              )}
             </div>
 
             {/* About */}

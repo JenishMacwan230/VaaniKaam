@@ -12,7 +12,7 @@ const jobApplicationSchema: Schema = new Schema(
     workerId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     status: {
       type: String,
-      enum: ["applied", "accepted", "rejected"],
+      enum: ["applied", "accepted", "rejected", "completion_pending", "completed"],
       default: "applied",
     },
   },
