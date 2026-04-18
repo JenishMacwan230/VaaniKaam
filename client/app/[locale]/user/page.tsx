@@ -71,7 +71,7 @@ export default function UserHubPage() {
       key: "help",
       title: "Help & support",
       description: "Get help with using VaaniKaam or report an issue.",
-      href: `/${locale}/contact`,
+      href: `/${locale}/help-support`,
       icon: HelpCircle,
     },
     {

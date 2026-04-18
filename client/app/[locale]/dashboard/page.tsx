@@ -2,112 +2,96 @@
 
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { fetchSessionUser, AuthUser, logoutSession, updateSessionProfile, resolveAccountType, getCurrentLocale } from "@/lib/authClient";
+import {
+  fetchSessionUser,
+  AuthUser,
+  logoutSession,
+  updateSessionProfile,
+  resolveAccountType,
+  getCurrentLocale,
+} from "@/lib/authClient";
 import { UserAvatar } from "@/components/UserAvatar";
 import { uploadProfilePicture, deleteProfilePicture } from "@/lib/cloudinaryUtils";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Loader2,
-  LogOut,
-  MapPin,
-  Edit,
-  Camera,
-  Trash2,
-  Check,
-  Briefcase,
-  FileText,
-  Settings,
-  Clock,
-  Users,
-  Star,
-  User,
-  Hammer,
-  Languages,
-  BriefcaseBusiness,
-  Wallet,
-  Upload,
-  ArrowLeft,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Loader2, LogOut, MapPin, Edit, Camera, Trash2, Check,
+  Briefcase, FileText, Settings, Clock, Star, User, Hammer,
+  Languages, BriefcaseBusiness, Wallet, Upload, ArrowLeft,
+  TrendingUp, CheckCircle, AlertCircle, IndianRupee,
+  ChevronRight, Activity,
 } from "lucide-react";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
+  Dialog, DialogContent, DialogDescription,
+  DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 type PricingType = "hour" | "day" | "job";
 
 function normalizeLanguages(userLanguages: unknown): string[] {
-  if (Array.isArray(userLanguages)) {
-    return userLanguages.filter((lang): lang is string => typeof lang === "string");
-  }
-
-  if (typeof userLanguages === "string") {
-    return userLanguages
-      .split(",")
-      .map((lang) => lang.trim())
-      .filter(Boolean);
-  }
-
+  if (Array.isArray(userLanguages))
+    return userLanguages.filter((l): l is string => typeof l === "string");
+  if (typeof userLanguages === "string")
+    return userLanguages.split(",").map((l) => l.trim()).filter(Boolean);
   return [];
 }
 
-function getPricingPlaceholder(pricingType: PricingType): string {
-  if (pricingType === "hour") return "INR per hour";
-  if (pricingType === "day") return "INR per day";
+function getPricingPlaceholder(t: PricingType) {
+  if (t === "hour") return "INR per hour";
+  if (t === "day") return "INR per day";
   return "INR per job";
 }
 
-function getPricingLabel(pricingType: PricingType): string {
-  if (pricingType === "hour") return "per hour";
-  if (pricingType === "day") return "per day";
-  return "per job";
+function getPricingLabel(t: PricingType) {
+  if (t === "hour") return "/ hr";
+  if (t === "day") return "/ day";
+  return "/ job";
+}
+
+/* ─── Analytics fetch helpers ─── */
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+
+interface WorkerAnalytics {
+  totalApplications: number;
+  activeJobs: number;
+  completedJobs: number;
+  totalEarned: number;
+  successRate: number;
+}
+
+async function fetchWorkerAnalytics(): Promise<WorkerAnalytics> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/jobs/worker/analytics`, {
+      credentials: "include",
+    });
+    if (res.ok) {
+      const d = await res.json();
+      return d.analytics;
+    }
+  } catch {}
+  return { totalApplications: 0, activeJobs: 0, completedJobs: 0, totalEarned: 0, successRate: 0 };
 }
 
 export default function DashboardPage() {
-  const professionOptions = [
-    "Mason",
-    "Carpenter",
-    "Plumber",
-    "Electrician",
-    "Painter",
-    "Welder",
-    "General Labor",
-  ];
-
-  const skillOptions = [
-    "Tile Work",
-    "Plumbing",
-    "Wiring",
-    "POP Work",
-    "Waterproofing",
-    "Painting",
-    "Furniture Fitting",
-    "Site Cleaning",
-  ];
-
-  const languageOptions = [
-    "Gujarati",
-    "Hindi",
-    "English",
-    // "Marathi",
-    // "Tamil",
-    // "Telugu",
-  ];
-
+  const professionOptions = ["Mason", "Carpenter", "Plumber", "Electrician", "Painter", "Welder", "General Labor"];
+  const skillOptions = ["Tile Work", "Plumbing", "Wiring", "POP Work", "Waterproofing", "Painting", "Furniture Fitting", "Site Cleaning"];
+  const languageOptions = ["Gujarati", "Hindi", "English"];
   const experienceOptions = [
     { label: "Fresher", value: 0 },
-    { label: "1-3 years", value: 2 },
-    { label: "3-5 years", value: 4 },
+    { label: "1–3 years", value: 2 },
+    { label: "3–5 years", value: 4 },
     { label: "5+ years", value: 6 },
   ];
 
@@ -117,80 +101,58 @@ export default function DashboardPage() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [isAvailable, setIsAvailable] = useState(true);
+  const [analytics, setAnalytics] = useState<WorkerAnalytics | null>(null);
   const [editFormData, setEditFormData] = useState({
-    name: "",
-    location: "",
-    phone: "",
-    profession: "",
-    skills: [] as string[],
-    experienceYears: 2,
-    pricingType: "hour" as PricingType,
-    pricingAmount: "",
-    languages: [] as string[],
-    about: "",
+    name: "", location: "", phone: "", profession: "",
+    skills: [] as string[], experienceYears: 2,
+    pricingType: "hour" as PricingType, pricingAmount: "",
+    languages: [] as string[], about: "",
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
   const profileCompletion = useMemo(() => {
     const checks = [
-      Boolean(editFormData.name.trim()),
-      Boolean(editFormData.location.trim()),
-      Boolean(editFormData.phone.trim()),
-      Boolean(editFormData.profession),
-      editFormData.skills.length > 0,
-      editFormData.experienceYears > 0,
-      Boolean(editFormData.pricingAmount),
-      editFormData.languages.length > 0,
-      Boolean(editFormData.about.trim()),
-      Boolean(user?.profilePictureUrl),
+      Boolean(editFormData.name.trim()), Boolean(editFormData.location.trim()),
+      Boolean(editFormData.phone.trim()), Boolean(editFormData.profession),
+      editFormData.skills.length > 0, editFormData.experienceYears > 0,
+      Boolean(editFormData.pricingAmount), editFormData.languages.length > 0,
+      Boolean(editFormData.about.trim()), Boolean(user?.profilePictureUrl),
     ];
-
-    const completeCount = checks.filter(Boolean).length;
-    return Math.round((completeCount / checks.length) * 100);
+    return Math.round((checks.filter(Boolean).length / checks.length) * 100);
   }, [editFormData, user?.profilePictureUrl]);
 
   useEffect(() => {
     const loadUser = async () => {
       try {
         const userData = await fetchSessionUser();
-        if (!userData) {
-          router.push("/en/login");
-          return;
-        }
-
-        // Redirect contractors to their dashboard
+        if (!userData) { router.push("/en/login"); return; }
         const accountType = resolveAccountType(userData);
         if (accountType === "contractor") {
           const locale = getCurrentLocale(window.location.pathname);
           router.push(`/${locale}/dashboard/contractor`);
           return;
         }
-
         setUser(userData);
-        if (typeof userData.availability === "boolean") {
-          setIsAvailable(userData.availability);
-        }
-        const userLanguages = (userData as unknown as Record<string, unknown>).languages;
-        const normalizedLanguages = normalizeLanguages(userLanguages);
-
+        if (typeof userData.availability === "boolean") setIsAvailable(userData.availability);
+        const raw = userData as unknown as Record<string, unknown>;
         setEditFormData({
           name: userData.name || "",
           location: userData.location || "",
           phone: userData.phone || "",
-          profession: (userData as unknown as Record<string, string>).profession || "",
-          skills: ((userData as unknown as Record<string, unknown>).skills as string[]) || [],
-          experienceYears: Number((userData as unknown as Record<string, unknown>).experienceYears || 2),
-          pricingType: ((userData as unknown as Record<string, PricingType>).pricingType || "hour"),
-          pricingAmount: typeof (userData as unknown as Record<string, unknown>).pricingAmount === "number"
-            || typeof (userData as unknown as Record<string, unknown>).pricingAmount === "string"
-            ? String((userData as unknown as Record<string, unknown>).pricingAmount)
-            : "",
-          languages: normalizedLanguages,
-          about: (userData as unknown as Record<string, string>).about || "",
+          profession: (raw.profession as string) || "",
+          skills: (raw.skills as string[]) || [],
+          experienceYears: Number(raw.experienceYears || 2),
+          pricingType: (raw.pricingType as PricingType) || "hour",
+          pricingAmount: raw.pricingAmount != null ? String(raw.pricingAmount) : "",
+          languages: normalizeLanguages(raw.languages),
+          about: (raw.about as string) || "",
         });
-      } catch (error) {
-        console.error("Failed to load user", error);
+        // Load analytics
+        const a = await fetchWorkerAnalytics();
+        setAnalytics(a);
+      } catch (err) {
+        console.error(err);
       } finally {
         setLoading(false);
       }
@@ -205,749 +167,541 @@ export default function DashboardPage() {
     router.push("/");
   };
 
-  const handleProfilePicClick = () => {
-    setShowPicDialog(true);
-  };
-
   const handleProfilePicChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-
+    if (!file || !user?.id) return;
     setUploading(true);
     try {
-      if (!user?.id) {
-        alert("User ID not found");
-        return;
-      }
-
       const result = await uploadProfilePicture(file, user.id);
-
-      if (!result.success) {
-        alert(`Upload failed: ${result.error}`);
-        return;
-      }
-
-      // Update user with new profile picture URL
-      const updatedUser = {
-        ...user,
-        profilePictureUrl: result.url,
-        profilePicturePublicId: result.publicId,
-      };
-      setUser(updatedUser);
-
-      // Also update localStorage for quick access
-      localStorage.setItem("user", JSON.stringify(updatedUser));
-
-      alert("Profile picture uploaded successfully!");
-    } catch (error) {
-      console.error("Failed to upload profile picture", error);
-      alert("Failed to upload profile picture");
-    } finally {
-      setUploading(false);
-    }
+      if (!result.success) { alert(`Upload failed: ${result.error}`); return; }
+      const updated = { ...user, profilePictureUrl: result.url, profilePicturePublicId: result.publicId };
+      setUser(updated);
+      localStorage.setItem("user", JSON.stringify(updated));
+    } catch { alert("Failed to upload"); }
+    finally { setUploading(false); }
   };
 
   const handleRemoveProfilePic = async () => {
     setUploading(true);
     try {
-      if (user?.profilePicturePublicId) {
-        const deleted = await deleteProfilePicture(user.profilePicturePublicId);
-        if (!deleted) {
-          console.warn("Failed to delete profile picture from Cloudinary");
-        }
-      }
-
-      // Update user to remove profile picture
-      const updatedUser = {
-        ...user,
-        profilePictureUrl: undefined,
-        profilePicturePublicId: undefined,
-      };
-      setUser(updatedUser);
-
-      // Update localStorage
-      localStorage.setItem("user", JSON.stringify(updatedUser));
-
+      if (user?.profilePicturePublicId) await deleteProfilePicture(user.profilePicturePublicId);
+      const updated = { ...user, profilePictureUrl: undefined, profilePicturePublicId: undefined };
+      setUser(updated);
+      localStorage.setItem("user", JSON.stringify(updated));
       setShowPicDialog(false);
-      alert("Profile picture removed successfully!");
-    } catch (error) {
-      console.error("Failed to remove profile picture", error);
-      alert("Failed to remove profile picture");
-    } finally {
-      setUploading(false);
-    }
+    } finally { setUploading(false); }
   };
 
   const handleEditProfile = async () => {
+    const parsedAmount: number | "" =
+      editFormData.pricingAmount.trim() === "" ? "" : Number(editFormData.pricingAmount);
+    if (parsedAmount !== "" && Number.isNaN(parsedAmount)) { alert("Enter a valid pricing amount"); return; }
     try {
-      const parsedPricingAmount: number | "" = editFormData.pricingAmount.trim() === ""
-        ? ""
-        : Number(editFormData.pricingAmount);
-
-      if (parsedPricingAmount !== "" && Number.isNaN(parsedPricingAmount)) {
-        alert("Please enter a valid pricing amount");
-        return;
-      }
-
-      const payload = {
-        name: editFormData.name.trim(),
-        location: editFormData.location.trim(),
-        profession: editFormData.profession.trim(),
-        skills: editFormData.skills,
-        experienceYears: editFormData.experienceYears,
-        pricingType: editFormData.pricingType,
-        pricingAmount: parsedPricingAmount,
-        languages: editFormData.languages,
+      const updated = await updateSessionProfile({
+        name: editFormData.name.trim(), location: editFormData.location.trim(),
+        profession: editFormData.profession.trim(), skills: editFormData.skills,
+        experienceYears: editFormData.experienceYears, pricingType: editFormData.pricingType,
+        pricingAmount: parsedAmount, languages: editFormData.languages,
         about: editFormData.about.trim(),
-      };
-
-      const updatedUser = await updateSessionProfile(payload);
-      if (!updatedUser) {
-        alert("Failed to update profile");
-        return;
-      }
-
-      localStorage.setItem("user", JSON.stringify(updatedUser));
-      setUser(updatedUser);
+      });
+      if (!updated) { alert("Failed to update profile"); return; }
+      localStorage.setItem("user", JSON.stringify(updated));
+      setUser(updated);
       setShowEditDialog(false);
-      alert("Profile updated successfully!");
-    } catch (error) {
-      console.error("Failed to update profile", error);
-      alert("Failed to update profile");
-    }
+    } catch { alert("Failed to update profile"); }
   };
 
   const handleAvailabilityToggle = async () => {
-    const nextValue = !isAvailable;
-    setIsAvailable(nextValue);
-
-    const updatedUser = await updateSessionProfile({ availability: nextValue });
-    if (!updatedUser) {
-      setIsAvailable(!nextValue);
-      alert("Failed to update availability");
-      return;
-    }
-
-    localStorage.setItem("user", JSON.stringify(updatedUser));
-    setUser(updatedUser);
-    if (typeof updatedUser.availability === "boolean") {
-      setIsAvailable(updatedUser.availability);
-    }
+    const next = !isAvailable;
+    setIsAvailable(next);
+    const updated = await updateSessionProfile({ availability: next });
+    if (!updated) { setIsAvailable(!next); return; }
+    localStorage.setItem("user", JSON.stringify(updated));
+    setUser(updated);
+    if (typeof updated.availability === "boolean") setIsAvailable(updated.availability);
   };
 
-  const toggleSkill = (skill: string, checked: boolean) => {
-    setEditFormData((prev) => ({
-      ...prev,
-      skills: checked
-        ? [...prev.skills, skill]
-        : prev.skills.filter((item) => item !== skill),
-    }));
-  };
-
-  const toggleLanguage = (language: string, checked: boolean) => {
-    setEditFormData((prev) => ({
-      ...prev,
-      languages: checked
-        ? [...prev.languages, language]
-        : prev.languages.filter((item) => item !== language),
-    }));
-  };
-
-  const getDashboardActions = () => {
-    if (user?.accountType === "contractor") {
-      return [
-        {
-          icon: Briefcase,
-          label: "My Jobs",
-          description: "View and manage your posted jobs",
-          color: "text-blue-600",
-          action: () => router.push("/dashboard/jobs"),
-        },
-        {
-          icon: Users,
-          label: "Applications",
-          description: "Review worker applications",
-          color: "text-green-600",
-          action: () => router.push("/dashboard/applications"),
-        },
-        {
-          icon: Star,
-          label: "Reviews",
-          description: "View your ratings & reviews",
-          color: "text-yellow-600",
-          action: () => router.push("/dashboard/reviews"),
-        },
-        {
-          icon: FileText,
-          label: "Contracts",
-          description: "Manage active contracts",
-          color: "text-purple-600",
-          action: () => router.push("/dashboard/contracts"),
-        },
-        {
-          icon: Settings,
-          label: "Settings",
-          description: "Account & notification settings",
-          color: "text-gray-600",
-          action: () => router.push("/dashboard/settings"),
-        },
-      ];
-    } else {
-      // Worker account
-      return [
-        // {
-        //   icon: Briefcase,
-        //   label: "Available Work",
-        //   description: "Browse and apply for jobs",
-        //   color: "text-blue-600",
-        //   action: () => router.push("/find-work"),
-        // },
-        {
-          icon: Clock,
-          label: "My Applications",
-          description: "Track your job applications",
-          color: "text-orange-600",
-          action: () => router.push("/dashboard/my-applications"),
-        },
-        {
-          icon: FileText,
-          label: "Active Projects",
-          description: "View your current projects",
-          color: "text-green-600",
-          action: () => router.push("/dashboard/projects"),
-        },
-        {
-          icon: Star,
-          label: "My Portfolio",
-          description: "Showcase your work & reviews",
-          color: "text-yellow-600",
-          action: () => router.push("/dashboard/portfolio"),
-        },
-        {
-          icon: Settings,
-          label: "Settings",
-          description: "Account & notification settings",
-          color: "text-gray-600",
-          action: () => router.push("/dashboard/settings"),
-        },
-      ];
-    }
-  };
+  const toggleSkill = (skill: string, checked: boolean) =>
+    setEditFormData((p) => ({ ...p, skills: checked ? [...p.skills, skill] : p.skills.filter((s) => s !== skill) }));
+  const toggleLanguage = (lang: string, checked: boolean) =>
+    setEditFormData((p) => ({ ...p, languages: checked ? [...p.languages, lang] : p.languages.filter((l) => l !== lang) }));
 
   if (loading) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="flex min-h-[60vh] items-center justify-center flex-col gap-3">
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+        <p className="text-sm text-muted-foreground">Loading your dashboard…</p>
       </div>
     );
   }
 
   if (!user) return null;
 
-  const actions = getDashboardActions();
-  const workerProfileData = user as AuthUser & {
-    profession?: string;
-    skills?: string[];
-    experienceYears?: number;
-    pricingType?: PricingType;
-    pricingAmount?: string | number;
-    languages?: string[] | string;
-    about?: string;
+  const workerData = user as AuthUser & {
+    profession?: string; skills?: string[]; experienceYears?: number;
+    pricingType?: PricingType; pricingAmount?: string | number;
+    languages?: string[] | string; about?: string;
   };
 
   const workerPricingAmount =
-    typeof workerProfileData.pricingAmount === "number" || typeof workerProfileData.pricingAmount === "string"
-      ? String(workerProfileData.pricingAmount)
-      : "";
-  const workerPricingType = workerProfileData.pricingType || "hour";
-  const workerPricingLabel = getPricingLabel(workerPricingType);
+    workerData.pricingAmount != null ? String(workerData.pricingAmount) : "";
+  const workerPricingType = workerData.pricingType || "hour";
 
   return (
-    <div className="container mx-auto px-4 py-8 pb-24 md:pb-8 max-w-4xl">
-      <div className="mb-8 space-y-3">
+    <div className="min-h-screen bg-muted/30">
+      <div className="mx-auto max-w-2xl px-4 py-6 pb-24 md:pb-8">
+
+        {/* Back */}
         <button
           type="button"
           onClick={() => router.back()}
-          className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent/40"
+          className="mb-4 inline-flex items-center gap-1.5 rounded-full border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent/50 transition-colors"
         >
-          <ArrowLeft className="h-4 w-4" />
-          <span>Back</span>
+          <ArrowLeft className="h-3.5 w-3.5" /> Back
         </button>
 
-        <div>
-          <h1 className="text-4xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Welcome back, {user.name}!</p>
+        {/* Page title */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold tracking-tight">My Dashboard</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Profile, analytics & quick actions</p>
         </div>
-      </div>
 
-      <div className="space-y-6">
-        {/* Profile Card */}
-        <Card className="shadow-lg border-primary/10">
-          <CardHeader className="flex flex-col items-start gap-4 space-y-0 pb-6 bg-muted/20 sm:flex-row sm:items-center">
-            <button
-              type="button"
-              className="relative group cursor-pointer self-center sm:self-auto"
-              onClick={handleProfilePicClick}
-              title="Click to manage profile picture"
-            >
-              {user?.profilePictureUrl ? (
-                <img
-                  src={user.profilePictureUrl}
-                  alt="Profile"
-                  className="h-20 w-20 rounded-full ring-4 ring-background object-cover transition-opacity group-hover:opacity-75 sm:h-24 sm:w-24"
-                />
-              ) : (
-                <div className="transition-opacity group-hover:opacity-75">
-                  <UserAvatar user={user} className="h-20 w-20 ring-4 ring-background sm:h-24 sm:w-24" />
-                </div>
+        {/* ── Profile Card ── */}
+        <Card className="mb-5 overflow-hidden border-0 shadow-md">
+          {/* Banner */}
+          <div className="h-20 bg-gradient-to-r from-emerald-500 to-teal-500" />
+          <CardContent className="pt-0 pb-5 px-5">
+            {/* Avatar row */}
+            <div className="flex items-end justify-between -mt-10 mb-4">
+              <button
+                type="button"
+                onClick={() => setShowPicDialog(true)}
+                className="relative group"
+              >
+                {user.profilePictureUrl ? (
+                  <img
+                    src={user.profilePictureUrl}
+                    alt="Profile"
+                    className="h-20 w-20 rounded-full border-4 border-background object-cover shadow-sm"
+                  />
+                ) : (
+                  <UserAvatar user={user} className="h-20 w-20 border-4 border-background shadow-sm" />
+                )}
+                <span className="absolute bottom-0.5 right-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-white opacity-0 group-hover:opacity-100 transition-opacity shadow">
+                  <Camera className="h-3.5 w-3.5" />
+                </span>
+              </button>
+              {/* Availability toggle */}
+              <button
+                type="button"
+                onClick={handleAvailabilityToggle}
+                className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold border transition-colors ${
+                  isAvailable
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400"
+                    : "bg-muted text-muted-foreground border-border"
+                }`}
+              >
+                <span className={`h-2 w-2 rounded-full ${isAvailable ? "bg-emerald-500" : "bg-gray-400"}`} />
+                {isAvailable ? "Available" : "Unavailable"}
+              </button>
+            </div>
+
+            {/* Name + meta */}
+            <h2 className="text-xl font-bold">{user.name || "User"}</h2>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              <Badge variant="secondary" className="text-xs font-semibold uppercase tracking-wide">
+                Worker
+              </Badge>
+              {workerData.profession && (
+                <Badge variant="outline" className="text-xs">{workerData.profession}</Badge>
               )}
-              <div className="absolute bottom-0 right-0 bg-primary text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
-                <Camera className="h-4 w-4" />
-              </div>
-            </button>
-            <div className="w-full flex-1">
-              <CardTitle className="text-center text-2xl sm:text-left">{user.name || "User"}</CardTitle>
-              <div className="mt-2 flex items-center justify-center gap-2 flex-wrap sm:justify-start">
-                <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider">
-                  {user.accountType === "contractor" ? "Business" : "Worker"}
+              {user.location && (
+                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <MapPin className="h-3 w-3" /> {user.location}
                 </span>
-                <span className="bg-muted text-muted-foreground px-3 py-1 rounded-full text-xs font-medium uppercase tracking-wider">
-                  {user.activeRole}
-                </span>
-              </div>
-              <div className="mt-3 text-sm text-muted-foreground">
-                <div className="flex items-center justify-center gap-1 sm:justify-start">
-                  <MapPin className="h-4 w-4" />
-                  {user.location || "Add location in profile"}
-                </div>
-              </div>
-
-              {user.accountType === "worker" && (
-                <div className="mt-4 space-y-3 rounded-lg border border-border/70 bg-background/70 p-3">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                    <div className="flex items-center gap-2 text-sm text-foreground">
-                      <Clock className="h-4 w-4 text-primary" />
-                      <span className="font-medium">Availability</span>
-                    </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={isAvailable ? "default" : "outline"}
-                      className="w-full rounded-full sm:w-auto"
-                      onClick={handleAvailabilityToggle}
-                    >
-                      {isAvailable ? "Available" : "Unavailable"}
-                    </Button>
-                  </div>
-
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                    <div className="flex items-center gap-2 text-sm text-foreground">
-                      <BriefcaseBusiness className="h-4 w-4 text-primary" />
-                      <span className="font-medium">Profession</span>
-                    </div>
-                    {workerProfileData.profession ? (
-                      <span className="text-sm text-muted-foreground">{workerProfileData.profession}</span>
-                    ) : (
-                      <Button size="sm" variant="outline" className="w-full sm:w-auto" onClick={() => setShowEditDialog(true)}>
-                        Add Profession
-                      </Button>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                    <div className="flex items-center gap-2 text-sm text-foreground">
-                      <Wallet className="h-4 w-4 text-primary" />
-                      <span className="font-medium">Pricing</span>
-                    </div>
-                    {workerPricingAmount ? (
-                      <span className="text-sm text-muted-foreground">INR {workerPricingAmount} {workerPricingLabel}</span>
-                    ) : (
-                      <Button size="sm" variant="outline" className="w-full sm:w-auto" onClick={() => setShowEditDialog(true)}>
-                        Add Pricing
-                      </Button>
-                    )}
-                  </div>
-
-                  <div className="space-y-1 pt-1">
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>Profile completion</span>
-                      <span className="font-semibold text-foreground">{profileCompletion}%</span>
-                    </div>
-                    <div className="h-2 w-full rounded-full bg-muted">
-                      <div className="h-2 rounded-full bg-primary transition-all" style={{ width: `${profileCompletion}%` }} />
-                    </div>
-                  </div>
-                </div>
               )}
             </div>
-          </CardHeader>
 
-          <CardFooter className="flex flex-col sm:flex-row gap-3 pt-4 bg-muted/10">
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full sm:w-auto"
-              onClick={() => setShowEditDialog(true)}
-            >
-              <Edit className="mr-2 h-4 w-4" />
-              Edit Profile
-            </Button>
-            <div className="hidden sm:block flex-1" />
-            <Button
-              variant="destructive"
-              size="sm"
-              className="w-full sm:w-auto"
-              onClick={handleLogout}
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              Log out
-            </Button>
-          </CardFooter>
-        </Card>
+            {/* Pricing */}
+            {workerPricingAmount ? (
+              <p className="mt-2 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                ₹{workerPricingAmount} {getPricingLabel(workerPricingType)}
+              </p>
+            ) : null}
 
-        {/* Actions Grid */}
-        <div>
-          <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {actions.map((action) => {
-              const IconComponent = action.icon;
-              return (
-                <Card
-                  key={action.label}
-                  className="hover:shadow-lg hover:border-primary/50 transition-all cursor-pointer group"
-                  onClick={action.action}
-                >
-                  <CardContent className="pt-6">
-                    <div className="flex items-start gap-4">
-                      <div className={`p-3 rounded-lg bg-muted/50 group-hover:bg-muted transition-colors`}>
-                        <IconComponent className={`h-6 w-6 ${action.color}`} />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-sm leading-tight">
-                          {action.label}
-                        </h3>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {action.description}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-      </div>
+            {/* About */}
+            {workerData.about && (
+              <p className="mt-3 text-sm text-muted-foreground leading-relaxed line-clamp-2">
+                {workerData.about}
+              </p>
+            )}
 
-      {/* Profile Picture Dialog */}
-      <Dialog open={showPicDialog} onOpenChange={setShowPicDialog}>
-        <DialogContent className="sm:max-w-100">
-          <DialogHeader>
-            <DialogTitle>Manage Profile Picture</DialogTitle>
-            <DialogDescription>
-              Upload, change, or remove your profile picture
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex flex-col gap-4 py-4">
-            {user?.profilePictureUrl && (
-              <div className="flex justify-center">
-                <img
-                  src={user.profilePictureUrl}
-                  alt="Current Profile"
-                  className="h-32 w-32 rounded-full object-cover ring-2 ring-primary"
-                />
+            {/* Skills */}
+            {workerData.skills && workerData.skills.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {workerData.skills.slice(0, 5).map((s) => (
+                  <span key={s} className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                    {s}
+                  </span>
+                ))}
+                {workerData.skills.length > 5 && (
+                  <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                    +{workerData.skills.length - 5}
+                  </span>
+                )}
               </div>
             )}
 
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleProfilePicChange}
-              className="hidden"
-            />
-
-            <div className="flex flex-col gap-2">
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="w-full"
-              >
-                {uploading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Uploading...
-                  </>
-                ) : (
-                  <>
-                    <Camera className="mr-2 h-4 w-4" />
-                    {user?.profilePictureUrl ? "Change Picture" : "Upload Picture"}
-                  </>
-                )}
-              </Button>
-
-              {user?.profilePictureUrl && (
-                <Button
-                  variant="destructive"
-                  onClick={handleRemoveProfilePic}
-                  disabled={uploading}
-                  className="w-full"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Remove Picture
-                </Button>
+            {/* Profile completion */}
+            <div className="mt-4 space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground font-medium">Profile completion</span>
+                <span className="font-bold text-foreground">{profileCompletion}%</span>
+              </div>
+              <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500"
+                  style={{ width: `${profileCompletion}%` }}
+                />
+              </div>
+              {profileCompletion < 100 && (
+                <p className="text-xs text-muted-foreground">
+                  Complete your profile to get more job matches
+                </p>
               )}
             </div>
 
-            <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded">
-              <p>• Max file size: 5MB</p>
-              <p>• Supported formats: JPG, PNG, GIF, WebP</p>
+            {/* Actions */}
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={() => setShowEditDialog(true)} className="gap-1.5">
+                <Edit className="h-3.5 w-3.5" /> Edit Profile
+              </Button>
+              <Button size="sm" variant="ghost" onClick={handleLogout} className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10">
+                <LogOut className="h-3.5 w-3.5" /> Log Out
+              </Button>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* ── Analytics ── */}
+        <div className="mb-5">
+          <div className="mb-3 flex items-center gap-2">
+            <Activity className="h-4 w-4 text-emerald-600" />
+            <h2 className="text-base font-bold">Analytics</h2>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[
+              {
+                label: "Applied",
+                value: analytics?.totalApplications ?? "—",
+                icon: Briefcase,
+                color: "text-blue-600",
+                bg: "bg-blue-50 dark:bg-blue-950/40",
+              },
+              {
+                label: "Active Jobs",
+                value: analytics?.activeJobs ?? "—",
+                icon: Clock,
+                color: "text-amber-600",
+                bg: "bg-amber-50 dark:bg-amber-950/40",
+              },
+              {
+                label: "Completed",
+                value: analytics?.completedJobs ?? "—",
+                icon: CheckCircle,
+                color: "text-emerald-600",
+                bg: "bg-emerald-50 dark:bg-emerald-950/40",
+              },
+              {
+                label: "Earned",
+                value: analytics
+                  ? analytics.totalEarned >= 1000
+                    ? `₹${(analytics.totalEarned / 1000).toFixed(1)}K`
+                    : `₹${analytics.totalEarned}`
+                  : "—",
+                icon: IndianRupee,
+                color: "text-emerald-600",
+                bg: "bg-emerald-50 dark:bg-emerald-950/40",
+              },
+            ].map(({ label, value, icon: Icon, color, bg }) => (
+              <Card key={label} className="border shadow-sm">
+                <CardContent className="p-4">
+                  <div className={`mb-2 inline-flex h-8 w-8 items-center justify-center rounded-lg ${bg}`}>
+                    <Icon className={`h-4 w-4 ${color}`} />
+                  </div>
+                  <p className="text-xl font-bold leading-none">{value}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{label}</p>
+                </CardContent>
+              </Card>
+            ))}
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPicDialog(false)}>
-              Close
+          {/* Success rate bar */}
+          {analytics && analytics.totalApplications > 0 && (
+            <Card className="mt-3 border shadow-sm">
+              <CardContent className="px-4 py-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
+                    <span className="text-sm font-semibold">Success Rate</span>
+                  </div>
+                  <span className="text-sm font-bold text-emerald-600">{analytics.successRate}%</span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all"
+                    style={{ width: `${analytics.successRate}%` }}
+                  />
+                </div>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  {analytics.completedJobs} of {analytics.totalApplications} applications completed
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* ── Navigate to Work Section ── */}
+        <div className="mb-5">
+          <div className="mb-3 flex items-center gap-2">
+            <Briefcase className="h-4 w-4 text-emerald-600" />
+            <h2 className="text-base font-bold">My Work</h2>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const locale = getCurrentLocale(window.location.pathname);
+              router.push(`/${locale}/dashboard/worker`);
+            }}
+            className="w-full flex items-center justify-between gap-4 rounded-2xl border bg-background p-4 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950/40">
+                <Briefcase className="h-5 w-5 text-emerald-600" />
+              </div>
+              <div className="text-left">
+                <p className="font-semibold text-sm">Jobs & Applications</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {analytics
+                    ? `${analytics.activeJobs} active · ${analytics.totalApplications} applied`
+                    : "View active jobs, applied jobs & completed work"}
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-emerald-600 transition-colors flex-shrink-0" />
+          </button>
+        </div>
+
+        {/* ── Quick Actions ── */}
+        <div>
+          <div className="mb-3 flex items-center gap-2">
+            <Settings className="h-4 w-4 text-muted-foreground" />
+            <h2 className="text-base font-bold">Quick Actions</h2>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {[
+              {
+                icon: FileText,
+                label: "My Portfolio",
+                desc: "Showcase your work",
+                color: "text-yellow-600",
+                bg: "bg-yellow-50 dark:bg-yellow-950/40",
+                action: () => { const l = getCurrentLocale(window.location.pathname); router.push(`/${l}/dashboard/portfolio`); },
+              },
+              {
+                icon: Star,
+                label: "My Reviews",
+                desc: "See your ratings",
+                color: "text-purple-600",
+                bg: "bg-purple-50 dark:bg-purple-950/40",
+                action: () => { const l = getCurrentLocale(window.location.pathname); router.push(`/${l}/dashboard/reviews`); },
+              },
+              {
+                icon: Settings,
+                label: "Settings",
+                desc: "Account settings",
+                color: "text-gray-600",
+                bg: "bg-gray-100 dark:bg-gray-800",
+                action: () => { const l = getCurrentLocale(window.location.pathname); router.push(`/${l}/dashboard/settings`); },
+              },
+            ].map(({ icon: Icon, label, desc, color, bg, action }) => (
+              <button
+                key={label}
+                type="button"
+                onClick={action}
+                className="flex flex-col items-start gap-3 rounded-2xl border bg-background p-4 shadow-sm hover:shadow-md hover:border-primary/30 transition-all text-left group"
+              >
+                <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${bg}`}>
+                  <Icon className={`h-4.5 w-4.5 ${color}`} />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold leading-tight">{label}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Profile Picture Dialog ── */}
+      <Dialog open={showPicDialog} onOpenChange={setShowPicDialog}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Profile Picture</DialogTitle>
+            <DialogDescription>Upload or remove your profile photo</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 py-2">
+            {user.profilePictureUrl && (
+              <div className="flex justify-center">
+                <img src={user.profilePictureUrl} alt="Profile" className="h-28 w-28 rounded-full object-cover ring-2 ring-primary" />
+              </div>
+            )}
+            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleProfilePicChange} className="hidden" />
+            <Button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="w-full gap-2">
+              {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+              {user.profilePictureUrl ? "Change Picture" : "Upload Picture"}
             </Button>
+            {user.profilePictureUrl && (
+              <Button variant="destructive" onClick={handleRemoveProfilePic} disabled={uploading} className="w-full gap-2">
+                <Trash2 className="h-4 w-4" /> Remove Picture
+              </Button>
+            )}
+            <p className="text-xs text-muted-foreground text-center">Max 5 MB · JPG, PNG, GIF, WebP</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPicDialog(false)} className="w-full">Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Edit Profile Dialog */}
+      {/* ── Edit Profile Dialog ── */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="max-h-[92vh] w-[95vw] max-w-107.5 overflow-hidden p-0">
-          <DialogHeader className="border-b px-4 py-3">
-            <DialogTitle>Edit Worker Profile</DialogTitle>
+        <DialogContent className="max-h-[92vh] w-[95vw] max-w-lg overflow-hidden p-0">
+          <DialogHeader className="border-b px-5 py-4">
+            <DialogTitle>Edit Profile</DialogTitle>
             <DialogDescription>Keep your details updated to get better job matches.</DialogDescription>
-            <div className="space-y-1 pt-1">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <div className="mt-2 space-y-1">
+              <div className="flex justify-between text-xs text-muted-foreground">
                 <span>Profile completion</span>
-                <span className="font-semibold text-foreground">{profileCompletion}%</span>
+                <span className="font-bold text-foreground">{profileCompletion}%</span>
               </div>
-              <div className="h-2 w-full rounded-full bg-muted">
-                <div className="h-2 rounded-full bg-primary transition-all" style={{ width: `${profileCompletion}%` }} />
+              <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all" style={{ width: `${profileCompletion}%` }} />
               </div>
             </div>
           </DialogHeader>
 
-          <div className="max-h-[calc(92vh-170px)] space-y-4 overflow-y-auto px-4 py-4">
-            <section className="space-y-3 rounded-lg border p-3">
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                <Camera className="h-4 w-4" />
-                Profile Photo
-              </div>
+          <div className="overflow-y-auto max-h-[calc(92vh-175px)] px-5 py-4 space-y-5">
+
+            {/* Photo */}
+            <section className="rounded-xl border bg-muted/30 p-4">
+              <p className="mb-3 flex items-center gap-2 text-sm font-semibold"><Camera className="h-4 w-4" /> Profile Photo</p>
               <div className="flex items-center gap-3">
-                {user?.profilePictureUrl ? (
-                  <img src={user.profilePictureUrl} alt="Profile" className="h-16 w-16 rounded-full object-cover" />
-                ) : (
-                  <UserAvatar user={user} className="h-16 w-16" />
-                )}
+                {user.profilePictureUrl
+                  ? <img src={user.profilePictureUrl} alt="" className="h-14 w-14 rounded-full object-cover" />
+                  : <UserAvatar user={user} className="h-14 w-14" />
+                }
                 <div className="flex-1 space-y-2">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleProfilePicChange}
-                    className="hidden"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading}
-                  >
-                    <Upload className="mr-2 h-4 w-4" />
-                    {uploading ? "Uploading..." : "Upload Photo"}
+                  <input ref={fileInputRef} type="file" accept="image/*" onChange={handleProfilePicChange} className="hidden" />
+                  <Button type="button" variant="outline" size="sm" className="w-full gap-1.5" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+                    <Upload className="h-3.5 w-3.5" /> {uploading ? "Uploading…" : "Upload"}
                   </Button>
-                  {user?.profilePictureUrl && (
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      className="w-full"
-                      onClick={handleRemoveProfilePic}
-                      disabled={uploading}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Remove Photo
+                  {user.profilePictureUrl && (
+                    <Button type="button" variant="destructive" size="sm" className="w-full gap-1.5" onClick={handleRemoveProfilePic} disabled={uploading}>
+                      <Trash2 className="h-3.5 w-3.5" /> Remove
                     </Button>
                   )}
                 </div>
               </div>
             </section>
-            <section className="space-y-3 rounded-lg border p-3">
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                <User className="h-4 w-4" />
-                Basic Info
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
-                <Input
-                  id="name"
-                  value={editFormData.name}
-                  onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-                  placeholder="Enter your full name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="location">Location</Label>
-                <Input
-                  id="location"
-                  value={editFormData.location}
-                  onChange={(e) => setEditFormData({ ...editFormData, location: e.target.value })}
-                  placeholder="Enter your location"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone</Label>
-                <Input id="phone" value={editFormData.phone} disabled readOnly />
-              </div>
+
+            {/* Basic Info */}
+            <section className="rounded-xl border bg-muted/30 p-4 space-y-3">
+              <p className="flex items-center gap-2 text-sm font-semibold"><User className="h-4 w-4" /> Basic Info</p>
+              <div className="space-y-1"><Label htmlFor="edit-name">Name</Label><Input id="edit-name" value={editFormData.name} onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })} placeholder="Full name" /></div>
+              <div className="space-y-1"><Label htmlFor="edit-location">Location</Label><Input id="edit-location" value={editFormData.location} onChange={(e) => setEditFormData({ ...editFormData, location: e.target.value })} placeholder="City, State" /></div>
+              <div className="space-y-1"><Label htmlFor="edit-phone">Phone</Label><Input id="edit-phone" value={editFormData.phone} disabled readOnly /></div>
             </section>
 
-            <section className="space-y-3 rounded-lg border p-3">
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                <BriefcaseBusiness className="h-4 w-4" />
-                Profession
-              </div>
-              <Select
-                value={editFormData.profession}
-                onValueChange={(value) => setEditFormData({ ...editFormData, profession: value })}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select your profession" />
-                </SelectTrigger>
-                <SelectContent>
-                  {professionOptions.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
+            {/* Profession */}
+            <section className="rounded-xl border bg-muted/30 p-4 space-y-3">
+              <p className="flex items-center gap-2 text-sm font-semibold"><BriefcaseBusiness className="h-4 w-4" /> Profession</p>
+              <Select value={editFormData.profession} onValueChange={(v) => setEditFormData({ ...editFormData, profession: v })}>
+                <SelectTrigger className="w-full"><SelectValue placeholder="Select profession" /></SelectTrigger>
+                <SelectContent>{professionOptions.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
               </Select>
             </section>
 
-            <section className="space-y-3 rounded-lg border p-3">
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                <Hammer className="h-4 w-4" />
-                Skills
-              </div>
+            {/* Skills */}
+            <section className="rounded-xl border bg-muted/30 p-4 space-y-3">
+              <p className="flex items-center gap-2 text-sm font-semibold"><Hammer className="h-4 w-4" /> Skills</p>
               <div className="flex flex-wrap gap-2">
                 {skillOptions.map((skill) => (
-                  <Button
-                    key={skill}
-                    type="button"
-                    size="sm"
-                    variant={editFormData.skills.includes(skill) ? "default" : "outline"}
-                    className="rounded-full"
-                    onClick={() => toggleSkill(skill, !editFormData.skills.includes(skill))}
-                  >
+                  <button key={skill} type="button"
+                    className={`rounded-full px-3 py-1 text-xs font-medium border transition-colors ${editFormData.skills.includes(skill) ? "bg-emerald-600 text-white border-emerald-600" : "bg-background text-muted-foreground border-border hover:border-emerald-400"}`}
+                    onClick={() => toggleSkill(skill, !editFormData.skills.includes(skill))}>
                     {skill}
-                  </Button>
+                  </button>
                 ))}
               </div>
             </section>
 
-            <section className="space-y-3 rounded-lg border p-3">
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                <Clock className="h-4 w-4" />
-                Experience
-              </div>
-              <div className="space-y-2">
-                {experienceOptions.map((option) => (
-                  <label key={option.label} className="flex items-center gap-3 rounded-md border px-3 py-2 text-sm">
-                    <input
-                      type="radio"
-                      name="experience"
-                      checked={editFormData.experienceYears === option.value}
-                      onChange={() => setEditFormData({ ...editFormData, experienceYears: option.value })}
-                      className="h-4 w-4"
-                    />
-                    <span>{option.label}</span>
-                  </label>
-                ))}
-              </div>
-            </section>
-
-            <section className="space-y-3 rounded-lg border p-3">
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                <Wallet className="h-4 w-4" />
-                Pricing
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={editFormData.pricingType === "hour" ? "default" : "outline"}
-                  onClick={() => setEditFormData({ ...editFormData, pricingType: "hour" })}
-                >
-                  Per Hour
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={editFormData.pricingType === "day" ? "default" : "outline"}
-                  onClick={() => setEditFormData({ ...editFormData, pricingType: "day" })}
-                >
-                  Per Day
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={editFormData.pricingType === "job" ? "default" : "outline"}
-                  onClick={() => setEditFormData({ ...editFormData, pricingType: "job" })}
-                >
-                  Per Job
-                </Button>
-              </div>
-              <Input
-                value={editFormData.pricingAmount}
-                onChange={(e) => setEditFormData({ ...editFormData, pricingAmount: e.target.value })}
-                placeholder={getPricingPlaceholder(editFormData.pricingType)}
-              />
-            </section>
-
-            
-
-            <section className="space-y-3 rounded-lg border p-3">
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                <Languages className="h-4 w-4" />
-                Languages Spoken
-              </div>
+            {/* Experience */}
+            <section className="rounded-xl border bg-muted/30 p-4 space-y-3">
+              <p className="flex items-center gap-2 text-sm font-semibold"><Clock className="h-4 w-4" /> Experience</p>
               <div className="grid grid-cols-2 gap-2">
-                {languageOptions.map((language) => (
-                  <label key={language} className="flex items-center gap-2 rounded-md border px-2 py-2 text-sm">
-                    <Checkbox
-                      checked={editFormData.languages.includes(language)}
-                      onCheckedChange={(checked) => toggleLanguage(language, checked === true)}
-                    />
-                    <span>{language}</span>
+                {experienceOptions.map((opt) => (
+                  <label key={opt.label}
+                    className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 cursor-pointer text-sm transition-colors ${editFormData.experienceYears === opt.value ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 font-medium" : "bg-background hover:border-emerald-300"}`}>
+                    <input type="radio" name="experience" checked={editFormData.experienceYears === opt.value}
+                      onChange={() => setEditFormData({ ...editFormData, experienceYears: opt.value })}
+                      className="accent-emerald-600 h-3.5 w-3.5" />
+                    {opt.label}
                   </label>
                 ))}
               </div>
             </section>
 
-            <section className="space-y-3 rounded-lg border p-3">
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                <FileText className="h-4 w-4" />
-                About
+            {/* Pricing */}
+            <section className="rounded-xl border bg-muted/30 p-4 space-y-3">
+              <p className="flex items-center gap-2 text-sm font-semibold"><Wallet className="h-4 w-4" /> Pricing</p>
+              <div className="flex gap-2">
+                {(["hour", "day", "job"] as PricingType[]).map((t) => (
+                  <button key={t} type="button"
+                    className={`flex-1 rounded-lg border py-2 text-xs font-semibold transition-colors ${editFormData.pricingType === t ? "bg-emerald-600 text-white border-emerald-600" : "bg-background hover:border-emerald-400"}`}
+                    onClick={() => setEditFormData({ ...editFormData, pricingType: t })}>
+                    Per {t.charAt(0).toUpperCase() + t.slice(1)}
+                  </button>
+                ))}
               </div>
-              <Textarea
-                value={editFormData.about}
-                onChange={(e) => setEditFormData({ ...editFormData, about: e.target.value })}
-                placeholder="Write a short summary about your work and strengths"
-                className="min-h-24"
-              />
+              <Input value={editFormData.pricingAmount} onChange={(e) => setEditFormData({ ...editFormData, pricingAmount: e.target.value })} placeholder={getPricingPlaceholder(editFormData.pricingType)} />
+            </section>
+
+            {/* Languages */}
+            <section className="rounded-xl border bg-muted/30 p-4 space-y-3">
+              <p className="flex items-center gap-2 text-sm font-semibold"><Languages className="h-4 w-4" /> Languages</p>
+              <div className="grid grid-cols-2 gap-2">
+                {languageOptions.map((lang) => (
+                  <label key={lang} className="flex items-center gap-2 rounded-lg border bg-background px-3 py-2.5 text-sm cursor-pointer hover:border-emerald-300 transition-colors">
+                    <Checkbox checked={editFormData.languages.includes(lang)} onCheckedChange={(c) => toggleLanguage(lang, c === true)} />
+                    {lang}
+                  </label>
+                ))}
+              </div>
+            </section>
+
+            {/* About */}
+            <section className="rounded-xl border bg-muted/30 p-4 space-y-3">
+              <p className="flex items-center gap-2 text-sm font-semibold"><FileText className="h-4 w-4" /> About</p>
+              <Textarea value={editFormData.about} onChange={(e) => setEditFormData({ ...editFormData, about: e.target.value })} placeholder="Short summary about your work and strengths…" className="min-h-[96px]" />
             </section>
           </div>
 
-          <DialogFooter className="sticky bottom-0 border-t bg-background px-4 py-3">
-            <Button variant="outline" onClick={() => setShowEditDialog(false)} className="w-full sm:w-auto">
-              Cancel
-            </Button>
-            <Button onClick={handleEditProfile} className="h-11 w-full text-base font-semibold sm:w-auto">
-              <Check className="mr-2 h-4 w-4" />
-              Save Profile
+          <DialogFooter className="border-t bg-background px-5 py-3 flex-row gap-2">
+            <Button variant="outline" onClick={() => setShowEditDialog(false)} className="flex-1">Cancel</Button>
+            <Button onClick={handleEditProfile} className="flex-1 gap-2 bg-emerald-600 hover:bg-emerald-700">
+              <Check className="h-4 w-4" /> Save Changes
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -4,17 +4,9 @@ import { useEffect, useState, use } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { fetchSessionUser, getCurrentLocale } from "@/lib/authClient";
 import ApplicantsList from "@/components/ApplicantsList";
-import { 
-  ArrowLeft, 
-  MapPin, 
-  DollarSign, 
-  Clock, 
-  Users, 
-  CheckCircle,
-  Briefcase,
-  Edit,
-  Trash2,
-  Copy
+import {
+  ArrowLeft, MapPin, DollarSign, Clock, Users, CheckCircle,
+  Briefcase, Edit, Trash2, Copy, AlertCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,16 +41,16 @@ interface JobApplication {
   status: "applied" | "accepted" | "rejected";
   createdAt: string;
   workerId: {
-    _id: string;
-    name: string;
-    email: string;
-    phone?: string;
-    proficiency?: string;
-    location?: string;
+    _id: string; name: string; email: string;
+    phone?: string; proficiency?: string; location?: string;
   };
 }
 
-export default function JobDetailsPage({ params }: { readonly params: Promise<{ readonly locale: string; readonly jobId: string }> }) {
+export default function JobDetailsPage({
+  params,
+}: {
+  readonly params: Promise<{ readonly locale: string; readonly jobId: string }>;
+}) {
   const resolvedParams = use(params);
   const router = useRouter();
   const pathname = usePathname();
@@ -69,348 +61,195 @@ export default function JobDetailsPage({ params }: { readonly params: Promise<{ 
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
+  const refreshJob = async () => {
+    const res = await fetch(`${API_BASE_URL}/api/jobs/${resolvedParams.jobId}`, { credentials: "include" });
+    if (res.ok) { const d = await res.json(); setJob(d.job); }
+  };
+
   useEffect(() => {
     const loadData = async () => {
       try {
-        // Check authentication
         const currentUser = await fetchSessionUser();
-        if (!currentUser) {
-          router.push(`/${locale}/login`);
-          return;
-        }
-
-        if (!API_BASE_URL) {
-          setError("API configuration missing");
-          setIsLoading(false);
-          return;
-        }
-
-        // Fetch job details
-        const res = await fetch(`${API_BASE_URL}/api/jobs/${resolvedParams.jobId}`, {
-          credentials: "include",
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          setJob(data.job);
-        } else {
-          setError("Failed to load job details");
-        }
-      } catch (err) {
-        console.error("Load error:", err);
-        setError("Error loading job details");
-      } finally {
-        setIsLoading(false);
-      }
+        if (!currentUser) { router.push(`/${locale}/login`); return; }
+        if (!API_BASE_URL) { setError("API configuration missing"); setIsLoading(false); return; }
+        const res = await fetch(`${API_BASE_URL}/api/jobs/${resolvedParams.jobId}`, { credentials: "include" });
+        if (res.ok) { const d = await res.json(); setJob(d.job); }
+        else setError("Failed to load job details");
+      } catch { setError("Error loading job details"); }
+      finally { setIsLoading(false); }
     };
-
     loadData();
   }, [resolvedParams.jobId, pathname, router, locale]);
 
-  const handleApplicationAction = async (applicationId: string, action: "accept" | "reject") => {
-    setActionLoading(applicationId);
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/jobs/applications/${applicationId}/${action}`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-      });
-
-      if (res.ok) {
-        // Update local state
-        if (job) {
-          setJob({
-            ...job,
-            applications: job.applications.map((app) =>
-              app._id === applicationId ? { ...app, status: action === "accept" ? "accepted" : "rejected" } : app
-            ),
-          });
-        }
-      } else {
-        alert("Failed to update application");
-      }
-    } catch (err) {
-      console.error("Action error:", err);
-      alert("Error updating application");
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
   const handleMarkJobComplete = async () => {
     if (!job) return;
-    
-    const acceptedApps = job.applications.filter((app) => app.status === "accepted");
-    if (acceptedApps.length === 0) {
-      alert("You must have at least one accepted worker to mark the job as complete");
-      return;
-    }
-
-    if (!confirm(`Mark this job as complete? This will notify ${acceptedApps.length} worker(s) to confirm completion.`)) {
-      return;
-    }
-
+    const acceptedApps = job.applications.filter((a) => a.status === "accepted");
+    if (acceptedApps.length === 0) { alert("You need at least one accepted worker"); return; }
+    if (!confirm(`Mark complete? This will notify ${acceptedApps.length} worker(s).`)) return;
     setActionLoading("complete");
     try {
-      // Mark each accepted application as completion_pending
       for (const app of acceptedApps) {
         const res = await fetch(`${API_BASE_URL}/api/jobs/mark-complete`, {
-          method: "POST",
-          credentials: "include",
+          method: "POST", credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ applicationId: app._id }),
         });
-
-        if (!res.ok) {
-          alert("Failed to mark job as complete");
-          setActionLoading(null);
-          return;
-        }
+        if (!res.ok) { alert("Failed to mark complete"); setActionLoading(null); return; }
       }
-
-      // Refresh job details
-      const refreshRes = await fetch(`${API_BASE_URL}/api/jobs/${resolvedParams.jobId}`, {
-        credentials: "include",
-      });
-      if (refreshRes.ok) {
-        const data = await refreshRes.json();
-        setJob(data.job);
-        alert("Job marked as complete. Workers will be notified to confirm.");
-      }
-    } catch (err) {
-      console.error("Complete error:", err);
-      alert("Error marking job as complete");
-    } finally {
-      setActionLoading(null);
-    }
+      await refreshJob();
+    } catch { alert("Error"); }
+    finally { setActionLoading(null); }
   };
 
   const handleDeleteJob = async () => {
-    if (!confirm("Are you sure you want to delete this job? This action cannot be undone.")) {
-      return;
-    }
-
+    if (!confirm("Delete this job? This cannot be undone.")) return;
     setActionLoading("delete");
     try {
       const res = await fetch(`${API_BASE_URL}/api/jobs/${resolvedParams.jobId}`, {
-        method: "DELETE",
-        credentials: "include",
+        method: "DELETE", credentials: "include",
       });
-
-      if (res.ok) {
-        router.push(`/${locale}/dashboard/contractor`);
-      } else {
-        alert("Failed to delete job");
-      }
-    } catch (err) {
-      console.error("Delete error:", err);
-      alert("Error deleting job");
-    } finally {
-      setActionLoading(null);
-    }
+      if (res.ok) router.push(`/${locale}/dashboard/contractor/projects`);
+      else alert("Failed to delete job");
+    } catch { alert("Error deleting job"); }
+    finally { setActionLoading(null); }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "open":
-        return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
-      case "assigned":
-        return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400";
-      case "in_progress":
-        return "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400";
-      case "completion_pending":
-        return "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400";
-      case "completed":
-        return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
-      case "cancelled":
-        return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
-      default:
-        return "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400";
-    }
+  const statusStyles: Record<string, string> = {
+    open: "bg-blue-50 text-blue-700 border-blue-200",
+    assigned: "bg-amber-50 text-amber-700 border-amber-200",
+    in_progress: "bg-purple-50 text-purple-700 border-purple-200",
+    completion_pending: "bg-orange-50 text-orange-700 border-orange-200",
+    completed: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    cancelled: "bg-red-50 text-red-700 border-red-200",
   };
 
-  const getApplicationColor = (status: string) => {
-    switch (status) {
-      case "applied":
-        return "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800";
-      case "accepted":
-        return "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800";
-      case "rejected":
-        return "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800";
-      default:
-        return "bg-gray-50 dark:bg-gray-900/20 border-gray-200 dark:border-gray-800";
-    }
-  };
+  if (isLoading) return (
+    <div className="flex min-h-[60vh] items-center justify-center flex-col gap-3">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-emerald-600" />
+      <p className="text-sm text-muted-foreground">Loading job details…</p>
+    </div>
+  );
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading job details...</p>
-        </div>
+  if (!job || error) return (
+    <div className="mx-auto max-w-2xl px-4 py-6">
+      <button
+        type="button"
+        onClick={() => router.push(`/${locale}/dashboard/contractor/projects`)}
+        className="mb-4 inline-flex items-center gap-1.5 rounded-full border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent/50 transition-colors"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" /> Back
+      </button>
+      <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+        <AlertCircle className="h-8 w-8 text-red-400 mx-auto mb-2" />
+        <p className="text-red-700 font-semibold">{error || "Job not found"}</p>
       </div>
-    );
-  }
+    </div>
+  );
 
-  if (!job || error) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-8 px-4">
-        <div className="max-w-4xl mx-auto">
-          <button
-            onClick={() => router.push(`/${locale}/dashboard/contractor`)}
-            className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent/40 mb-6"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </button>
-          <Card className="border-l-4 border-l-red-500">
-            <CardContent className="p-8 text-center">
-              <p className="text-red-600 dark:text-red-400 text-lg">{error || "Job not found"}</p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
-  const acceptedCount = job.applications.filter((app) => app.status === "accepted").length;
-  const appliedCount = job.applications.filter((app) => app.status === "applied").length;
+  const acceptedCount = job.applications.filter((a) => a.status === "accepted").length;
+  const appliedCount = job.applications.filter((a) => a.status === "applied").length;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="space-y-4">
-          <button
-            onClick={() => router.push(`/${locale}/dashboard/contractor`)}
-            className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent/40"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Dashboard
-          </button>
+    <div className="min-h-screen bg-muted/30">
+      <div className="mx-auto max-w-2xl px-4 py-6 pb-24 md:pb-8 space-y-5">
 
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
-                {job.title}
-              </h1>
-              <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                <Briefcase className="h-4 w-4" />
-                <span>{job.category}</span>
+        {/* Back */}
+        <button
+          type="button"
+          onClick={() => router.push(`/${locale}/dashboard/contractor/projects`)}
+          className="inline-flex items-center gap-1.5 rounded-full border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent/50 transition-colors"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" /> Back to Projects
+        </button>
+
+        {/* Job Header Card */}
+        <div className="overflow-hidden rounded-2xl border bg-background shadow-sm">
+          <div className="h-1.5 w-full bg-gradient-to-r from-emerald-500 to-teal-400" />
+          <div className="p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h1 className="text-xl font-bold leading-tight">{job.title}</h1>
+                {job.category && (
+                  <div className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <Briefcase className="h-3.5 w-3.5" />
+                    <span>{job.category}</span>
+                  </div>
+                )}
               </div>
+              <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-bold uppercase tracking-wide ${statusStyles[job.status] || ""}`}>
+                {job.status.replace("_", " ")}
+              </span>
             </div>
-            <Badge className={getStatusColor(job.status)}>
-              {job.status.charAt(0).toUpperCase() + job.status.slice(1)}
-            </Badge>
           </div>
         </div>
 
-        {/* Job Details Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Details Grid */}
+        <div className="grid grid-cols-2 gap-3">
           {/* Location */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center gap-2">
-                <MapPin className="h-4 w-4" />
-                Location
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="font-semibold text-gray-900 dark:text-white">
-                {job.normalizedLocation || job.location || "Not specified"}
-              </p>
-              {Boolean(job.latitude && job.longitude) && (
-                <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                  📍 {job.latitude?.toFixed(4)}, {job.longitude?.toFixed(4)}
-                </p>
-              )}
-            </CardContent>
-          </Card>
+          <div className="rounded-2xl border bg-background p-4 shadow-sm">
+            <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+              <MapPin className="h-3.5 w-3.5" /> Location
+            </div>
+            <p className="text-sm font-semibold leading-snug">
+              {job.normalizedLocation || job.location || "Not specified"}
+            </p>
+          </div>
 
           {/* Payment */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center gap-2">
-                <DollarSign className="h-4 w-4" />
-                Payment
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-1">
-                <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                  ₹{job.pricingAmount?.toLocaleString()}
-                </p>
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  Per {job.pricingType?.replace("per_", "") || "job"}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="rounded-2xl border bg-background p-4 shadow-sm">
+            <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+              <DollarSign className="h-3.5 w-3.5" /> Payment
+            </div>
+            <p className="text-xl font-bold text-emerald-600">
+              ₹{job.pricingAmount?.toLocaleString() || "—"}
+            </p>
+            <p className="text-xs text-muted-foreground">per {job.pricingType?.replace("per_", "") || "job"}</p>
+          </div>
 
           {/* Duration */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                Duration
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="font-semibold text-gray-900 dark:text-white">
-                {job.duration_value} {job.duration_unit}
-                {job.duration_value && job.duration_value > 1 ? "s" : ""}
-              </p>
-              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                {job.jobDate === "pick" ? `Scheduled for ${job.selectedDate}` : `${String(job.jobDate).charAt(0).toUpperCase() + String(job.jobDate).slice(1)}`}
-              </p>
-            </CardContent>
-          </Card>
+          <div className="rounded-2xl border bg-background p-4 shadow-sm">
+            <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+              <Clock className="h-3.5 w-3.5" /> Duration
+            </div>
+            <p className="text-sm font-semibold">
+              {job.duration_value} {job.duration_unit}{job.duration_value && job.duration_value > 1 ? "s" : ""}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {job.jobDate === "pick" ? `On ${job.selectedDate}` : `${String(job.jobDate || "").charAt(0).toUpperCase()}${String(job.jobDate || "").slice(1)}`}
+            </p>
+          </div>
 
-          {/* Workers Needed */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                Workers
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="font-semibold text-gray-900 dark:text-white">
-                {job.workersRequired} needed
-              </p>
-              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                {acceptedCount} accepted
-              </p>
-            </CardContent>
-          </Card>
+          {/* Workers */}
+          <div className="rounded-2xl border bg-background p-4 shadow-sm">
+            <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+              <Users className="h-3.5 w-3.5" /> Workers
+            </div>
+            <p className="text-sm font-semibold">{job.workersRequired} needed</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{acceptedCount} accepted</p>
+          </div>
         </div>
 
         {/* Description */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Description</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-              {job.description || "No description provided"}
-            </p>
-          </CardContent>
-        </Card>
+        {job.description && (
+          <div className="rounded-2xl border bg-background p-5 shadow-sm">
+            <h2 className="text-sm font-bold mb-2">Description</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">{job.description}</p>
+          </div>
+        )}
 
-        {/* Applicants Section */}
-        <Card>
-          <CardHeader>
+        {/* Applications */}
+        <div className="rounded-2xl border bg-background shadow-sm overflow-hidden">
+          <div className="px-5 pt-5 pb-3 border-b">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Applications ({job.applications.length})</CardTitle>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  {appliedCount} pending • {acceptedCount} accepted
+                <h2 className="text-sm font-bold">Applications ({job.applications.length})</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {appliedCount} pending · {acceptedCount} accepted
                 </p>
               </div>
             </div>
-          </CardHeader>
-          <CardContent>
+          </div>
+          <div className="p-4">
             <ApplicantsList
               applicants={job.applications.map((app) => ({
                 _id: app.workerId._id,
@@ -423,85 +262,48 @@ export default function JobDetailsPage({ params }: { readonly params: Promise<{ 
                 createdAt: app.createdAt,
               }))}
               jobTitle={job.title}
-              applicationIds={Object.fromEntries(
-                job.applications.map((app) => [app.workerId._id, app._id])
-              )}
-              onStatusUpdate={() => {
-                // Refresh job details after status update
-                const loadData = async () => {
-                  try {
-                    const res = await fetch(`${API_BASE_URL}/api/jobs/${resolvedParams.jobId}`, {
-                      credentials: "include",
-                    });
-                    if (res.ok) {
-                      const data = await res.json();
-                      setJob(data.job);
-                    }
-                  } catch (err) {
-                    console.error("Refresh error:", err);
-                  }
-                };
-                loadData();
-              }}
+              applicationIds={Object.fromEntries(job.applications.map((app) => [app.workerId._id, app._id]))}
+              onStatusUpdate={refreshJob}
             />
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {/* Job Actions */}
-        <Card className="bg-gray-50 dark:bg-gray-900/50">
-          <CardHeader>
-            <CardTitle>Job Actions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {job.status === "open" && (
-                <Button
-                  variant="outline"
-                  className="gap-2"
-                  onClick={() => router.push(`/${locale}/add-works?jobId=${resolvedParams.jobId}`)}
-                >
-                  <Edit className="h-4 w-4" />
-                  Edit Job
-                </Button>
-              )}
-              {(job.status === "assigned" || job.status === "in_progress") && acceptedCount > 0 && (
-                <Button
-                  className="gap-2 bg-green-600 hover:bg-green-700"
-                  onClick={handleMarkJobComplete}
-                  disabled={actionLoading === "complete"}
-                >
-                  <CheckCircle className="h-4 w-4" />
-                  {actionLoading === "complete" ? "Marking..." : "Mark as Complete"}
-                </Button>
-              )}
-              <Button
-                variant="outline"
-                className="gap-2"
-                onClick={() => {
-                  if (typeof globalThis !== "undefined" && globalThis.location) {
-                    const url = `${globalThis.location.protocol}//${globalThis.location.host}/${locale}/projects/${resolvedParams.jobId}`;
-                    navigator.clipboard.writeText(url);
-                    alert("Job link copied to clipboard");
-                  }
-                }}
-              >
-                <Copy className="h-4 w-4" />
-                Copy Link
+        <div className="rounded-2xl border bg-muted/30 p-5 shadow-sm">
+          <h2 className="text-sm font-bold mb-3">Job Actions</h2>
+          <div className="flex flex-wrap gap-2">
+            {job.status === "open" && (
+              <Button variant="outline" size="sm" className="gap-1.5"
+                onClick={() => router.push(`/${locale}/add-works?jobId=${resolvedParams.jobId}`)}>
+                <Edit className="h-3.5 w-3.5" /> Edit Job
               </Button>
-              {job.status !== "completed" && (
-                <Button
-                  variant="destructive"
-                  className="gap-2"
-                  onClick={handleDeleteJob}
-                  disabled={actionLoading === "delete"}
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Delete Job
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+            )}
+            {(job.status === "assigned" || job.status === "in_progress") && acceptedCount > 0 && (
+              <Button size="sm" className="gap-1.5 bg-emerald-600 hover:bg-emerald-700"
+                onClick={handleMarkJobComplete} disabled={actionLoading === "complete"}>
+                <CheckCircle className="h-3.5 w-3.5" />
+                {actionLoading === "complete" ? "Marking…" : "Mark Complete"}
+              </Button>
+            )}
+            <Button variant="outline" size="sm" className="gap-1.5"
+              onClick={() => {
+                if (typeof globalThis !== "undefined" && globalThis.location) {
+                  const url = `${globalThis.location.protocol}//${globalThis.location.host}/${locale}/projects/${resolvedParams.jobId}`;
+                  navigator.clipboard.writeText(url);
+                  alert("Job link copied!");
+                }
+              }}>
+              <Copy className="h-3.5 w-3.5" /> Copy Link
+            </Button>
+            {job.status !== "completed" && (
+              <Button variant="destructive" size="sm" className="gap-1.5"
+                onClick={handleDeleteJob} disabled={actionLoading === "delete"}>
+                <Trash2 className="h-3.5 w-3.5" />
+                {actionLoading === "delete" ? "Deleting…" : "Delete"}
+              </Button>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

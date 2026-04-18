@@ -3,11 +3,18 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { getCurrentLocale, fetchSessionUser, resolveAccountType } from "@/lib/authClient";
-import { getWorkerApplications, getWorkerAcceptedJobs, getWorkerPendingCompletion, getWorkerCompletedJobs, confirmJobCompletion, rejectJobCompletion } from "@/lib/jobApplicationApi";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  getWorkerApplications, getWorkerAcceptedJobs,
+  getWorkerPendingCompletion, getWorkerCompletedJobs,
+  confirmJobCompletion, rejectJobCompletion,
+} from "@/lib/jobApplicationApi";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Briefcase, CheckCircle, Clock, AlertCircle, MapPin, IndianRupee, ArrowRight } from "lucide-react";
+import {
+  Briefcase, CheckCircle, Clock, AlertCircle,
+  MapPin, IndianRupee, ArrowRight, ArrowLeft,
+  ChevronRight, Search,
+} from "lucide-react";
 
 interface Job {
   _id: string;
@@ -16,12 +23,19 @@ interface Job {
   pricingAmount?: number | string;
   pricingType?: string;
   status: "applied" | "accepted" | "completion_pending" | "completed";
-  postedBy?: {
-    name: string;
-  };
+  postedBy?: { name: string };
   createdAt?: string;
   applicationId?: string;
 }
+
+type TabId = "active" | "applied" | "pending" | "completed";
+
+const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
+  { id: "active",    label: "Active",    icon: Clock },
+  { id: "applied",   label: "Applied",   icon: Briefcase },
+  { id: "pending",   label: "Confirm",   icon: AlertCircle },
+  { id: "completed", label: "Done",      icon: CheckCircle },
+];
 
 export default function WorkerDashboardPage() {
   const router = useRouter();
@@ -29,492 +43,308 @@ export default function WorkerDashboardPage() {
   const locale = getCurrentLocale(pathname);
 
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<TabId>("active");
   const [appliedJobs, setAppliedJobs] = useState<Job[]>([]);
   const [activeJobs, setActiveJobs] = useState<Job[]>([]);
-  const [pendingCompletionJobs, setPendingCompletionJobs] = useState<Job[]>([]);
+  const [pendingJobs, setPendingJobs] = useState<Job[]>([]);
   const [completedJobs, setCompletedJobs] = useState<Job[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const getNumericAmount = (value: number | string | undefined): number => {
-    if (typeof value === "number") return value;
-    if (typeof value === "string") {
-      const parsed = Number.parseFloat(value);
-      return Number.isFinite(parsed) ? parsed : 0;
-    }
+  const toNum = (v: number | string | undefined): number => {
+    if (typeof v === "number") return v;
+    if (typeof v === "string") { const p = parseFloat(v); return isFinite(p) ? p : 0; }
     return 0;
   };
 
-  const formatPricing = (amount: number | string | undefined, type?: string): string => {
-    const numericAmount = getNumericAmount(amount);
-    if (numericAmount > 0) {
-      return `₹${numericAmount.toLocaleString()}/${type || "job"}`;
-    }
-    return `POA/${type || "job"}`;
+  const fmt = (amount: number | string | undefined, type?: string) => {
+    const n = toNum(amount);
+    return n > 0 ? `₹${n.toLocaleString()}/${type || "job"}` : `POA`;
   };
 
   useEffect(() => {
-    const checkAuth = async () => {
+    const init = async () => {
       try {
         const sessionUser = await fetchSessionUser();
-        if (!sessionUser) {
-          router.push(`/${locale}/login`);
-          return;
-        }
+        if (!sessionUser) { router.push(`/${locale}/login`); return; }
+        if (resolveAccountType(sessionUser) !== "worker") { router.push(`/${locale}`); return; }
 
-        const accountType = resolveAccountType(sessionUser);
-        if (accountType !== "worker") {
-          router.push(`/${locale}`);
-          return;
-        }
+        const [apps, accepted, pending, completed] = await Promise.allSettled([
+          getWorkerApplications(),
+          getWorkerAcceptedJobs(),
+          getWorkerPendingCompletion(),
+          getWorkerCompletedJobs(),
+        ]);
 
-        // Fetch applied jobs
-        try {
-          const applicationsData = await getWorkerApplications();
-          const appliedJobsList = applicationsData
-            .filter((app: any) => app.status === "applied" && app.jobId)
-            .map((app: any) => ({
-              _id: app.jobId._id,
-              title: app.jobId.title,
-              location: app.jobId.location,
-              pricingAmount: app.jobId.pricingAmount,
-              pricingType: app.jobId.pricingType,
-              status: "applied" as const,
-              postedBy: app.jobId.postedBy,
-              createdAt: app.createdAt,
-            }));
-          setAppliedJobs(appliedJobsList);
-        } catch (err) {
-          console.error("Error fetching applied jobs:", err);
-        }
+        if (apps.status === "fulfilled")
+          setAppliedJobs(apps.value.filter((a: any) => a.status === "applied" && a.jobId).map((a: any) => ({
+            _id: a.jobId._id, title: a.jobId.title, location: a.jobId.location,
+            pricingAmount: a.jobId.pricingAmount, pricingType: a.jobId.pricingType,
+            status: "applied" as const, postedBy: a.jobId.postedBy, createdAt: a.createdAt,
+          })));
 
-        // Fetch accepted jobs (active work)
-        try {
-          const acceptedData = await getWorkerAcceptedJobs();
-          const acceptedJobsList = acceptedData
-            .map((app: any) => ({
-              _id: app.jobId._id,
-              title: app.jobId.title,
-              location: app.jobId.location,
-              pricingAmount: app.jobId.pricingAmount,
-              pricingType: app.jobId.pricingType,
-              status: "accepted" as const,
-              postedBy: app.jobId.postedBy,
-              createdAt: app.jobId.createdAt,
-            }));
-          setActiveJobs(acceptedJobsList);
-        } catch (err) {
-          console.error("Error fetching accepted jobs:", err);
-        }
+        if (accepted.status === "fulfilled")
+          setActiveJobs(accepted.value.map((a: any) => ({
+            _id: a.jobId._id, title: a.jobId.title, location: a.jobId.location,
+            pricingAmount: a.jobId.pricingAmount, pricingType: a.jobId.pricingType,
+            status: "accepted" as const, postedBy: a.jobId.postedBy, createdAt: a.jobId.createdAt,
+          })));
 
-        // Fetch pending completion jobs
-        try {
-          const pendingData = await getWorkerPendingCompletion();
-          const pendingJobsList = pendingData
-            .map((app: any) => ({
-              _id: app.jobId._id,
-              title: app.jobId.title,
-              location: app.jobId.location,
-              pricingAmount: app.jobId.pricingAmount,
-              pricingType: app.jobId.pricingType,
-              status: "completion_pending" as const,
-              postedBy: app.jobId.postedBy,
-              createdAt: app.jobId.createdAt,
-              applicationId: app._id,
-            }));
-          setPendingCompletionJobs(pendingJobsList);
-        } catch (err) {
-          console.error("Error fetching pending completion jobs:", err);
-        }
+        if (pending.status === "fulfilled")
+          setPendingJobs(pending.value.map((a: any) => ({
+            _id: a.jobId._id, title: a.jobId.title, location: a.jobId.location,
+            pricingAmount: a.jobId.pricingAmount, pricingType: a.jobId.pricingType,
+            status: "completion_pending" as const, postedBy: a.jobId.postedBy,
+            createdAt: a.jobId.createdAt, applicationId: a._id,
+          })));
 
-        // Fetch completed jobs
-        try {
-          const completedData = await getWorkerCompletedJobs();
-          const completedJobsList = completedData
-            .map((app: any) => ({
-              _id: app.jobId._id,
-              title: app.jobId.title,
-              location: app.jobId.location,
-              pricingAmount: app.jobId.pricingAmount,
-              pricingType: app.jobId.pricingType,
-              status: "completed" as const,
-              postedBy: app.jobId.postedBy,
-              createdAt: app.jobId.createdAt,
-            }));
-          setCompletedJobs(completedJobsList);
-        } catch (err) {
-          console.error("Error fetching completed jobs:", err);
-        }
+        if (completed.status === "fulfilled")
+          setCompletedJobs(completed.value.map((a: any) => ({
+            _id: a.jobId._id, title: a.jobId.title, location: a.jobId.location,
+            pricingAmount: a.jobId.pricingAmount, pricingType: a.jobId.pricingType,
+            status: "completed" as const, postedBy: a.jobId.postedBy, createdAt: a.jobId.createdAt,
+          })));
 
-        setLoading(false);
-      } catch (err) {
-        console.error("Auth error:", err);
-        setError("Failed to load dashboard");
-        setLoading(false);
-      }
+        // Auto-switch to pending if there are items needing action
+        if (pending.status === "fulfilled" && pending.value.length > 0) setActiveTab("pending");
+
+      } catch { setError("Failed to load dashboard"); }
+      finally { setLoading(false); }
     };
-
-    checkAuth();
+    init();
   }, [locale, router]);
 
-  const handleConfirmCompletion = async (job: Job) => {
+  const handleConfirm = async (job: Job) => {
     if (!job.applicationId) return;
-    try {
-      await confirmJobCompletion(job.applicationId);
-      // Refresh the data
-      const completedData = await getWorkerCompletedJobs();
-      const completedJobsList = completedData.map((app: any) => ({
-        _id: app.jobId._id,
-        title: app.jobId.title,
-        location: app.jobId.location,
-        pricingAmount: app.jobId.pricingAmount,
-        pricingType: app.jobId.pricingType,
-        status: "completed" as const,
-        postedBy: app.jobId.postedBy,
-        createdAt: app.jobId.createdAt,
-      }));
-      setCompletedJobs(completedJobsList);
-      setPendingCompletionJobs(pendingCompletionJobs.filter(j => j._id !== job._id));
-    } catch (err) {
-      console.error("Error confirming completion:", err);
-    }
+    await confirmJobCompletion(job.applicationId);
+    setPendingJobs((p) => p.filter((j) => j._id !== job._id));
+    const d = await getWorkerCompletedJobs();
+    setCompletedJobs(d.map((a: any) => ({ _id: a.jobId._id, title: a.jobId.title, location: a.jobId.location, pricingAmount: a.jobId.pricingAmount, pricingType: a.jobId.pricingType, status: "completed" as const, postedBy: a.jobId.postedBy, createdAt: a.jobId.createdAt })));
   };
 
-  const handleRejectCompletion = async (job: Job) => {
+  const handleReject = async (job: Job) => {
     if (!job.applicationId) return;
-    try {
-      await rejectJobCompletion(job.applicationId);
-      // Refresh active jobs
-      const acceptedData = await getWorkerAcceptedJobs();
-      const acceptedJobsList = acceptedData.map((app: any) => ({
-        _id: app.jobId._id,
-        title: app.jobId.title,
-        location: app.jobId.location,
-        pricingAmount: app.jobId.pricingAmount,
-        pricingType: app.jobId.pricingType,
-        status: "accepted" as const,
-        postedBy: app.jobId.postedBy,
-        createdAt: app.jobId.createdAt,
-      }));
-      setActiveJobs(acceptedJobsList);
-      setPendingCompletionJobs(pendingCompletionJobs.filter(j => j._id !== job._id));
-    } catch (err) {
-      console.error("Error rejecting completion:", err);
-    }
+    await rejectJobCompletion(job.applicationId);
+    setPendingJobs((p) => p.filter((j) => j._id !== job._id));
+    const d = await getWorkerAcceptedJobs();
+    setActiveJobs(d.map((a: any) => ({ _id: a.jobId._id, title: a.jobId.title, location: a.jobId.location, pricingAmount: a.jobId.pricingAmount, pricingType: a.jobId.pricingType, status: "accepted" as const, postedBy: a.jobId.postedBy, createdAt: a.jobId.createdAt })));
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="flex min-h-[60vh] items-center justify-center flex-col gap-3">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-emerald-600" />
+      <p className="text-sm text-muted-foreground">Loading your jobs…</p>
+    </div>
+  );
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-8 px-4">
-        <div className="max-w-7xl mx-auto">
-          <Card className="border-red-200 bg-red-50">
-            <CardContent className="p-6 text-red-700">
-              {error}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
+  if (error) return (
+    <div className="mx-auto max-w-2xl px-4 py-6">
+      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
+    </div>
+  );
+
+  const tabData: Record<TabId, Job[]> = {
+    active: activeJobs,
+    applied: appliedJobs,
+    pending: pendingJobs,
+    completed: completedJobs,
+  };
+
+  const currentJobs = tabData[activeTab];
+  const totalEarned = completedJobs.reduce((s, j) => s + toNum(j.pricingAmount), 0);
+
+  const statusColors: Record<string, string> = {
+    applied: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400",
+    accepted: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400",
+    completion_pending: "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-400",
+    completed: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400",
+  };
+  const statusLabels: Record<string, string> = {
+    applied: "Applied",
+    accepted: "In Progress",
+    completion_pending: "Confirm?",
+    completed: "Done",
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-muted/30">
+      <div className="mx-auto max-w-2xl px-4 py-6 pb-24 md:pb-8">
+
+        {/* Back */}
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="mb-4 inline-flex items-center gap-1.5 rounded-full border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent/50 transition-colors"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" /> Dashboard
+        </button>
+
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            My Work Dashboard
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Track your applied jobs, active projects, and completed work
-          </p>
+        <div className="mb-5 flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">My Work</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Jobs, applications & earnings</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => router.push(`/${locale}/projects`)}
+            className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors shrink-0"
+          >
+            <Search className="h-3.5 w-3.5" /> Find Jobs
+          </button>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Applied
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="text-3xl font-bold text-gray-900 dark:text-white">
-                  {appliedJobs.length}
-                </div>
-                <AlertCircle className="h-8 w-8 text-blue-500 opacity-50" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Active
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">
-                  {activeJobs.length + pendingCompletionJobs.length}
-                </div>
-                <Clock className="h-8 w-8 text-amber-500 opacity-50" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Completed
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="text-3xl font-bold text-green-600 dark:text-green-400">
-                  {completedJobs.length}
-                </div>
-                <CheckCircle className="h-8 w-8 text-green-500 opacity-50" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Total Earned
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">
-                  ₹{(completedJobs.reduce((sum, job) => sum + getNumericAmount(job.pricingAmount), 0) / 1000).toFixed(1)}K
-                </div>
-                <IndianRupee className="h-8 w-8 text-emerald-500 opacity-50" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Active Jobs */}
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Active Jobs</h2>
-          {activeJobs.length === 0 ? (
-            <Card>
-              <CardContent className="text-center py-12">
-                <Briefcase className="h-12 w-12 text-gray-300 dark:text-gray-700 mx-auto mb-4" />
-                <p className="text-gray-600 dark:text-gray-400">No active jobs</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4">
-              {activeJobs.map((job) => (
-                <Card key={job._id} className="hover:shadow-lg transition-shadow">
-                  <CardContent className="pt-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h3 className="font-semibold text-lg text-gray-900 dark:text-white">
-                          {job.title}
-                        </h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-1 mt-1">
-                          <MapPin className="h-4 w-4" />
-                          {job.location || "Location not specified"}
-                        </p>
-                      </div>
-                      <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                        In Progress
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <p className="font-semibold text-lg text-emerald-600 dark:text-emerald-400">
-                        {formatPricing(job.pricingAmount, job.pricingType)}
-                      </p>
-                      <Button variant="outline" size="sm">
-                        View Details
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+        {/* Summary row */}
+        <div className="mb-5 grid grid-cols-4 gap-2">
+          {[
+            { label: "Applied",  value: appliedJobs.length,   color: "text-blue-600" },
+            { label: "Active",   value: activeJobs.length + pendingJobs.length, color: "text-amber-600" },
+            { label: "Done",     value: completedJobs.length, color: "text-emerald-600" },
+            {
+              label: "Earned",
+              value: totalEarned > 0
+                ? totalEarned >= 1000 ? `₹${(totalEarned / 1000).toFixed(1)}K` : `₹${totalEarned}`
+                : "₹0",
+              color: "text-emerald-600",
+            },
+          ].map(({ label, value, color }) => (
+            <div key={label} className="rounded-xl border bg-background p-3 text-center shadow-sm">
+              <p className={`text-lg font-bold leading-none ${color}`}>{value}</p>
+              <p className="mt-1 text-[10px] text-muted-foreground">{label}</p>
             </div>
-          )}
+          ))}
         </div>
 
-        {/* Pending Completion Jobs */}
-        {pendingCompletionJobs.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Jobs Pending Confirmation</h2>
-            <div className="grid gap-4">
-              {pendingCompletionJobs.map((job) => (
-                <Card key={job._id} className="hover:shadow-lg transition-shadow border-orange-200 dark:border-orange-900/30">
-                  <CardContent className="pt-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h3 className="font-semibold text-lg text-gray-900 dark:text-white">
-                          {job.title}
-                        </h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-1 mt-1">
-                          <MapPin className="h-4 w-4" />
-                          {job.location || "Location not specified"}
-                        </p>
-                      </div>
-                      <Badge className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
-                        Awaiting Confirmation
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <p className="font-semibold text-lg text-emerald-600 dark:text-emerald-400">
-                        {formatPricing(job.pricingAmount, job.pricingType)}
-                      </p>
-                    </div>
-                    <div className="mt-4 flex gap-3">
-                      <Button
-                        size="sm"
-                        className="bg-green-600 hover:bg-green-700"
-                        onClick={() => handleConfirmCompletion(job)}
-                      >
-                        Confirm Completion
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleRejectCompletion(job)}
-                      >
-                        Reject & Continue
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+        {/* ── Tabs ── */}
+        <div className="mb-4 flex gap-1 rounded-xl border bg-muted/60 p-1">
+          {TABS.map(({ id, label, icon: Icon }) => {
+            const count = tabData[id].length;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setActiveTab(id)}
+                className={`relative flex flex-1 flex-col items-center gap-0.5 rounded-lg px-2 py-2 text-xs font-semibold transition-all ${
+                  activeTab === id
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                <span className="hidden sm:inline">{label}</span>
+                {count > 0 && (
+                  <span className={`absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-white ${
+                    id === "pending" ? "bg-orange-500" : "bg-emerald-600"
+                  }`}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ── Job List ── */}
+        {currentJobs.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed bg-background p-10 text-center">
+            {activeTab === "active" && <Clock className="h-10 w-10 text-muted-foreground/30" />}
+            {activeTab === "applied" && <Briefcase className="h-10 w-10 text-muted-foreground/30" />}
+            {activeTab === "pending" && <AlertCircle className="h-10 w-10 text-muted-foreground/30" />}
+            {activeTab === "completed" && <CheckCircle className="h-10 w-10 text-muted-foreground/30" />}
+            <div>
+              <p className="font-semibold text-muted-foreground">
+                {activeTab === "active" && "No active jobs"}
+                {activeTab === "applied" && "No applications yet"}
+                {activeTab === "pending" && "Nothing to confirm"}
+                {activeTab === "completed" && "No completed jobs yet"}
+              </p>
+              {(activeTab === "active" || activeTab === "applied") && (
+                <p className="text-xs text-muted-foreground mt-1">Browse available jobs to get started</p>
+              )}
             </div>
+            {(activeTab === "active" || activeTab === "applied") && (
+              <button
+                type="button"
+                onClick={() => router.push(`/${locale}/projects`)}
+                className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors"
+              >
+                <Search className="h-3.5 w-3.5" /> Find Jobs
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {currentJobs.map((job) => (
+              <div
+                key={job._id}
+                className="overflow-hidden rounded-2xl border bg-background shadow-sm hover:shadow-md transition-shadow"
+              >
+                {/* Status accent line */}
+                <div className={`h-1 w-full ${
+                  job.status === "accepted" ? "bg-amber-400" :
+                  job.status === "completion_pending" ? "bg-orange-400" :
+                  job.status === "completed" ? "bg-emerald-400" :
+                  "bg-blue-400"
+                }`} />
+
+                <div className="p-4">
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="min-w-0">
+                      <h3 className="font-semibold text-sm leading-snug">{job.title}</h3>
+                      {job.postedBy && (
+                        <p className="text-xs text-muted-foreground mt-0.5">by {job.postedBy.name}</p>
+                      )}
+                      {job.location && (
+                        <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                          <MapPin className="h-3 w-3 shrink-0" />
+                          <span className="truncate">{job.location}</span>
+                        </p>
+                      )}
+                    </div>
+                    <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${statusColors[job.status]}`}>
+                      {statusLabels[job.status]}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-base font-bold text-emerald-600">
+                      {fmt(job.pricingAmount, job.pricingType)}
+                    </p>
+
+                    {job.status === "completion_pending" ? (
+                      <div className="flex gap-2">
+                        <Button size="sm" className="h-8 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-xs" onClick={() => handleConfirm(job)}>
+                          <CheckCircle className="h-3.5 w-3.5" /> Confirm
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => handleReject(job)}>
+                          Reject
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button size="sm" variant="outline" className="h-8 gap-1 text-xs">
+                        Details <ChevronRight className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
-        {/* Applied Jobs */}
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Applied Jobs</h2>
-          {appliedJobs.length === 0 ? (
-            <Card>
-              <CardContent className="text-center py-12">
-                <AlertCircle className="h-12 w-12 text-gray-300 dark:text-gray-700 mx-auto mb-4" />
-                <p className="text-gray-600 dark:text-gray-400">No applied jobs</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4">
-              {appliedJobs.map((job) => (
-                <Card key={job._id} className="hover:shadow-lg transition-shadow">
-                  <CardContent className="pt-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h3 className="font-semibold text-lg text-gray-900 dark:text-white">
-                          {job.title}
-                        </h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-1 mt-1">
-                          <MapPin className="h-4 w-4" />
-                          {job.location || "Location not specified"}
-                        </p>
-                      </div>
-                      <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                        Applied
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <p className="font-semibold text-lg text-emerald-600 dark:text-emerald-400">
-                        {formatPricing(job.pricingAmount, job.pricingType)}
-                      </p>
-                      <Button variant="outline" size="sm">
-                        View Details
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+        {/* Find more jobs CTA (bottom) */}
+        <div className="mt-6 pt-5 border-t">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold">Looking for more work?</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Browse jobs that match your skills</p>
             </div>
-          )}
-        </div>
-
-        {/* Completed Jobs */}
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Completed Jobs</h2>
-          {completedJobs.length === 0 ? (
-            <Card>
-              <CardContent className="text-center py-12">
-                <CheckCircle className="h-12 w-12 text-gray-300 dark:text-gray-700 mx-auto mb-4" />
-                <p className="text-gray-600 dark:text-gray-400">No completed jobs yet</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4">
-              {completedJobs.map((job) => (
-                <Card key={job._id} className="hover:shadow-lg transition-shadow">
-                  <CardContent className="pt-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h3 className="font-semibold text-lg text-gray-900 dark:text-white">
-                          {job.title}
-                        </h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-1 mt-1">
-                          <MapPin className="h-4 w-4" />
-                          {job.location || "Location not specified"}
-                        </p>
-                      </div>
-                      <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                        Completed
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <p className="font-semibold text-lg text-emerald-600 dark:text-emerald-400">
-                        {formatPricing(job.pricingAmount, job.pricingType)}
-                      </p>
-                      <Button variant="outline" size="sm">
-                        View Details
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Quick Actions */}
-        <div className="mt-12 pt-8 border-t border-gray-200 dark:border-gray-800">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Button
+            <button
+              type="button"
               onClick={() => router.push(`/${locale}/projects`)}
-              className="bg-emerald-600 hover:bg-emerald-700 h-auto py-4 text-base"
+              className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors"
             >
-              <Briefcase className="h-5 w-5 mr-2" />
-              Find More Jobs
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => router.push(`/${locale}/dashboard`)}
-              className="h-auto py-4 text-base"
-            >
-              View Profile
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => router.push(`/${locale}`)}
-              className="h-auto py-4 text-base"
-            >
-              <ArrowRight className="h-5 w-5 mr-2" />
-              Back to Home
-            </Button>
+              Find Jobs <ArrowRight className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </div>

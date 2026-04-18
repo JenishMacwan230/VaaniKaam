@@ -89,7 +89,7 @@ const BlogHeader = () => {
     if (user) {
       if (isContractor) {
         baseLinks.push({
-          href: "/dashboard/contractor",
+          href: "/dashboard/contractor/projects",
           text: "My Projects",
           icon: Briefcase,
         });
@@ -128,11 +128,6 @@ const BlogHeader = () => {
       const userSectionPrefixes = [
         "/user",
         "/profile",
-        "/contact",
-        "/about",
-        "/dashboard",
-        "/dashboard/worker",
-        "/dashboard/contractor",
       ];
 
       return userSectionPrefixes.some((base) =>

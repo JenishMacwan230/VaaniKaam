@@ -3,40 +3,27 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { fetchSessionUser, getCurrentLocale, resolveAccountType } from "@/lib/authClient";
-import { Bell, TrendingUp, Briefcase, CheckCircle, AlertCircle, Eye, Phone, MessageSquare, ArrowLeft } from "lucide-react";
+import {
+  Bell, TrendingUp, Briefcase, CheckCircle, AlertCircle,
+  MessageSquare, ArrowLeft, Plus, ChevronRight, Activity,
+  Users, Clock, BarChart3,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 interface JobWithApplications {
   _id: string;
-  title: string;
-  description?: string;
-  location?: string;
-  wage?: number | string;
   status: "open" | "assigned" | "in_progress" | "completion_pending" | "completed" | "cancelled";
   applicationsCount: number;
-  applications: JobApplication[];
-  createdAt: string;
 }
 
 interface JobApplication {
   _id: string;
-  jobId: {
-    title: string;
-    status: string;
-  };
+  jobId: { title: string };
   status: "applied" | "accepted" | "rejected" | "completion_pending" | "completed";
-  createdAt: string;
-  workerId: {
-    _id: string;
-    name: string;
-    email: string;
-    proficiency?: string;
-    location?: string;
-  };
+  workerId: { name: string; location?: string };
 }
 
 interface ContractorStats {
@@ -58,604 +45,280 @@ export default function ContractorDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const formatWage = (value: number | string | undefined): string => {
-    if (typeof value === "number" && Number.isFinite(value) && value > 0) {
-      return `₹${value.toLocaleString()}`;
-    }
-    if (typeof value === "string") {
-      const parsed = Number.parseFloat(value);
-      if (Number.isFinite(parsed) && parsed > 0) {
-        return `₹${parsed.toLocaleString()}`;
-      }
-      return value.trim() || "POA";
-    }
-    return "POA";
-  };
-
   useEffect(() => {
     const loadData = async () => {
       try {
-        // Check authentication
         const currentUser = await fetchSessionUser();
-        if (!currentUser) {
-          router.push(`/${locale}/login`);
-          return;
+        if (!currentUser) { router.push(`/${locale}/login`); return; }
+        if (resolveAccountType(currentUser) !== "contractor") {
+          router.push(`/${locale}/dashboard/worker`); return;
         }
+        if (!API_BASE_URL) { setError("API configuration missing"); setIsLoading(false); return; }
 
-        // Check if user is contractor
-        const accountType = resolveAccountType(currentUser);
-        if (accountType !== "contractor") {
-          router.push(`/${locale}/dashboard/worker`);
-          return;
+        const [jobsRes, statsRes, appsRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/jobs/contractor/jobs`, { credentials: "include" }).catch(() => null),
+          fetch(`${API_BASE_URL}/api/jobs/contractor/stats`, { credentials: "include" }).catch(() => null),
+          fetch(`${API_BASE_URL}/api/jobs/contractor/applications`, { credentials: "include" }).catch(() => null),
+        ]);
+
+        if (jobsRes?.ok) { const d = await jobsRes.json(); setJobs(d.jobs || []); }
+        if (statsRes?.ok) { const d = await statsRes.json(); setStats(d.stats || null); }
+        if (appsRes?.ok) {
+          const d = await appsRes.json();
+          setRecentApplications(
+            (d.applications || []).filter((a: JobApplication) => a.status === "applied").slice(0, 4)
+          );
         }
-
-        // Only fetch if API_BASE_URL is defined
-        if (!API_BASE_URL) {
-          console.warn("API_BASE_URL is not defined");
-          setError("API configuration missing");
-          setIsLoading(false);
-          return;
-        }
-
-        // Fetch contractor data in parallel
-        try {
-          const [jobsRes, statsRes, applicationsRes] = await Promise.all([
-            fetch(`${API_BASE_URL}/api/jobs/contractor/jobs`, { credentials: "include" }).catch(err => {
-              console.error("Jobs fetch error:", err);
-              return null;
-            }),
-            fetch(`${API_BASE_URL}/api/jobs/contractor/stats`, { credentials: "include" }).catch(err => {
-              console.error("Stats fetch error:", err);
-              return null;
-            }),
-            fetch(`${API_BASE_URL}/api/jobs/contractor/applications`, { credentials: "include" }).catch(err => {
-              console.error("Applications fetch error:", err);
-              return null;
-            }),
-          ]);
-
-          if (jobsRes?.ok) {
-            const data = await jobsRes.json();
-            setJobs(data.jobs || []);
-          } else if (jobsRes) {
-            console.warn("Jobs response not ok:", jobsRes.status, await jobsRes.text());
-          }
-
-          if (statsRes?.ok) {
-            const data = await statsRes.json();
-            setStats(data.stats || null);
-          } else if (statsRes) {
-            console.warn("Stats response not ok:", statsRes.status, await statsRes.text());
-          }
-
-          if (applicationsRes?.ok) {
-            const data = await applicationsRes.json();
-            // Only show pending/applied applications (not accepted or rejected)
-            const pendingApps = (data.applications || []).filter((app: JobApplication) => app.status === "applied").slice(0, 5);
-            setRecentApplications(pendingApps);
-          } else if (applicationsRes) {
-            console.warn("Applications response not ok:", applicationsRes.status, await applicationsRes.text());
-          }
-        } catch (err) {
-          console.error("Data fetch error:", err);
-          // Continue anyway - show partial dashboard
-        }
-      } catch (err) {
-        console.error("Dashboard load error:", err);
-        setError("Failed to load dashboard data");
-      } finally {
-        setIsLoading(false);
-      }
+      } catch { setError("Failed to load dashboard data"); }
+      finally { setIsLoading(false); }
     };
-
     loadData();
   }, [pathname, router, locale]);
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading your dashboard...</p>
-        </div>
+      <div className="flex min-h-[60vh] items-center justify-center flex-col gap-3">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-emerald-600" />
+        <p className="text-sm text-muted-foreground">Loading your dashboard…</p>
       </div>
     );
   }
 
-  const openJobs = jobs.filter(job => job.status === "open");
-  const inProgressJobs = jobs.filter(
-    job => job.status === "assigned" || job.status === "in_progress" || job.status === "completion_pending"
-  );
-  const completedJobs = jobs.filter(job => job.status === "completed");
-  const jobsWithApplications = jobs
-    .filter(job => job.applicationsCount > 0 && job.status !== "completed")
-    .sort((a, b) => b.applicationsCount - a.applicationsCount);
+  const openJobs = jobs.filter((j) => j.status === "open");
+  const inProgressJobs = jobs.filter((j) => ["assigned", "in_progress", "completion_pending"].includes(j.status));
+  const completedJobs = jobs.filter((j) => j.status === "completed");
+  const completionRate = jobs.length > 0 ? Math.round((completedJobs.length / jobs.length) * 100) : 0;
+  const fillRate = jobs.length > 0 ? Math.round(((jobs.length - openJobs.length) / jobs.length) * 100) : 0;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-muted/30">
+      <div className="mx-auto max-w-2xl px-4 py-6 pb-24 md:pb-8">
+
+        {/* Back */}
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="mb-4 inline-flex items-center gap-1.5 rounded-full border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent/50 transition-colors"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" /> Back
+        </button>
+
         {/* Header */}
-        <div className="mb-8 space-y-3">
+        <div className="mb-6 flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Overview, analytics & quick actions</p>
+          </div>
+          <Button
+            onClick={() => router.push(`/${locale}/add-works`)}
+            size="sm"
+            className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 shrink-0"
+          >
+            <Plus className="h-3.5 w-3.5" /> Post Job
+          </Button>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900">
+            {error}
+          </div>
+        )}
+
+        {/* ── New Applications Alert ── */}
+        {recentApplications.length > 0 && (
+          <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-white">
+                  <Bell className="h-3.5 w-3.5" />
+                </div>
+                <p className="text-sm font-bold text-amber-800 dark:text-amber-300">
+                  {recentApplications.length} New Application{recentApplications.length > 1 ? "s" : ""}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => router.push(`/${locale}/dashboard/contractor/projects`)}
+                className="text-xs font-semibold text-amber-700 dark:text-amber-400 hover:underline"
+              >
+                View all →
+              </button>
+            </div>
+            <div className="space-y-2">
+              {recentApplications.map((app) => (
+                <div key={app._id} className="flex items-center justify-between rounded-xl bg-white dark:bg-amber-950/40 border border-amber-100 dark:border-amber-900/50 px-3 py-2.5 gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold truncate">{app.workerId.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      For: {app.jobId?.title || "Job"}
+                      {app.workerId.location ? ` · ${app.workerId.location}` : ""}
+                    </p>
+                  </div>
+                  <Button size="sm" variant="outline" className="shrink-0 h-7 text-xs"
+                    onClick={() => router.push(`/${locale}/dashboard/contractor/projects`)}>
+                    Review
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Analytics ── */}
+        <div className="mb-5">
+          <div className="mb-3 flex items-center gap-2">
+            <Activity className="h-4 w-4 text-emerald-600" />
+            <h2 className="text-base font-bold">Analytics</h2>
+          </div>
+
+          {/* Stats grid */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-3">
+            {[
+              { label: "Total", value: jobs.length, Icon: Briefcase, color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-950/40" },
+              { label: "Open", value: openJobs.length, Icon: AlertCircle, color: "text-sky-600", bg: "bg-sky-50 dark:bg-sky-950/40" },
+              { label: "Active", value: inProgressJobs.length, Icon: Clock, color: "text-amber-600", bg: "bg-amber-50 dark:bg-amber-950/40" },
+              { label: "Done", value: completedJobs.length, Icon: CheckCircle, color: "text-emerald-600", bg: "bg-emerald-50 dark:bg-emerald-950/40" },
+            ].map(({ label, value, Icon, color, bg }) => (
+              <Card key={label} className="border shadow-sm">
+                <CardContent className="p-4">
+                  <div className={`mb-2 inline-flex h-8 w-8 items-center justify-center rounded-lg ${bg}`}>
+                    <Icon className={`h-4 w-4 ${color}`} />
+                  </div>
+                  <p className="text-xl font-bold leading-none">{value}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{label}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Applications + rates row */}
+          <div className="grid grid-cols-2 gap-3">
+            <Card className="border shadow-sm">
+              <CardContent className="p-4">
+                <div className="mb-2 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50 dark:bg-purple-950/40">
+                  <MessageSquare className="h-4 w-4 text-purple-600" />
+                </div>
+                <p className="text-xl font-bold leading-none">{stats?.totalApplications ?? 0}</p>
+                <p className="mt-1 text-xs text-muted-foreground">Total Applications</p>
+              </CardContent>
+            </Card>
+            <Card className="border shadow-sm">
+              <CardContent className="p-4">
+                <div className="mb-2 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-teal-50 dark:bg-teal-950/40">
+                  <Users className="h-4 w-4 text-teal-600" />
+                </div>
+                <p className="text-xl font-bold leading-none">{completionRate}%</p>
+                <p className="mt-1 text-xs text-muted-foreground">Completion Rate</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Progress bars */}
+          {jobs.length > 0 && (
+            <Card className="mt-3 border shadow-sm">
+              <CardContent className="px-4 py-4 space-y-3">
+                <div>
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="text-muted-foreground font-medium flex items-center gap-1">
+                      <CheckCircle className="h-3 w-3" /> Completion Rate
+                    </span>
+                    <span className="font-bold text-emerald-600">{completionRate}%</span>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                    <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all" style={{ width: `${completionRate}%` }} />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="text-muted-foreground font-medium flex items-center gap-1">
+                      <TrendingUp className="h-3 w-3" /> Fill Rate
+                    </span>
+                    <span className="font-bold text-blue-600">{fillRate}%</span>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                    <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-sky-400 transition-all" style={{ width: `${fillRate}%` }} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* ── Navigate to Projects ── */}
+        <div className="mb-5">
+          <div className="mb-3 flex items-center gap-2">
+            <Briefcase className="h-4 w-4 text-emerald-600" />
+            <h2 className="text-base font-bold">My Projects</h2>
+          </div>
           <button
             type="button"
-            onClick={() => router.back()}
-            className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent/40"
+            onClick={() => router.push(`/${locale}/dashboard/contractor/projects`)}
+            className="w-full flex items-center justify-between gap-4 rounded-2xl border bg-background p-4 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all group"
           >
-            <ArrowLeft className="h-4 w-4" />
-            <span>Back</span>
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950/40">
+                <Briefcase className="h-5 w-5 text-emerald-600" />
+              </div>
+              <div className="text-left">
+                <p className="font-semibold text-sm">Manage All Projects</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {openJobs.length} open · {inProgressJobs.length} active · {completedJobs.length} completed
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-emerald-600 transition-colors flex-shrink-0" />
           </button>
-
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-              Welcome back! 👋
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              Manage your projects and track applications
-            </p>
-          </div>
         </div>
 
-        {/* Error Display */}
-        {error && (
-          <Card className="mb-8 border-l-4 border-l-red-500">
-            <CardContent className="p-4">
-              <p className="text-red-600 dark:text-red-400">{error}</p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Notifications Section - Only show for jobs with pending applications */}
-        {recentApplications.length > 0 && (
-          <Card className="mb-8 border-l-4 border-l-amber-500">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Bell className="h-5 w-5 text-amber-600" />
-                  <CardTitle className="text-lg">
-                    New Applications ({recentApplications.length})
-                  </CardTitle>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {recentApplications.map((app) => (
-                  <div
-                    key={app._id}
-                    className="flex items-center justify-between p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800"
-                  >
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900 dark:text-white">
-                        {app.workerId.name}
-                      </p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Applied for: <span className="font-semibold">{app.jobId?.title || "Job"}</span>
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                        {app.workerId.location && `📍 ${app.workerId.location}`}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="gap-1"
-                      >
-                        <Eye className="h-4 w-4" />
-                        View
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="gap-1"
-                      >
-                        <Phone className="h-4 w-4" />
-                        Call
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Statistics Grid */}
-        {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Total Projects
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="text-3xl font-bold text-gray-900 dark:text-white">
-                    {jobs.length}
-                  </div>
-                  <Briefcase className="h-8 w-8 text-blue-500 opacity-50" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Open Projects
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-                    {openJobs.length}
-                  </div>
-                  <AlertCircle className="h-8 w-8 text-blue-500 opacity-50" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  In Progress
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">
-                    {inProgressJobs.length}
-                  </div>
-                  <TrendingUp className="h-8 w-8 text-amber-500 opacity-50" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Completed
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="text-3xl font-bold text-green-600 dark:text-green-400">
-                    {completedJobs.length}
-                  </div>
-                  <CheckCircle className="h-8 w-8 text-green-500 opacity-50" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Applications
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">
-                    {stats.totalApplications}
-                  </div>
-                  <MessageSquare className="h-8 w-8 text-purple-500 opacity-50" />
-                </div>
-              </CardContent>
-            </Card>
+        {/* ── Quick Actions ── */}
+        <div>
+          <div className="mb-3 flex items-center gap-2">
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+            <h2 className="text-base font-bold">Quick Actions</h2>
           </div>
-        )}
-
-        {/* Current Projects Section */}
-        <div className="space-y-8">
-          {jobs.length === 0 ? (
-            <Card className="text-center py-12">
-              <Briefcase className="h-12 w-12 text-gray-300 dark:text-gray-700 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                No projects yet
-              </h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-6">
-                Start by creating your first project to find skilled workers
-              </p>
-              <Button
-                onClick={() => router.push(`/${locale}/add-works`)}
-                className="bg-emerald-600 hover:bg-emerald-700"
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {[
+              {
+                icon: Plus,
+                label: "Post New Job",
+                desc: "Create a new project",
+                color: "text-emerald-600",
+                bg: "bg-emerald-50 dark:bg-emerald-950/40",
+                action: () => router.push(`/${locale}/add-works`),
+              },
+              {
+                icon: Users,
+                label: "Browse Workers",
+                desc: "Find skilled labour",
+                color: "text-purple-600",
+                bg: "bg-purple-50 dark:bg-purple-950/40",
+                action: () => router.push(`/${locale}/projects`),
+              },
+              {
+                icon: CheckCircle,
+                label: "View Profile",
+                desc: "Your public profile",
+                color: "text-blue-600",
+                bg: "bg-blue-50 dark:bg-blue-950/40",
+                action: () => router.push(`/${locale}/profile`),
+              },
+            ].map(({ icon: Icon, label, desc, color, bg, action }) => (
+              <button
+                key={label}
+                type="button"
+                onClick={action}
+                className="flex flex-col items-start gap-3 rounded-2xl border bg-background p-4 shadow-sm hover:shadow-md hover:border-primary/30 transition-all text-left"
               >
-                Post First Project
-              </Button>
-            </Card>
-          ) : (
-            <>
-              {/* Jobs With Applications */}
-              {jobsWithApplications.length > 0 && (
+                <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${bg}`}>
+                  <Icon className={`h-4.5 w-4.5 ${color}`} />
+                </div>
                 <div>
-                  <div className="mb-6">
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                      <Bell className="h-6 w-6 text-indigo-600" />
-                      Jobs With Applications
-                    </h2>
-                    <p className="text-gray-600 dark:text-gray-400 mt-1">
-                      Projects that currently have worker interest
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                    {jobsWithApplications.map((job) => (
-                      <Card key={`applications-${job._id}`} className="overflow-hidden hover:shadow-lg transition-shadow border-indigo-200 dark:border-indigo-900/30">
-                        <CardHeader>
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <CardTitle className="text-lg text-gray-900 dark:text-white">
-                                {job.title}
-                              </CardTitle>
-                              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                {job.location && `📍 ${job.location}`}
-                              </p>
-                            </div>
-                            <Badge className="bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
-                              {job.applicationsCount} Applications
-                            </Badge>
-                          </div>
-                        </CardHeader>
-
-                        <CardContent>
-                          <div className="flex items-center justify-between mb-6">
-                            <div>
-                              <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                                {formatWage(job.wage)}
-                              </p>
-                              <p className="text-xs text-gray-500 dark:text-gray-500">
-                                Posted on {new Date(job.createdAt).toLocaleDateString()}
-                              </p>
-                            </div>
-                            <Badge variant="outline" className="text-xs">
-                              {job.status.replace("_", " ")}
-                            </Badge>
-                          </div>
-
-                          <Button
-                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-sm"
-                            onClick={() =>
-                              router.push(`/${locale}/dashboard/contractor/${job._id}?tab=applications`)
-                            }
-                          >
-                            Manage Applications
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
+                  <p className="text-sm font-semibold leading-tight">{label}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
                 </div>
-              )}
-
-              {/* Open Projects */}
-              <div>
-                <div className="mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                    <AlertCircle className="h-6 w-6 text-blue-600" />
-                    Open Projects
-                  </h2>
-                  <p className="text-gray-600 dark:text-gray-400 mt-1">
-                    Waiting for workers to apply
-                  </p>
-                </div>
-
-                {openJobs.length === 0 ? (
-                  <Card className="text-center py-12">
-                    <Briefcase className="h-12 w-12 text-gray-300 dark:text-gray-700 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                      No open projects
-                    </h3>
-                    <p className="text-gray-600 dark:text-gray-400 mb-6">
-                      All your projects have been accepted or completed
-                    </p>
-                  </Card>
-                ) : (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                {openJobs.map((job) => (
-                  <Card key={job._id} className="overflow-hidden hover:shadow-lg transition-shadow border-blue-200 dark:border-blue-900/30">
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <CardTitle className="text-lg text-gray-900 dark:text-white">
-                            {job.title}
-                          </CardTitle>
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                            {job.location && `📍 ${job.location}`}
-                          </p>
-                        </div>
-                        <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                          Open
-                        </Badge>
-                      </div>
-                    </CardHeader>
-
-                    <CardContent>
-                      <div className="flex items-center justify-between mb-6">
-                        <div>
-                          <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                            {formatWage(job.wage)}
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-500">
-                            Posted on {new Date(job.createdAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                            {job.applicationsCount}
-                          </p>
-                          <p className="text-xs text-gray-600 dark:text-gray-400">Applications</p>
-                        </div>
-                      </div>
-
-                      <Button
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-sm"
-                        onClick={() =>
-                          router.push(`/${locale}/dashboard/contractor/${job._id}?tab=applications`)
-                        }
-                      >
-                        Manage Applications
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-              </div>
-
-              {/* In Progress Projects */}
-          {inProgressJobs.length > 0 && (
-            <div>
-              <div className="mb-6">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                  <TrendingUp className="h-6 w-6 text-amber-600" />
-                  In Progress
-                </h2>
-                <p className="text-gray-600 dark:text-gray-400 mt-1">
-                  Workers are actively working on these projects
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                {inProgressJobs.map((job) => (
-                  <Card key={job._id} className="overflow-hidden hover:shadow-lg transition-shadow border-amber-200 dark:border-amber-900/30">
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <CardTitle className="text-lg text-gray-900 dark:text-white">
-                            {job.title}
-                          </CardTitle>
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                            {job.location && `📍 ${job.location}`}
-                          </p>
-                        </div>
-                        <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                          {job.status === "completion_pending" ? "Awaiting Confirmation" : "In Progress"}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-
-                    <CardContent>
-                      <div className="flex items-center justify-between mb-6">
-                        <div>
-                          <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                            {formatWage(job.wage)}
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-500">
-                            Posted on {new Date(job.createdAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-                            {job.applications?.filter(a => a.status === "accepted").length || 0}
-                          </p>
-                          <p className="text-xs text-gray-600 dark:text-gray-400">Workers</p>
-                        </div>
-                      </div>
-
-                      <Button
-                        className="w-full bg-amber-600 hover:bg-amber-700 text-sm"
-                        onClick={() => router.push(`/${locale}/dashboard/contractor/${job._id}`)}
-                      >
-                        {job.status === "completion_pending" ? "View Status" : "Mark as Complete"}
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {completedJobs.length > 0 && (
-            <div>
-              <div className="mb-6">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                  <CheckCircle className="h-6 w-6 text-green-600" />
-                  Completed Projects ({completedJobs.length})
-                </h2>
-                <p className="text-gray-600 dark:text-gray-400 mt-1">
-                  Successfully finished projects
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                  {completedJobs.map((job) => (
-                    <Card key={job._id} className="overflow-hidden hover:shadow-lg transition-shadow border-green-200 dark:border-green-900/30">
-                      <CardHeader>
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <CardTitle className="text-lg text-gray-900 dark:text-white">
-                              {job.title}
-                            </CardTitle>
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                              {job.location && `📍 ${job.location}`}
-                            </p>
-                          </div>
-                          <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                            Completed
-                          </Badge>
-                        </div>
-                      </CardHeader>
-
-                      <CardContent>
-                        <div className="flex items-center justify-between mb-6">
-                          <div>
-                            <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                              {formatWage(job.wage)}
-                            </p>
-                            <p className="text-xs text-gray-500 dark:text-gray-500">
-                              Completed on {new Date(job.createdAt).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                              {job.applications?.filter(a => a.status === "accepted" || a.status === "completed").length || 0}
-                            </p>
-                            <p className="text-xs text-gray-600 dark:text-gray-400">Workers</p>
-                          </div>
-                        </div>
-
-                        <Button
-                          variant="outline"
-                          className="w-full text-sm"
-                          onClick={() => router.push(`/${locale}/dashboard/contractor/${job._id}`)}
-                        >
-                          View Details
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  ))}
-              </div>
-            </div>
-          )}
-            </>
-          )}
-        </div>
-
-        {/* Quick Actions */}
-        <div className="mt-12 pt-8 border-t border-gray-200 dark:border-gray-800">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Button
-              onClick={() => router.push(`/${locale}/add-works`)}
-              className="bg-emerald-600 hover:bg-emerald-700 h-auto py-4 text-base"
-            >
-              <Briefcase className="h-5 w-5 mr-2" />
-              Post New Project
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => router.push(`/${locale}/projects`)}
-              className="h-auto py-4 text-base"
-            >
-              Browse Workers
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => router.push(`/${locale}/dashboard`)}
-              className="h-auto py-4 text-base"
-            >
-              View Profile
-            </Button>
+              </button>
+            ))}
           </div>
         </div>
       </div>

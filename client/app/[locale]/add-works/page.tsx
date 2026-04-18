@@ -315,7 +315,7 @@ export default function AddWorksPage() {
       });
 
       setTimeout(() => {
-        router.push(`/${locale}/dashboard/contractor`);
+        router.push(`/${locale}/dashboard/contractor/projects`);
       }, 2000);
     } catch (err: unknown) {
       console.error('Work submission error:', err);
