@@ -2,7 +2,6 @@
 
 import { usePathname } from "next/navigation";
 import BlogHeader from "@/components/Navbar";
-import MobilePageHeader from "@/components/MobilePageHeader";
 import Footer from "@/components/Footer";
 import Logo from "@/components/ui/logo";
 import Link from "next/link";
@@ -37,7 +36,6 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
       <BlogHeader />
       {/* Page Content */}
       <main className="min-h-screen">
-        <MobilePageHeader />
         {children}
       </main>
       {/* Footer */}

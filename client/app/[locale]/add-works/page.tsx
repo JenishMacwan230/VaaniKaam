@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,7 +15,25 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getCurrentLocale } from "@/lib/authClient";
-import { AlertCircle, CheckCircle, MapPin, Loader, Eye, EyeOff } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle,
+  MapPin,
+  Loader,
+  Eye,
+  EyeOff,
+  Briefcase,
+  FileText,
+  Tag,
+  IndianRupee,
+  Clock,
+  CalendarDays,
+  Users,
+  Sparkles,
+  ChevronRight,
+  ArrowLeft,
+  Info,
+} from "lucide-react";
 import { getCurrentLocation } from "@/lib/geolocation";
 import { reverseGeocodeWithCache, getLocationDisplayName } from "@/lib/geocoding";
 import { normalizeLocationWithCache } from "@/lib/locationNormalizer";
@@ -30,13 +48,24 @@ interface WorkForm {
   normalizedLocation?: string;
   latitude?: number;
   longitude?: number;
-  // Duration with structured inputs
   duration_value: number;
   duration_unit: "hour" | "day" | "week";
   workersRequired: number | "";
   jobDate: "today" | "tomorrow" | "pick" | "flexible";
   selectedDate?: string;
 }
+
+const categoryIcons: Record<string, string> = {
+  Construction: "🏗️",
+  Plumbing: "🔧",
+  Electrical: "⚡",
+  Carpentry: "🪚",
+  Painting: "🎨",
+  Cleaning: "🧹",
+  Gardening: "🌱",
+  Tutoring: "📚",
+  Other: "💼",
+};
 
 export default function AddWorksPage() {
   const pathname = usePathname();
@@ -63,7 +92,6 @@ export default function AddWorksPage() {
     normalizedLocation: undefined,
     latitude: undefined,
     longitude: undefined,
-    // New duration structure with defaults
     duration_value: 1,
     duration_unit: "day",
     workersRequired: 1,
@@ -72,57 +100,37 @@ export default function AddWorksPage() {
   });
 
   const categories = [
-    "Construction",
-    "Plumbing",
-    "Electrical",
-    "Carpentry",
-    "Painting",
-    "Cleaning",
-    "Gardening",
-    "Tutoring",
-    "Other",
+    "Construction", "Plumbing", "Electrical", "Carpentry",
+    "Painting", "Cleaning", "Gardening", "Tutoring", "Other",
   ];
 
-  // Get valid duration units based on pay type
   const getValidDurationUnits = (payType: WorkForm["payType"]): WorkForm["duration_unit"][] => {
     switch (payType) {
-      case "per_hour":
-        return ["hour"];
-      case "per_day":
-        return ["day"];
-      case "per_job":
-        return ["hour", "day", "week"];
-      default:
-        return ["day"];
+      case "per_hour": return ["hour"];
+      case "per_day": return ["day"];
+      case "per_job": return ["hour", "day", "week"];
+      default: return ["day"];
     }
   };
 
-  // Get default duration unit and value for a pay type
   const getDefaultDurationForPayType = (payType: WorkForm["payType"]) => {
     switch (payType) {
-      case "per_hour":
-        return { duration_value: 8, duration_unit: "hour" as const };
-      case "per_day":
-        return { duration_value: 1, duration_unit: "day" as const };
-      case "per_job":
-        return { duration_value: 1, duration_unit: "day" as const };
-      default:
-        return { duration_value: 1, duration_unit: "day" as const };
+      case "per_hour": return { duration_value: 8, duration_unit: "hour" as const };
+      case "per_day": return { duration_value: 1, duration_unit: "day" as const };
+      case "per_job": return { duration_value: 1, duration_unit: "day" as const };
+      default: return { duration_value: 1, duration_unit: "day" as const };
     }
   };
 
-  // Calculate estimated total
   const calculateEstimatedTotal = () => {
     const amount = Number.parseFloat(formData.payAmount) || 0;
     if (amount <= 0) return null;
-    
     if (formData.payType === "per_hour" || formData.payType === "per_day") {
       return amount * formData.duration_value;
     }
-    return null; // per_job doesn't calculate total
+    return null;
   };
 
-  // Handle pay type change - reset duration to defaults
   const handlePayTypeChange = (newPayType: WorkForm["payType"]) => {
     const defaultDuration = getDefaultDurationForPayType(newPayType);
     setFormData((prev) => ({
@@ -133,44 +141,27 @@ export default function AddWorksPage() {
     }));
   };
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-
-    // Check for low payment amount
+    setFormData((prev) => ({ ...prev, [name]: value }));
     if (name === "payAmount") {
       const amount = Number.parseFloat(value);
       setLowPaymentWarning(amount > 0 && amount < 100);
     }
-
-    if (name === "location" && value.trim()) {
-      setLocationError("");
-    }
+    if (name === "location" && value.trim()) setLocationError("");
   };
 
-  // Handle location blur - auto-normalize, but non-blocking (fallback to original)
   const handleLocationBlur = async () => {
     if (!formData.location.trim()) {
       setLocationError("Please enter a location");
       return;
     }
-
     try {
       setIsNormalizingLocation(true);
-      
-      // Normalize location via API (simple, fast - ONE call)
       const normalized = await normalizeLocationWithCache(formData.location);
-      
       if (normalized.isValid) {
-        // ✅ Normalization succeeded
         setFormData((prev) => ({
           ...prev,
-          location: prev.location,
           normalizedLocation: normalized.standardizedName,
           latitude: normalized.latitude,
           longitude: normalized.longitude,
@@ -178,22 +169,12 @@ export default function AddWorksPage() {
         setIsLocationNormalized(true);
         setLocationError("");
       } else {
-        // ❌ Normalization failed - don't use fallback
-        setFormData((prev) => ({
-          ...prev,
-          normalizedLocation: undefined,
-        }));
+        setFormData((prev) => ({ ...prev, normalizedLocation: undefined }));
         setIsLocationNormalized(false);
-        setLocationError(
-          normalized.error || `"${formData.location}" not found. Try GPS auto-fill or use exact city name.`
-        );
+        setLocationError(normalized.error || `"${formData.location}" not found. Try GPS or use exact city name.`);
       }
-    } catch (err: unknown) {
-      console.error('Location normalization error:', err);
-      setFormData((prev) => ({
-        ...prev,
-        normalizedLocation: undefined,
-      }));
+    } catch {
+      setFormData((prev) => ({ ...prev, normalizedLocation: undefined }));
       setIsLocationNormalized(false);
       setLocationError("Location verification failed. Use GPS or try again.");
     } finally {
@@ -202,30 +183,17 @@ export default function AddWorksPage() {
   };
 
   const handleSelectChange = (name: string, value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Handle GPS Auto-Fill
   const handleAutoFillLocation = async () => {
     setIsGPSLoading(true);
     setGpsError("");
     setLocationError("");
-
     try {
-      // Get user's GPS location
       const location = await getCurrentLocation();
-      
-      // Reverse geocode to get city name
-      const address = await reverseGeocodeWithCache(
-        location.latitude,
-        location.longitude
-      );
+      const address = await reverseGeocodeWithCache(location.latitude, location.longitude);
       const cityName = getLocationDisplayName(address);
-
-      // Update form with location and coordinates
       setFormData((prev) => ({
         ...prev,
         location: cityName,
@@ -233,11 +201,8 @@ export default function AddWorksPage() {
         latitude: location.latitude,
         longitude: location.longitude,
       }));
-
-      setGpsError("");
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to get location";
-      setGpsError(message);
+      setGpsError(err instanceof Error ? err.message : "Failed to get location");
     } finally {
       setIsGPSLoading(false);
     }
@@ -247,15 +212,12 @@ export default function AddWorksPage() {
     e.preventDefault();
     setError("");
     setIsLoading(true);
-
     try {
-      // Validate form
       if (!formData.title || !formData.category || !formData.payAmount || !formData.location) {
         setError("Please fill in all required fields");
         setIsLoading(false);
         return;
       }
-
       const payload = {
         title: formData.title,
         description: formData.description,
@@ -265,7 +227,6 @@ export default function AddWorksPage() {
         location: formData.location,
         normalizedLocation: formData.normalizedLocation || formData.location,
         isLocationNormalized,
-        // Duration fields - structured format
         duration_value: formData.duration_value,
         duration_unit: formData.duration_unit,
         workersRequired: formData.workersRequired,
@@ -276,474 +237,454 @@ export default function AddWorksPage() {
           longitude: formData.longitude,
         }),
       };
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/jobs`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        }
-      );
-
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/jobs`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
       if (!response.ok) {
         const data = await response.json();
         setError(data.message || "Failed to create work");
         setIsLoading(false);
         return;
       }
-
       setSuccess(true);
       setFormData({
-        title: "",
-        description: "",
-        category: "",
-        payType: "per_day",
-        payAmount: "",
-        location: "",
-        normalizedLocation: undefined,
-        latitude: undefined,
-        longitude: undefined,
-        duration_value: 1,
-        duration_unit: "day",
-        workersRequired: 1,
-        jobDate: "today",
-        selectedDate: "",
+        title: "", description: "", category: "", payType: "per_day",
+        payAmount: "", location: "", normalizedLocation: undefined,
+        latitude: undefined, longitude: undefined, duration_value: 1,
+        duration_unit: "day", workersRequired: 1, jobDate: "today", selectedDate: "",
       });
-
-      setTimeout(() => {
-        router.push(`/${locale}/dashboard/contractor/projects`);
-      }, 2000);
-    } catch (err: unknown) {
-      console.error('Work submission error:', err);
+      setTimeout(() => router.push(`/${locale}/dashboard/contractor/projects`), 2000);
+    } catch {
       setError("An error occurred. Please try again.");
       setIsLoading(false);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-2xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Post a New Work Opportunity
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Fill in the details below to create a work posting
-          </p>
-        </div>
+  const estimatedTotal = calculateEstimatedTotal();
 
-        <Card className="border border-gray-200 dark:border-gray-800">
-          <CardHeader>
-            <CardTitle>Work Details</CardTitle>
-          </CardHeader>
-          <CardContent>
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Hero Header */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-700 dark:from-emerald-700 dark:via-teal-700 dark:to-cyan-800 px-4 pt-10 pb-20 sm:pt-14 sm:pb-24">
+        {/* Decorative blobs */}
+        <div className="pointer-events-none absolute -top-10 -right-10 h-48 w-48 rounded-full bg-white/10 blur-3xl" />
+        <div className="pointer-events-none absolute bottom-0 -left-10 h-40 w-40 rounded-full bg-emerald-400/20 blur-2xl" />
+
+        <div className="relative mx-auto max-w-2xl">
+          <button
+            onClick={() => router.back()}
+            className="mb-6 flex items-center gap-1.5 text-sm text-white/80 hover:text-white transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </button>
+
+          <div className="flex items-start gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm shadow-lg">
+              <Briefcase className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-white leading-tight">
+                Post a Work Opportunity
+              </h1>
+              <p className="mt-1 text-sm sm:text-base text-white/75">
+                Connect with skilled workers in your area instantly
+              </p>
+            </div>
+          </div>
+
+          {/* Quick stat chips */}
+          <div className="mt-6 flex flex-wrap gap-2">
+            {["Fast Hiring", "Verified Workers", "Local Talent"].map((tag) => (
+              <span
+                key={tag}
+                className="flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-medium text-white backdrop-blur-sm"
+              >
+                <Sparkles className="h-3 w-3" />
+                {tag}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Form Card — overlaps the header */}
+      <div className="relative z-10 mx-auto -mt-10 max-w-2xl px-4 pb-16 sm:px-6">
+        <Card className="border-0 shadow-2xl shadow-black/10 dark:shadow-black/30 rounded-2xl overflow-hidden">
+          <CardContent className="p-5 sm:p-8">
+
+            {/* Alerts */}
             {error && (
-              <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex gap-2">
-              <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
-                <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+              <div className="mb-6 flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4">
+                <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                <p className="text-sm text-destructive">{error}</p>
               </div>
             )}
-
             {success && (
-              <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg flex gap-2">
-              <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
-                <p className="text-sm text-green-600 dark:text-green-400">
-                  Work posted successfully! Redirecting...
+              <div className="mb-6 flex items-start gap-3 rounded-xl border border-emerald-300 bg-emerald-50 dark:bg-emerald-900/20 dark:border-emerald-800 p-4">
+                <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                <p className="text-sm text-emerald-700 dark:text-emerald-400 font-medium">
+                  Work posted successfully! Redirecting…
                 </p>
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Title */}
-              <div>
-                <Label htmlFor="title" className="text-base font-medium">
-                  Work Title *
-                </Label>
-                <Input
-                  id="title"
-                  name="title"
-                  type="text"
-                  placeholder="e.g., Plumber needed for apartment repair"
-                  value={formData.title}
-                  onChange={handleChange}
-                  className="mt-2"
-                />
-              </div>
+            <form onSubmit={handleSubmit} className="space-y-8">
 
-              {/* Description */}
-              <div>
-                <Label htmlFor="description" className="text-base font-medium">
-                  Description
-                </Label>
-                <Textarea
-                  id="description"
-                  name="description"
-                  placeholder="Provide details about the work (optional)"
-                  value={formData.description}
-                  onChange={handleChange}
-                  rows={4}
-                  className="mt-2"
-                />
-              </div>
+              {/* ── SECTION 1: Basic Info ── */}
+              <section>
+                <SectionHeader icon={<FileText className="h-4 w-4" />} title="Basic Info" />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Category */}
-                <div>
-                  <Label htmlFor="category" className="text-base font-medium">
-                    Category *
-                  </Label>
-                  <Select
-                    value={formData.category}
-                    onValueChange={(value) =>
-                      handleSelectChange("category", value)
-                    }
-                  >
-                    <SelectTrigger id="category" className="mt-2">
-                      <SelectValue placeholder="Select a category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat} value={cat}>
-                          {cat}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="mt-4 space-y-4">
+                  {/* Title */}
+                  <div>
+                    <Label htmlFor="title" className="text-sm font-semibold text-foreground">
+                      Work Title <Required />
+                    </Label>
+                    <Input
+                      id="title"
+                      name="title"
+                      type="text"
+                      placeholder="e.g., Plumber needed for apartment repair"
+                      value={formData.title}
+                      onChange={handleChange}
+                      className="mt-1.5 h-11 rounded-xl border-border/60 bg-muted/40 focus:bg-background focus:border-emerald-500 focus:ring-emerald-500/20 transition-all"
+                    />
+                  </div>
+
+                  {/* Description */}
+                  <div>
+                    <Label htmlFor="description" className="text-sm font-semibold text-foreground">
+                      Description
+                      <span className="ml-2 text-xs font-normal text-muted-foreground">(optional)</span>
+                    </Label>
+                    <Textarea
+                      id="description"
+                      name="description"
+                      placeholder="Add any extra details, requirements, tools needed…"
+                      value={formData.description}
+                      onChange={handleChange}
+                      rows={3}
+                      className="mt-1.5 rounded-xl border-border/60 bg-muted/40 focus:bg-background focus:border-emerald-500 focus:ring-emerald-500/20 resize-none transition-all"
+                    />
+                  </div>
                 </div>
+              </section>
 
-                {/* Location */}
-                <div className="relative">
-                  <Label htmlFor="location" className="text-base font-medium">
-                    Location *
-                    {isNormalizingLocation && (
-                      <span className="text-xs text-blue-600 ml-2">Normalizing...</span>
-                    )}
-                  </Label>
-                  <div className="flex gap-2 mt-2">
-                    <div className="flex-1 relative">
+              {/* ── SECTION 2: Category & Location ── */}
+              <section>
+                <SectionHeader icon={<Tag className="h-4 w-4" />} title="Category & Location" />
+
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Category */}
+                  <div>
+                    <Label className="text-sm font-semibold text-foreground">
+                      Category <Required />
+                    </Label>
+                    <Select
+                      value={formData.category}
+                      onValueChange={(v) => handleSelectChange("category", v)}
+                    >
+                      <SelectTrigger className="mt-1.5 h-11 rounded-xl border-border/60 bg-muted/40 focus:border-emerald-500">
+                        <SelectValue placeholder="Select a category" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl">
+                        {categories.map((cat) => (
+                          <SelectItem key={cat} value={cat} className="rounded-lg">
+                            <span className="flex items-center gap-2">
+                              <span>{categoryIcons[cat]}</span>
+                              {cat}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Location */}
+                  <div>
+                    <Label className="text-sm font-semibold text-foreground">
+                      Location <Required />
+                      {isNormalizingLocation && (
+                        <span className="ml-2 inline-flex items-center gap-1 text-xs font-normal text-blue-500">
+                          <Loader className="h-3 w-3 animate-spin" /> Verifying…
+                        </span>
+                      )}
+                    </Label>
+                    <div className="mt-1.5 flex gap-2">
                       <Input
                         id="location"
                         name="location"
                         type="text"
-                        placeholder="Type city name or use GPS (e.g., Indore, Surat)"
+                        placeholder="City name (e.g., Surat, Indore)"
                         value={formData.location}
                         onChange={handleChange}
                         onBlur={handleLocationBlur}
-                        className="flex-1"
+                        className="h-11 rounded-xl border-border/60 bg-muted/40 focus:bg-background focus:border-emerald-500 focus:ring-emerald-500/20 transition-all"
                       />
-
-                      {/* Auto-normalization happens on blur - no dropdown needed */}
+                      <Button
+                        type="button"
+                        onClick={handleAutoFillLocation}
+                        disabled={isGPSLoading}
+                        title="Use my current location"
+                        className="h-11 w-11 shrink-0 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 shadow-md shadow-blue-500/25 p-0"
+                      >
+                        {isGPSLoading
+                          ? <Loader className="h-4 w-4 animate-spin text-white" />
+                          : <MapPin className="h-4 w-4 text-white" />}
+                      </Button>
                     </div>
 
-                    <Button
-                      type="button"
-                      onClick={handleAutoFillLocation}
-                      disabled={isGPSLoading}
-                      className="bg-blue-600 hover:bg-blue-700 px-3"
-                      title="Auto-fill with your current location"
-                    >
-                      {isGPSLoading ? (
-                        <Loader className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <MapPin className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-
-                  {/* Location Error */}
-                  {locationError && (
-                    <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-xs text-red-600 dark:text-red-400">
-                      ⚠️ {locationError}
-                    </div>
-                  )}
-
-                  {/* Normalizing Status */}
-                  {isNormalizingLocation && (
-                    <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded text-xs text-blue-600 dark:text-blue-400 flex items-center gap-2">
-                      <Loader className="h-3 w-3 animate-spin" />
-                      <span>Auto-normalizing location format...</span>
-                    </div>
-                  )}
-
-                  {/* GPS Error */}
-                  {gpsError && (
-                    <div className="mt-2 p-2 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded text-xs text-orange-600 dark:text-orange-400">
-                      <p className="font-medium">⚠️ Location Issue</p>
-                      <p>{gpsError}</p>
-                      <p className="text-xs text-orange-500 mt-1">Tip: Type or select from suggestions</p>
-                    </div>
-                  )}
-
-                  {/* DEBUG: Show Normalized Location (Disabled, Read-Only) */}
-                  {formData.normalizedLocation && (
-                    <div className="mt-4 p-3 bg-gray-100 dark:bg-gray-800 rounded border border-gray-300 dark:border-gray-700">
-                      <label htmlFor="normalized-location" className="text-xs font-semibold text-gray-600 dark:text-gray-400 block mb-1">
-                        🔍 DEBUG: Normalized Location (System Format)
-                      </label>
-                      <Input
-                        id="normalized-location"
-                        type="text"
-                        value={formData.normalizedLocation}
-                        disabled
-                        readOnly
-                        className="text-xs bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300"
-                      />
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Status: {isLocationNormalized ? (
-                          <span className="text-green-600 dark:text-green-400 font-semibold">✅ Normalized</span>
-                        ) : (
-                          <span className="text-orange-600 dark:text-orange-400 font-semibold">⚠️ Using Fallback</span>
-                        )}
-                        {formData.latitude && formData.longitude && (
-                          <span className="ml-2 text-blue-600 dark:text-blue-400">
-                            📍 Coordinates: {formData.latitude.toFixed(4)}, {formData.longitude.toFixed(4)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Coordinates Display */}
-                  {formData.latitude && formData.longitude && (
-                    <button
-                      type="button"
-                      onClick={() => setShowCoordinates(!showCoordinates)}
-                      className="mt-2 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 flex items-center gap-1"
-                    >
-                      {showCoordinates ? (
-                        <>
-                          <EyeOff className="h-3 w-3" />
-                          Hide coordinates
-                        </>
-                      ) : (
-                        <>
-                          <Eye className="h-3 w-3" />
-                          Show coordinates
-                        </>
-                      )}
-                    </button>
-                  )}
-
-                  {showCoordinates && formData.latitude && formData.longitude && (
-                    <div className="mt-2 p-2 bg-gray-50 dark:bg-gray-800 rounded text-xs text-gray-600 dark:text-gray-400 font-mono">
-                      <div>Latitude: {formData.latitude.toFixed(4)}</div>
-                      <div>Longitude: {formData.longitude.toFixed(4)}</div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Pay Type */}
-                <div>
-                  <Label htmlFor="payType" className="text-base font-medium">
-                    Pay Type
-                  </Label>
-                  <Select
-                    value={formData.payType}
-                    onValueChange={(value) =>
-                      handlePayTypeChange(value as any)
-                    }
-                  >
-                    <SelectTrigger id="payType" className="mt-2">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="per_hour">Per Hour</SelectItem>
-                      <SelectItem value="per_day">Per Day</SelectItem>
-                      <SelectItem value="per_job">Per Job</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Pay Amount */}
-                <div>
-                  <Label htmlFor="payAmount" className="text-base font-medium">
-                    Pay Amount (₹) *
-                  </Label>
-                  <Input
-                    id="payAmount"
-                    name="payAmount"
-                    type="number"
-                    placeholder="Amount"
-                    value={formData.payAmount}
-                    onChange={handleChange}
-                    className="mt-2"
-                  />
-                  {formData.payType === "per_day" && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      💡 Typical: ₹400–₹700/day
-                    </p>
-                  )}
-                  {formData.payType === "per_hour" && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      💡 Typical: ₹50–₹150/hour
-                    </p>
-                  )}
-                  {lowPaymentWarning && (
-                    <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
-                      <p className="text-xs font-medium text-yellow-800 dark:text-yellow-200">
-                        ⚠️ That's... optimistic. Workers might not respond to such low pay.
+                    {/* Location status messages */}
+                    {locationError && (
+                      <p className="mt-1.5 flex items-start gap-1.5 text-xs text-destructive">
+                        <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                        {locationError}
                       </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Duration Value */}
-                <div>
-                  <Label htmlFor="duration_value" className="text-base font-medium">
-                    Duration *
-                  </Label>
-                  <Input
-                    id="duration_value"
-                    name="duration_value"
-                    type="number"
-                    min="1"
-                    placeholder="Number"
-                    value={formData.duration_value}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        duration_value: Math.max(1, Number.parseInt(e.target.value) || 1),
-                      }))
-                    }
-                    className="mt-2"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Duration Unit */}
-                <div>
-                  <Label htmlFor="duration_unit" className="text-base font-medium">
-                    Unit *
-                  </Label>
-                  <Select
-                    value={formData.duration_unit}
-                    onValueChange={(value) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        duration_unit: value as WorkForm["duration_unit"],
-                      }))
-                    }
-                  >
-                    <SelectTrigger id="duration_unit" className="mt-2">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getValidDurationUnits(formData.payType).map((unit) => (
-                        <SelectItem key={unit} value={unit}>
-                          {unit.charAt(0).toUpperCase() + unit.slice(1)}
-                          {formData.payType === "per_job" && `${formData.payType === "per_job" ? "s" : ""}`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {formData.payType === "per_job" ? (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      📌 Per job is flexible
-                    </p>
-                  ) : (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Locked to {formData.duration_unit}
-                    </p>
-                  )}
-                </div>
-
-                {/* Duration Summary & Estimated Total */}
-                <div>
-                  <div className="text-base font-medium mb-2 text-gray-700 dark:text-gray-300">
-                    Duration Summary
+                    )}
+                    {gpsError && (
+                      <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400">
+                        ⚠️ {gpsError}
+                      </p>
+                    )}
+                    {isLocationNormalized && formData.normalizedLocation && (
+                      <p className="mt-1.5 flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+                        <CheckCircle className="h-3.5 w-3.5" />
+                        {formData.normalizedLocation}
+                        {formData.latitude && (
+                          <button
+                            type="button"
+                            onClick={() => setShowCoordinates(!showCoordinates)}
+                            className="ml-1 underline underline-offset-2 opacity-70 hover:opacity-100"
+                          >
+                            {showCoordinates ? <EyeOff className="h-3 w-3 inline" /> : <Eye className="h-3 w-3 inline" />}
+                          </button>
+                        )}
+                      </p>
+                    )}
+                    {showCoordinates && formData.latitude && formData.longitude && (
+                      <p className="mt-1 font-mono text-xs text-muted-foreground">
+                        {formData.latitude.toFixed(4)}, {formData.longitude.toFixed(4)}
+                      </p>
+                    )}
                   </div>
-                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded">
-                    <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">
-                      {formData.duration_value} {formData.duration_unit}
-                      {formData.duration_value > 1 ? "s" : ""}
-                    </p>
-                    {(formData.payType === "per_hour" || formData.payType === "per_day") && (
-                      <div className="mt-2 pt-2 border-t border-blue-200 dark:border-blue-800">
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-                          Estimated Total:
-                        </p>
-                        <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
-                          ₹{calculateEstimatedTotal()?.toLocaleString() || "0"}
+                </div>
+              </section>
+
+              {/* ── SECTION 3: Pay ── */}
+              <section>
+                <SectionHeader icon={<IndianRupee className="h-4 w-4" />} title="Pay Details" />
+
+                <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  {/* Pay Type */}
+                  <div className="col-span-1">
+                    <Label className="text-sm font-semibold text-foreground">Pay Type</Label>
+                    <Select
+                      value={formData.payType}
+                      onValueChange={(v) => handlePayTypeChange(v as WorkForm["payType"])}
+                    >
+                      <SelectTrigger className="mt-1.5 h-11 rounded-xl border-border/60 bg-muted/40">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl">
+                        <SelectItem value="per_hour">⏱ Per Hour</SelectItem>
+                        <SelectItem value="per_day">📅 Per Day</SelectItem>
+                        <SelectItem value="per_job">💼 Per Job</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Pay Amount */}
+                  <div className="col-span-1 sm:col-span-2">
+                    <Label className="text-sm font-semibold text-foreground">
+                      Amount (₹) <Required />
+                    </Label>
+                    <div className="mt-1.5 relative">
+                      <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="payAmount"
+                        name="payAmount"
+                        type="number"
+                        placeholder="0"
+                        value={formData.payAmount}
+                        onChange={handleChange}
+                        className="h-11 pl-9 rounded-xl border-border/60 bg-muted/40 focus:bg-background focus:border-emerald-500 focus:ring-emerald-500/20 transition-all"
+                      />
+                    </div>
+                    {formData.payType === "per_day" && (
+                      <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                        <Info className="h-3 w-3" /> Typical: ₹400–₹700/day
+                      </p>
+                    )}
+                    {formData.payType === "per_hour" && (
+                      <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                        <Info className="h-3 w-3" /> Typical: ₹50–₹150/hour
+                      </p>
+                    )}
+                    {lowPaymentWarning && (
+                      <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 px-3 py-2">
+                        <p className="text-xs text-amber-700 dark:text-amber-300 font-medium">
+                          ⚠️ Very low pay — workers may not respond.
                         </p>
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* When */}
-                <div>
-                  <Label htmlFor="jobDate" className="text-base font-medium">
-                    When *
-                  </Label>
-                  <Select
-                    value={formData.jobDate}
-                    onValueChange={(value) =>
-                      handleSelectChange("jobDate", value as any)
-                    }
-                  >
-                    <SelectTrigger id="jobDate" className="mt-2">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="today">Today</SelectItem>
-                      <SelectItem value="tomorrow">Tomorrow</SelectItem>
-                      <SelectItem value="pick">Pick a date</SelectItem>
-                      <SelectItem value="flexible">Flexible</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {formData.jobDate === "pick" && (
+                {/* Estimated Total Banner */}
+                {estimatedTotal !== null && (
+                  <div className="mt-4 flex items-center justify-between rounded-xl bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-cyan-500/10 border border-emerald-200 dark:border-emerald-800 px-4 py-3">
+                    <span className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">
+                      Estimated Total
+                    </span>
+                    <span className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
+                      ₹{estimatedTotal.toLocaleString()}
+                    </span>
+                  </div>
+                )}
+              </section>
+
+              {/* ── SECTION 4: Duration ── */}
+              <section>
+                <SectionHeader icon={<Clock className="h-4 w-4" />} title="Duration" />
+
+                <div className="mt-4 grid grid-cols-2 gap-4">
+                  {/* Duration Value */}
+                  <div>
+                    <Label className="text-sm font-semibold text-foreground">
+                      How many? <Required />
+                    </Label>
                     <Input
-                      name="selectedDate"
-                      type="date"
-                      value={formData.selectedDate || ""}
-                      onChange={handleChange}
-                      className="mt-2"
+                      id="duration_value"
+                      name="duration_value"
+                      type="number"
+                      min="1"
+                      value={formData.duration_value}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          duration_value: Math.max(1, Number.parseInt(e.target.value) || 1),
+                        }))
+                      }
+                      className="mt-1.5 h-11 rounded-xl border-border/60 bg-muted/40 focus:bg-background focus:border-emerald-500 focus:ring-emerald-500/20 transition-all"
                     />
-                  )}
-                </div>
-              </div>
+                  </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Workers Required */}
-                <div>
-                  <Label htmlFor="workersRequired" className="text-base font-medium">
-                    Workers Required *
-                  </Label>
-                  <Input
-                    id="workersRequired"
-                    name="workersRequired"
-                    type="number"
-                    min="1"
-                    placeholder="Number of workers"
-                    value={formData.workersRequired}
-                    onChange={handleChange}
-                    className="mt-2"
-                  />
+                  {/* Duration Unit */}
+                  <div>
+                    <Label className="text-sm font-semibold text-foreground">
+                      Unit <Required />
+                    </Label>
+                    <Select
+                      value={formData.duration_unit}
+                      onValueChange={(v) =>
+                        setFormData((prev) => ({ ...prev, duration_unit: v as WorkForm["duration_unit"] }))
+                      }
+                    >
+                      <SelectTrigger className="mt-1.5 h-11 rounded-xl border-border/60 bg-muted/40">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl">
+                        {getValidDurationUnits(formData.payType).map((unit) => (
+                          <SelectItem key={unit} value={unit}>
+                            {unit.charAt(0).toUpperCase() + unit.slice(1)}s
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {formData.payType !== "per_job" && (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Locked to {formData.duration_unit}s for this pay type
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
+              </section>
 
-              {/* Buttons */}
-              <div className="flex gap-4 pt-6">
+              {/* ── SECTION 5: Schedule & Team ── */}
+              <section>
+                <SectionHeader icon={<CalendarDays className="h-4 w-4" />} title="Schedule & Team" />
+
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* When */}
+                  <div>
+                    <Label className="text-sm font-semibold text-foreground">
+                      Start Date <Required />
+                    </Label>
+                    <Select
+                      value={formData.jobDate}
+                      onValueChange={(v) => handleSelectChange("jobDate", v)}
+                    >
+                      <SelectTrigger className="mt-1.5 h-11 rounded-xl border-border/60 bg-muted/40">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl">
+                        <SelectItem value="today">📅 Today</SelectItem>
+                        <SelectItem value="tomorrow">🌅 Tomorrow</SelectItem>
+                        <SelectItem value="pick">🗓 Pick a date</SelectItem>
+                        <SelectItem value="flexible">🔄 Flexible</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {formData.jobDate === "pick" && (
+                      <Input
+                        name="selectedDate"
+                        type="date"
+                        value={formData.selectedDate || ""}
+                        onChange={handleChange}
+                        className="mt-2 h-11 rounded-xl border-border/60 bg-muted/40"
+                      />
+                    )}
+                  </div>
+
+                  {/* Workers Required */}
+                  <div>
+                    <Label htmlFor="workersRequired" className="text-sm font-semibold text-foreground">
+                      Workers Needed <Required />
+                    </Label>
+                    <div className="mt-1.5 relative">
+                      <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="workersRequired"
+                        name="workersRequired"
+                        type="number"
+                        min="1"
+                        placeholder="1"
+                        value={formData.workersRequired}
+                        onChange={handleChange}
+                        className="h-11 pl-9 rounded-xl border-border/60 bg-muted/40 focus:bg-background focus:border-emerald-500 focus:ring-emerald-500/20 transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* ── Submit Buttons ── */}
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 <Button
                   type="submit"
-                  disabled={isLoading}
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                  disabled={isLoading || success}
+                  className="flex-1 h-12 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold shadow-lg shadow-emerald-500/30 hover:shadow-emerald-600/40 transition-all text-base"
                 >
-                  {isLoading ? "Posting..." : "Post Work"}
+                  {isLoading ? (
+                    <span className="flex items-center gap-2">
+                      <Loader className="h-4 w-4 animate-spin" /> Posting…
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      Post Work
+                      <ChevronRight className="h-4 w-4" />
+                    </span>
+                  )}
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => router.back()}
                   disabled={isLoading}
-                  className="flex-1"
+                  className="flex-1 h-12 rounded-xl border-border/60 font-medium text-base hover:bg-muted transition-all"
                 >
                   Cancel
                 </Button>
@@ -754,4 +695,21 @@ export default function AddWorksPage() {
       </div>
     </div>
   );
+}
+
+/* ── Helpers ── */
+function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500/20 to-teal-500/20 text-emerald-600 dark:text-emerald-400">
+        {icon}
+      </div>
+      <h2 className="text-base font-semibold text-foreground">{title}</h2>
+      <div className="flex-1 h-px bg-gradient-to-r from-border to-transparent" />
+    </div>
+  );
+}
+
+function Required() {
+  return <span className="ml-0.5 text-rose-500">*</span>;
 }

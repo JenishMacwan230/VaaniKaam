@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   fetchSessionUser,
   AuthUser,
@@ -110,6 +110,7 @@ export default function DashboardPage() {
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const profileCompletion = useMemo(() => {
     const checks = [
@@ -159,6 +160,12 @@ export default function DashboardPage() {
     };
     loadUser();
   }, [router]);
+
+  useEffect(() => {
+    if (!loading && searchParams.get("editProfile") === "1") {
+      setShowEditDialog(true);
+    }
+  }, [loading, searchParams]);
 
   const handleLogout = async () => {
     await logoutSession();

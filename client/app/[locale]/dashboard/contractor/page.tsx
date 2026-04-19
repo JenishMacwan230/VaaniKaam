@@ -301,7 +301,7 @@ export default function ContractorDashboard() {
                 desc: "Your public profile",
                 color: "text-blue-600",
                 bg: "bg-blue-50 dark:bg-blue-950/40",
-                action: () => router.push(`/${locale}/profile`),
+                action: () => router.push(`/${locale}/dashboard?editProfile=1`),
               },
             ].map(({ icon: Icon, label, desc, color, bg, action }) => (
               <button

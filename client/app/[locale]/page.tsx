@@ -1,16 +1,27 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { useRouter, useParams } from "next/navigation";
+import Image from "next/image";
+import { useRouter, useParams, usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { fetchSessionUser, resolveAccountType } from "@/lib/authClient";
+import { fetchSessionUser, resolveAccountType, AuthUser } from "@/lib/authClient";
 import Logo from "@/components/ui/logo";
-import { 
-  MapPin, 
-  Briefcase, 
-  TrendingUp, 
-  Users, 
-  Star, 
+import { UserMenu } from "@/components/UserMenu";
+import { locales } from "@/i18n";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Check,
+  Globe,
+  MapPin,
+  Briefcase,
+  TrendingUp,
+  Users,
+  Star,
   ArrowRight,
   Zap,
   Shield,
@@ -22,577 +33,652 @@ import {
   AlertCircle,
   ChevronRight,
   DollarSign,
-  TrendingDown
+  User,
+  Mic,
+  Wrench,
+  Paintbrush,
+  Lightbulb,
+  HardHat,
+  Hammer,
+  Layers,
 } from "lucide-react";
 
+// ─── Brand tokens ────────────────────────────────────────────────────────────
+const TEAL = "#0d9e6e";
+const BLUE = "#1a7a9e";
+const TEAL_L = "#14b87c";
+const HERO_GRADIENT = `linear-gradient(135deg, ${BLUE} 0%, ${TEAL} 55%, ${TEAL_L} 100%)`;
+const PILL_BG = "rgba(255,255,255,0.16)";
+const PILL_BORDER = "rgba(255,255,255,0.28)";
+const DEFAULT_PROFILE_PICTURE = "/default-avatar.png";
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+const GradientText: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = "" }) => (
+  <span
+    className={className}
+    style={{
+      background: `linear-gradient(135deg, ${BLUE} 0%, ${TEAL} 100%)`,
+      WebkitBackgroundClip: "text",
+      WebkitTextFillColor: "transparent",
+      backgroundClip: "text",
+    }}
+  >
+    {children}
+  </span>
+);
+
+const SectionHeading: React.FC<{ title: string; subtitle?: string }> = ({ title, subtitle }) => (
+  <div className="text-center mb-10 md:mb-14">
+    <h2 className="text-2xl md:text-4xl font-extrabold text-foreground mb-2 tracking-tight">{title}</h2>
+    {subtitle && <p className="text-foreground/55 text-sm md:text-base mt-1">{subtitle}</p>}
+    <div className="mx-auto mt-3 h-[3px] w-12 rounded-full" style={{ background: HERO_GRADIENT }} />
+  </div>
+);
+
+// ─── Notification banner card ────────────────────────────────────────────────
+const NotifCard: React.FC<{ icon: string; title: string; message: string }> = ({ icon, title, message }) => (
+  <div
+    className="flex items-center gap-3 rounded-2xl border px-4 py-3 cursor-pointer group transition-all"
+    style={{ background: "rgba(13,158,110,0.07)", borderColor: "rgba(13,158,110,0.22)" }}
+  >
+    <span className="text-2xl flex-shrink-0">{icon}</span>
+    <div className="min-w-0 flex-1">
+      <p className="text-[11px] font-bold uppercase tracking-wider mb-0.5" style={{ color: TEAL }}>
+        {title}
+      </p>
+      <p className="text-[13px] font-semibold text-foreground truncate">{message}</p>
+    </div>
+    <ChevronRight
+      className="h-4 w-4 flex-shrink-0 transition-transform group-hover:translate-x-1"
+      style={{ color: TEAL }}
+    />
+  </div>
+);
+
+// ─── Feature card ─────────────────────────────────────────────────────────────
+const FeatureCard: React.FC<{
+  icon: React.ElementType;
+  title: string;
+  desc: string;
+}> = ({ icon: Icon, title, desc }) => (
+  <div
+    className="group relative rounded-2xl border bg-white p-5 transition-all hover:-translate-y-1 hover:shadow-lg"
+    style={{ borderColor: "rgba(13,158,110,0.18)" }}
+  >
+    <div
+      className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-xl"
+      style={{ background: "rgba(13,158,110,0.1)" }}
+    >
+      <Icon className="h-5 w-5" style={{ color: TEAL }} />
+    </div>
+    <div
+      className="absolute inset-x-0 top-0 h-[2px] rounded-t-2xl opacity-0 group-hover:opacity-100 transition-opacity"
+      style={{ background: HERO_GRADIENT }}
+    />
+    <h3 className="mb-1 text-[15px] font-bold text-foreground">{title}</h3>
+    <p className="text-[13px] leading-relaxed text-foreground/55">{desc}</p>
+  </div>
+);
+
+// ─── Stat card (numbers) ──────────────────────────────────────────────────────
+const StatCard: React.FC<{ value: string; label: string }> = ({ value, label }) => (
+  <div
+    className="rounded-xl border px-4 py-5 text-center"
+    style={{ background: "rgba(13,158,110,0.06)", borderColor: "rgba(13,158,110,0.18)" }}
+  >
+    <p className="text-2xl font-extrabold" style={{ color: TEAL }}>{value}</p>
+    <p className="mt-1 text-[12px] text-foreground/55 font-medium">{label}</p>
+  </div>
+);
+
+// ─── Dashboard card ───────────────────────────────────────────────────────────
+const DashCard: React.FC<{
+  icon: React.ElementType;
+  badge: string;
+  badgeBg: string;
+  badgeText: string;
+  value: string;
+  label: string;
+  btnLabel: string;
+  topColor: string;
+  iconBg: string;
+  iconColor: string;
+  onClick?: () => void;
+}> = ({ icon: Icon, badge, badgeBg, badgeText, value, label, btnLabel, topColor, iconBg, iconColor, onClick }) => (
+  <div
+    className="group relative overflow-hidden rounded-2xl border bg-white transition-all hover:-translate-y-1 hover:shadow-xl"
+    style={{ borderColor: "rgba(0,0,0,0.08)" }}
+  >
+    <div className="h-[3px]" style={{ background: topColor }} />
+    <div className="p-5">
+      <div className="mb-4 flex items-start justify-between">
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl" style={{ background: iconBg }}>
+          <Icon className="h-6 w-6" style={{ color: iconColor }} />
+        </div>
+        <span className="rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ background: badgeBg, color: badgeText }}>
+          {badge}
+        </span>
+      </div>
+      <p className="text-2xl font-extrabold text-foreground">{value}</p>
+      <p className="mb-4 text-[13px] text-foreground/55">{label}</p>
+      <button
+        onClick={onClick}
+        className="flex w-full items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-bold text-white transition-opacity active:opacity-80"
+        style={{ background: topColor }}
+      >
+        {btnLabel} <ArrowRight className="h-4 w-4" />
+      </button>
+    </div>
+  </div>
+);
+
+// ─── Category chip ────────────────────────────────────────────────────────────
+const CategoryChip: React.FC<{ icon: React.ElementType; label: string }> = ({ icon: Icon, label }) => (
+  <div
+    className="group flex flex-col items-center gap-2.5 rounded-2xl border bg-white p-4 cursor-pointer transition-all hover:-translate-y-1 hover:shadow-md"
+    style={{ borderColor: "rgba(13,158,110,0.15)" }}
+  >
+    <div
+      className="flex h-11 w-11 items-center justify-center rounded-full transition-colors group-hover:scale-110"
+      style={{ background: "rgba(13,158,110,0.1)" }}
+    >
+      <Icon className="h-5 w-5" style={{ color: TEAL }} />
+    </div>
+    <p className="text-[13px] font-semibold text-foreground">{label}</p>
+  </div>
+);
+
+// ─── Main page ────────────────────────────────────────────────────────────────
 const HomePage: React.FC = () => {
   const router = useRouter();
   const params = useParams();
-  const [user, setUser] = useState(null);
+  const pathname = usePathname();
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [sessionChecked, setSessionChecked] = useState(false);
-  const [notificationIndex, setNotificationIndex] = useState(0);
+  const [notifIdx, setNotifIdx] = useState(0);
 
-  // Mock notifications
   const notifications = [
-    {
-      id: 1,
-      title: "New Opportunity!",
-      message: "₹2,000 - Plumber needed in Bilimora",
-      type: "job",
-      icon: "🔧"
-    },
-    {
-      id: 2,
-      title: "Payment Received",
-      message: "₹5,500 credited to your account",
-      type: "payment",
-      icon: "💳"
-    },
-    {
-      id: 3,
-      title: "New Rating",
-      message: "5.0★ - Great work! Excellent services",
-      type: "rating",
-      icon: "⭐"
-    },
-    {
-      id: 4,
-      title: "Job Near You",
-      message: "Interior painting - 1.2 km away - ₹1,500",
-      type: "job",
-      icon: "🎨"
-    }
+    { id: 1, title: "New Opportunity!", message: "₹2,000 - Plumber needed in Bilimora", icon: "🔧" },
+    { id: 2, title: "Payment Received", message: "₹5,500 credited to your account", icon: "💳" },
+    { id: 3, title: "New Rating", message: "5.0★ — Great work! Excellent services", icon: "⭐" },
+    { id: 4, title: "Job Near You", message: "Interior painting - 1.2 km away - ₹1,500", icon: "🎨" },
   ];
 
   useEffect(() => {
-    const hydrateSession = async () => {
-      const sessionUser = await fetchSessionUser();
-      setUser(sessionUser || null);
+    const run = async () => {
+      const s = await fetchSessionUser();
+      setUser(s || null);
       setSessionChecked(true);
     };
-
-    void hydrateSession();
+    void run();
   }, []);
 
-  // Auto-rotate notifications
   useEffect(() => {
-    if (notifications.length > 1) {
-      const interval = setInterval(() => {
-        setNotificationIndex((prev) => (prev + 1) % notifications.length);
-      }, 5000);
-      return () => clearInterval(interval);
-    }
+    if (notifications.length < 2) return;
+    const t = setInterval(() => setNotifIdx((p) => (p + 1) % notifications.length), 4500);
+    return () => clearInterval(t);
   }, [notifications.length]);
 
   if (!sessionChecked) {
     return (
-      <div className="fixed inset-0 z-100 flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
-        <Logo size={80} showText={true} />
-        <p className="mt-4 text-purple-600 animate-pulse">Loading...</p>
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white">
+        <Logo size={72} showText />
+        <p className="mt-4 animate-pulse text-sm font-medium" style={{ color: TEAL }}>Loading…</p>
       </div>
     );
   }
 
-  const locale = params.locale as string || "en";
+  const locale = (params.locale as string) || "en";
+  const currentLocale = locales.includes(locale as (typeof locales)[number]) ? locale : "en";
   const accountType = resolveAccountType(user);
   const isContractor = accountType === "contractor";
 
-  // Hero Section
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-background to-secondary/5">
-      {/* ========== NOTIFICATION CAROUSEL BANNER ========== */}
-      <div className="relative w-full bg-gradient-to-r from-secondary/10 via-secondary/5 to-accent/10 border-b border-secondary/20 px-4 py-4 overflow-hidden">
-        <div className="max-w-7xl mx-auto">
-          <div className="relative h-20 md:h-24 flex items-center">
-            {/* Notification Cards Carousel */}
-            <div className="relative w-full overflow-hidden">
-              <div 
-                className="flex transition-transform duration-500 ease-in-out"
-                style={{
-                  transform: `translateX(calc(-${notificationIndex * 100}%))`
-                }}
-              >
-                {notifications.map((notif, idx) => (
-                  <div
-                    key={notif.id}
-                    className="w-full flex-shrink-0"
-                  >
-                    <div className="bg-white/80 backdrop-blur-md rounded-2xl border-2 border-secondary/20 hover:border-secondary/40 shadow-lg hover:shadow-xl transition-all p-4 md:p-5 h-full flex items-center gap-4 cursor-pointer group">
-                      {/* Icon */}
-                      <div className="text-3xl md:text-4xl flex-shrink-0 group-hover:scale-110 transition-transform">
-                        {notif.icon}
-                      </div>
-                      
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs md:text-sm font-bold text-secondary uppercase tracking-wide mb-1">
-                          {notif.title}
-                        </p>
-                        <p className="text-sm md:text-base font-semibold text-foreground truncate">
-                          {notif.message}
-                        </p>
-                      </div>
+  const handleLanguageChange = (value: string) => {
+    const newLocale = value.toLowerCase();
+    const segments = pathname.split("/").filter(Boolean);
+    if (locales.includes(segments[0] as (typeof locales)[number])) segments.shift();
+    router.push(`/${newLocale}${segments.length > 0 ? "/" + segments.join("/") : "/"}`);
+  };
 
-                      {/* Arrow */}
-                      <ChevronRight className="h-5 w-5 md:h-6 md:w-6 text-secondary/40 group-hover:text-secondary flex-shrink-0 group-hover:translate-x-1 transition-all" />
-                    </div>
-                  </div>
-                ))}
+  const greeting =
+    currentLocale === "hi" ? "नमस्ते" : currentLocale === "gu" ? "નમસ્તે" : "Hello";
+
+  const languages = [
+    { code: "en", label: "English" },
+    { code: "hi", label: "हिन्दी" },
+    { code: "gu", label: "ગુજરાતી" },
+  ];
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* ══════════════════════════════════════════════════
+          MOBILE HERO HEADER
+      ══════════════════════════════════════════════════ */}
+      <header className="lg:hidden relative overflow-hidden" style={{ background: HERO_GRADIENT, paddingBottom: "20px" }}>
+        {/* Decorative orbs */}
+        <span className="pointer-events-none absolute -top-12 -right-12 h-40 w-40 rounded-full" style={{ background: "rgba(255,255,255,0.07)" }} />
+        <span className="pointer-events-none absolute -bottom-8 left-4 h-28 w-28 rounded-full" style={{ background: "rgba(255,255,255,0.05)" }} />
+        <span className="pointer-events-none absolute top-1/2 right-8 h-16 w-16 rounded-full" style={{ background: "rgba(255,255,255,0.04)" }} />
+
+        <div className="relative z-10 px-4 pt-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => router.push(user ? `/${currentLocale}/user` : `/${currentLocale}/login`)}
+                className="relative h-11 w-11 overflow-hidden rounded-full border"
+                style={{ background: PILL_BG, borderColor: PILL_BORDER }}
+              >
+                <Image
+                  src={user?.profilePictureUrl || DEFAULT_PROFILE_PICTURE}
+                  alt={user?.name || "User"}
+                  fill
+                  className="object-cover"
+                  sizes="44px"
+                />
+              </button>
+              <div>
+                <p className="text-[11px] font-medium" style={{ color: "rgba(255,255,255,0.68)" }}>{greeting}</p>
+                <p className="text-[17px] font-extrabold text-white leading-tight tracking-tight">
+                  {user?.name || "Guest"}
+                </p>
               </div>
             </div>
 
-            {/* Dots Indicator */}
-            <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 flex gap-2">
-              {notifications.map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setNotificationIndex(idx)}
-                  className={`h-2 rounded-full transition-all ${
-                    idx === notificationIndex 
-                      ? "bg-secondary w-8" 
-                      : "bg-secondary/30 w-2 hover:bg-secondary/50"
-                  }`}
-                />
-              ))}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                aria-label="Voice search"
+                className="flex h-9 w-9 items-center justify-center rounded-full border"
+                style={{ background: PILL_BG, borderColor: PILL_BORDER }}
+              >
+                <Mic className="h-4 w-4 text-white" />
+              </button>
+              <Select value={currentLocale} onValueChange={handleLanguageChange}>
+                <SelectTrigger
+                  className="h-[32px] w-auto gap-1 rounded-full border px-3 text-[12px] font-semibold text-white shadow-none"
+                  style={{ background: PILL_BG, borderColor: PILL_BORDER }}
+                >
+                  <Globe className="h-3.5 w-3.5 shrink-0 text-white" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent align="end" className="min-w-[148px]">
+                  {languages.map((l) => (
+                    <SelectItem key={l.code} value={l.code}>
+                      <div className="flex w-full items-center justify-between gap-4">
+                        <span className="text-[13px]">{l.label}</span>
+                        {currentLocale === l.code && <Check className="h-3 w-3 text-emerald-600" />}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </div>
+      </header>
+
+      {/* ══════════════════════════════════════════════════
+          NOTIFICATION BANNER
+      ══════════════════════════════════════════════════ */}
+      <div className="relative px-4 py-3 border-b" style={{ borderColor: "rgba(13,158,110,0.15)", background: "rgba(13,158,110,0.04)" }}>
+        <div className="overflow-hidden">
+          <div className="flex transition-transform duration-500 ease-in-out" style={{ transform: `translateX(-${notifIdx * 100}%)` }}>
+            {notifications.map((n) => (
+              <div key={n.id} className="w-full shrink-0">
+                <NotifCard icon={n.icon} title={n.title} message={n.message} />
+              </div>
+            ))}
+          </div>
+        </div>
+        {/* Dots */}
+        <div className="mt-2.5 flex justify-center gap-1.5">
+          {notifications.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setNotifIdx(i)}
+              className="h-1.5 rounded-full transition-all"
+              style={{
+                width: i === notifIdx ? 24 : 6,
+                background: i === notifIdx ? TEAL : "rgba(13,158,110,0.25)",
+              }}
+            />
+          ))}
+        </div>
       </div>
 
-      {/* ========== MAIN HERO SECTION ========== */}
-      <div className="relative py-12 md:py-20 px-4">
-        <div className="absolute inset-0 overflow-hidden -z-10">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-secondary/20 to-accent/20 rounded-full blur-3xl opacity-40" />
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-primary/20 to-secondary/20 rounded-full blur-3xl opacity-40" />
-        </div>
+      {/* ══════════════════════════════════════════════════
+          DESKTOP HERO / MAIN CTA
+      ══════════════════════════════════════════════════ */}
+      <section className="relative overflow-hidden px-4 py-14 md:py-24">
+        {/* bg blobs */}
+        <div className="pointer-events-none absolute -top-32 -right-32 h-80 w-80 rounded-full opacity-20 blur-3xl" style={{ background: TEAL }} />
+        <div className="pointer-events-none absolute -bottom-32 -left-32 h-80 w-80 rounded-full opacity-15 blur-3xl" style={{ background: BLUE }} />
 
-        <div className="max-w-6xl mx-auto text-center space-y-6 md:space-y-8">
-          <div className="space-y-4 md:space-y-6">
-            <Logo size={60} showText={true} />
-            <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold leading-tight">
-              <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-                Find Your Perfect Opportunity Today
-              </span>
-            </h1>
-            <p className="text-base md:text-lg text-foreground/70 max-w-2xl mx-auto leading-relaxed">
-              Connect talented workers with amazing opportunities. Build your career with India's most trusted work platform.
-            </p>
+        <div className="relative mx-auto max-w-3xl text-center">
+          <div className="mb-6">
+            <Logo size={56} showText />
           </div>
 
-          {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-center pt-4 md:pt-8">
+          <h1 className="mb-4 text-3xl font-extrabold leading-tight tracking-tight md:text-5xl">
+            <GradientText>Find Your Perfect</GradientText>
+            <br />
+            <span className="text-foreground">Opportunity Today</span>
+          </h1>
+
+          <p className="mx-auto mb-8 max-w-xl text-base text-foreground/55 md:text-lg leading-relaxed">
+            Connect talented workers with amazing opportunities. Build your career with India's most trusted work platform.
+          </p>
+
+          <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
             {user ? (
               <>
-                <Button
+                <button
                   onClick={() => router.push(`/${locale}/projects`)}
-                  className="bg-gradient-to-r from-secondary to-accent hover:from-secondary/90 hover:to-accent/90 text-white px-6 md:px-8 py-5 md:py-6 text-base md:text-lg h-auto rounded-xl shadow-lg hover:shadow-xl transition-all"
+                  className="flex items-center gap-2 rounded-xl px-7 py-3.5 text-[15px] font-bold text-white transition-opacity active:opacity-80 shadow-md"
+                  style={{ background: HERO_GRADIENT }}
                 >
-                  Find Jobs <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-                <Button
+                  Find Jobs <ArrowRight className="h-5 w-5" />
+                </button>
+                <button
                   onClick={() => router.push(`/${locale}/dashboard`)}
-                  className="border-2 border-secondary text-secondary hover:bg-secondary/10 bg-white px-6 md:px-8 py-5 md:py-6 text-base md:text-lg h-auto rounded-xl transition-all"
+                  className="rounded-xl border-2 px-7 py-3.5 text-[15px] font-bold transition-colors"
+                  style={{ borderColor: TEAL, color: TEAL }}
                 >
-                  Go to Dashboard
-                </Button>
+                  Dashboard
+                </button>
               </>
             ) : (
               <>
-                <Button
+                <button
                   onClick={() => router.push(`/${locale}/create-account`)}
-                  className="bg-gradient-to-r from-secondary to-accent hover:from-secondary/90 hover:to-accent/90 text-white px-6 md:px-8 py-5 md:py-6 text-base md:text-lg h-auto rounded-xl shadow-lg hover:shadow-xl transition-all"
+                  className="flex items-center gap-2 rounded-xl px-7 py-3.5 text-[15px] font-bold text-white shadow-md transition-opacity active:opacity-80"
+                  style={{ background: HERO_GRADIENT }}
                 >
-                  Get Started <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-                <Button
+                  Get Started <ArrowRight className="h-5 w-5" />
+                </button>
+                <button
                   onClick={() => router.push(`/${locale}/login`)}
-                  className="border-2 border-primary/30 text-foreground hover:bg-primary/5 bg-white px-6 md:px-8 py-5 md:py-6 text-base md:text-lg h-auto rounded-xl transition-all"
+                  className="rounded-xl border-2 px-7 py-3.5 text-[15px] font-bold text-foreground transition-colors hover:border-current"
+                  style={{ borderColor: "rgba(0,0,0,0.15)" }}
                 >
                   Sign In
-                </Button>
+                </button>
               </>
             )}
           </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-4 md:gap-6 pt-8 md:pt-12">
-            <div className="bg-white/70 backdrop-blur-sm rounded-lg md:rounded-xl p-4 md:p-6 border border-secondary/30 hover:border-secondary/50 transition-colors">
-              <p className="text-2xl md:text-3xl font-bold text-secondary">10K+</p>
-              <p className="text-foreground/60 text-xs md:text-sm mt-2">Active Users</p>
-            </div>
-            <div className="bg-white/70 backdrop-blur-sm rounded-lg md:rounded-xl p-4 md:p-6 border border-primary/30 hover:border-primary/50 transition-colors">
-              <p className="text-2xl md:text-3xl font-bold text-primary">5K+</p>
-              <p className="text-foreground/60 text-xs md:text-sm mt-2">Jobs Posted</p>
-            </div>
-            <div className="bg-white/70 backdrop-blur-sm rounded-lg md:rounded-xl p-4 md:p-6 border border-accent/30 hover:border-accent/50 transition-colors">
-              <p className="text-2xl md:text-3xl font-bold text-accent">4.8★</p>
-              <p className="text-foreground/60 text-xs md:text-sm mt-2">Average Rating</p>
-            </div>
+          {/* Quick stats */}
+          <div className="mt-12 grid grid-cols-3 gap-3">
+            <StatCard value="10K+" label="Active Users" />
+            <StatCard value="5K+" label="Jobs Posted" />
+            <StatCard value="4.8★" label="Avg Rating" />
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* ========== FEATURES SECTION ========== */}
-      <div className="py-16 md:py-24 px-4 bg-gradient-to-b from-transparent via-white to-secondary/5">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12 md:mb-16">
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4">Why Choose VaaniKaam?</h2>
-            <div className="w-16 h-1 bg-gradient-to-r from-secondary to-accent mx-auto rounded-full"></div>
-          </div>
-          
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-            {[
-              {
-                icon: Zap,
-                title: "Quick Apply",
-                desc: "Apply to jobs in seconds with your verified profile",
-                color: "from-primary to-accent"
-              },
-              {
-                icon: Shield,
-                title: "Verified Workers",
-                desc: "All workers are verified with background checks",
-                color: "from-secondary to-accent"
-              },
-              {
-                icon: Clock,
-                title: "24/7 Support",
-                desc: "Round-the-clock customer support for all queries",
-                color: "from-primary to-secondary"
-              },
-              {
-                icon: Award,
-                title: "Ratings & Reviews",
-                desc: "Build your reputation with genuine reviews",
-                color: "from-accent to-secondary"
-              }
-            ].map((feature, idx) => {
-              const IconComponent = feature.icon;
-              return (
-                <Card key={idx} className="bg-white/80 backdrop-blur-sm border border-secondary/20 hover:border-secondary/40 hover:shadow-xl transition-all rounded-xl overflow-hidden">
-                  <div className={`h-1 bg-gradient-to-r ${feature.color}`}></div>
-                  <CardContent className="pt-6">
-                    <div className={`inline-flex p-3 rounded-lg mb-4 bg-gradient-to-br ${feature.color}`}>
-                      <IconComponent className="h-6 w-6 text-white" />
-                    </div>
-                    <h3 className="text-foreground font-bold text-lg mb-2">{feature.title}</h3>
-                    <p className="text-foreground/60 text-sm leading-relaxed">{feature.desc}</p>
-                  </CardContent>
-                </Card>
-              );
-            })}
+      {/* ══════════════════════════════════════════════════
+          FEATURES
+      ══════════════════════════════════════════════════ */}
+      <section className="px-4 py-14 md:py-20" style={{ background: "rgba(13,158,110,0.03)" }}>
+        <div className="mx-auto max-w-5xl">
+          <SectionHeading title="Why Choose VaaniKaam?" />
+          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
+            <FeatureCard icon={Zap} title="Quick Apply" desc="Apply in seconds with your verified profile" />
+            <FeatureCard icon={Shield} title="Verified Workers" desc="All workers pass background verification" />
+            <FeatureCard icon={Clock} title="24/7 Support" desc="Round-the-clock support for every query" />
+            <FeatureCard icon={Award} title="Ratings & Reviews" desc="Build reputation with genuine client reviews" />
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* ========== POPULAR JOBS SECTION ========== */}
+      {/* ══════════════════════════════════════════════════
+          POPULAR JOBS (logged-in only)
+      ══════════════════════════════════════════════════ */}
       {user && (
-        <div className="py-16 md:py-24 px-4 bg-gradient-to-b from-secondary/5 via-white to-accent/5">
-          <div className="max-w-6xl mx-auto">
-            <div className="text-center mb-12 md:mb-16">
-              <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4">Popular Jobs Near You</h2>
-              <div className="w-16 h-1 bg-gradient-to-r from-primary to-secondary mx-auto rounded-full"></div>
-            </div>
-            
-            <div className="grid md:grid-cols-3 gap-4 md:gap-6">
+        <section className="px-4 py-14 md:py-20 bg-white">
+          <div className="mx-auto max-w-5xl">
+            <SectionHeading title="Popular Jobs Near You" subtitle="Opportunities matched to your location" />
+            <div className="grid gap-4 md:grid-cols-3">
               {[
-                {
-                  title: "Plumber Needed",
-                  location: "Bilimora",
-                  pay: "₹1,200/day",
-                  distance: "1.2 km",
-                  urgency: "Urgent",
-                  urgencyColor: "from-red-500 to-rose-500"
-                },
-                {
-                  title: "Painter for Interior Work",
-                  location: "Navsari",
-                  pay: "₹950/day",
-                  distance: "2.8 km",
-                  urgency: "Today",
-                  urgencyColor: "from-secondary to-accent"
-                },
-                {
-                  title: "Construction Helper",
-                  location: "Valsad",
-                  pay: "₹1,100/day",
-                  distance: "3.4 km",
-                  urgency: "Flexible",
-                  urgencyColor: "from-primary to-secondary"
-                },
-              ].map((job, idx) => (
-                <Card key={idx} className="bg-white/90 backdrop-blur-sm border border-secondary/20 hover:border-secondary/40 hover:shadow-xl transition-all rounded-xl overflow-hidden cursor-pointer group">
-                  <div className={`h-1 bg-gradient-to-r ${job.urgencyColor}`}></div>
-                  <CardContent className="pt-6">
-                    <div className="flex justify-between items-start mb-4">
-                      <h3 className="text-foreground font-bold text-lg group-hover:text-secondary transition-all">{job.title}</h3>
-                      <span className={`text-xs px-2 py-1 rounded-full font-semibold text-white bg-gradient-to-r ${job.urgencyColor} whitespace-nowrap ml-2`}>
-                        {job.urgency}
+                { title: "Plumber Needed", location: "Bilimora", pay: "₹1,200/day", dist: "1.2 km", badge: "Urgent", badgeColor: "#dc2626" },
+                { title: "Painter for Interior", location: "Navsari", pay: "₹950/day", dist: "2.8 km", badge: "Today", badgeColor: TEAL },
+                { title: "Construction Helper", location: "Valsad", pay: "₹1,100/day", dist: "3.4 km", badge: "Flexible", badgeColor: BLUE },
+              ].map((job) => (
+                <div
+                  key={job.title}
+                  className="group overflow-hidden rounded-2xl border bg-white transition-all hover:-translate-y-1 hover:shadow-lg"
+                  style={{ borderColor: "rgba(0,0,0,0.08)" }}
+                >
+                  <div className="h-[3px]" style={{ background: job.badgeColor }} />
+                  <div className="p-5">
+                    <div className="mb-3 flex items-start justify-between gap-2">
+                      <h3 className="text-[15px] font-bold text-foreground leading-snug">{job.title}</h3>
+                      <span
+                        className="shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold text-white"
+                        style={{ background: job.badgeColor }}
+                      >
+                        {job.badge}
                       </span>
                     </div>
-                    <div className="space-y-3 mb-6">
-                      <p className="text-foreground/60 flex items-center gap-2 text-sm">
-                        <MapPin className="h-4 w-4 text-secondary flex-shrink-0" />
-                        {job.location} • {job.distance}
-                      </p>
-                      <p className="text-foreground font-bold flex items-center gap-2">
-                        <DollarSign className="h-4 w-4 text-secondary flex-shrink-0" />
-                        {job.pay}
-                      </p>
-                    </div>
-                    <Button className="w-full bg-gradient-to-r from-secondary to-accent hover:from-secondary/90 hover:to-accent/90 text-white rounded-lg h-10 transition-all">
+                    <p className="mb-1 flex items-center gap-1.5 text-[13px] text-foreground/55">
+                      <MapPin className="h-3.5 w-3.5 shrink-0" style={{ color: TEAL }} />
+                      {job.location} · {job.dist}
+                    </p>
+                    <p className="mb-4 flex items-center gap-1.5 text-[14px] font-bold text-foreground">
+                      <DollarSign className="h-3.5 w-3.5 shrink-0" style={{ color: TEAL }} />
+                      {job.pay}
+                    </p>
+                    <button
+                      className="w-full rounded-xl py-2.5 text-[13px] font-bold text-white transition-opacity active:opacity-80"
+                      style={{ background: HERO_GRADIENT }}
+                    >
                       View Job
-                    </Button>
-                  </CardContent>
-                </Card>
+                    </button>
+                  </div>
+                </div>
               ))}
             </div>
-
-            <div className="text-center mt-12">
-              <Button
+            <div className="mt-10 text-center">
+              <button
                 onClick={() => router.push(`/${locale}/projects`)}
-                size="lg"
-                className="bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-white px-8 py-6 text-lg h-auto rounded-xl shadow-lg hover:shadow-xl transition-all"
+                className="inline-flex items-center gap-2 rounded-xl px-7 py-3.5 text-[15px] font-bold text-white shadow-md transition-opacity active:opacity-80"
+                style={{ background: HERO_GRADIENT }}
               >
-                View All Jobs <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
+                View All Jobs <ArrowRight className="h-5 w-5" />
+              </button>
             </div>
           </div>
-        </div>
+        </section>
       )}
 
-      {/* ========== HOW IT WORKS SECTION ========== */}
-      <div className="py-16 md:py-24 px-4 bg-white">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12 md:mb-16">
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4">How It Works</h2>
-            <div className="w-16 h-1 bg-gradient-to-r from-secondary to-accent mx-auto rounded-full"></div>
-          </div>
-
-          <div className="grid md:grid-cols-4 gap-6 md:gap-4">
+      {/* ══════════════════════════════════════════════════
+          HOW IT WORKS
+      ══════════════════════════════════════════════════ */}
+      <section className="px-4 py-14 md:py-20" style={{ background: "rgba(13,158,110,0.03)" }}>
+        <div className="mx-auto max-w-5xl">
+          <SectionHeading title="How It Works" />
+          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
             {[
-              { step: "1", title: "Create Profile", desc: "Sign up and create your profile in minutes", icon: Users },
-              { step: "2", title: "Browse Jobs", desc: "Find opportunities matching your skills", icon: Target },
-              { step: "3", title: "Apply Instantly", desc: "Apply to jobs with one click", icon: Smartphone },
-              { step: "4", title: "Get Hired", desc: "Connect with employers and start earning", icon: CheckCircle }
+              { step: "1", title: "Create Profile", desc: "Sign up in minutes", icon: Users },
+              { step: "2", title: "Browse Jobs", desc: "Find matching opportunities", icon: Target },
+              { step: "3", title: "Apply Instantly", desc: "One-tap job applications", icon: Smartphone },
+              { step: "4", title: "Get Hired", desc: "Start earning right away", icon: CheckCircle },
             ].map((item, idx) => {
-              const IconComponent = item.icon;
+              const Icon = item.icon;
               return (
                 <div key={idx} className="relative">
-                  <div className="bg-gradient-to-br from-secondary/10 to-accent/10 rounded-xl p-6 text-center border border-secondary/20 hover:border-secondary/40 transition-colors">
-                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-r from-secondary to-accent text-white font-bold text-lg mb-4">
+                  <div
+                    className="rounded-2xl border bg-white p-5 text-center transition-all hover:-translate-y-1 hover:shadow-md"
+                    style={{ borderColor: "rgba(13,158,110,0.15)" }}
+                  >
+                    <div
+                      className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full text-[15px] font-extrabold text-white"
+                      style={{ background: HERO_GRADIENT }}
+                    >
                       {item.step}
                     </div>
-                    <IconComponent className="h-8 w-8 text-secondary mx-auto mb-3" />
-                    <h3 className="font-bold text-foreground mb-2">{item.title}</h3>
-                    <p className="text-foreground/60 text-sm">{item.desc}</p>
+                    <Icon className="mx-auto mb-2 h-7 w-7" style={{ color: TEAL }} />
+                    <h3 className="mb-1 text-[14px] font-bold text-foreground">{item.title}</h3>
+                    <p className="text-[12px] text-foreground/50">{item.desc}</p>
                   </div>
                   {idx < 3 && (
-                    <div className="hidden md:flex absolute -right-3 top-1/3 items-center justify-center">
-                      <ArrowRight className="h-6 w-6 text-secondary/30" />
-                    </div>
+                    <ArrowRight
+                      className="absolute -right-2.5 top-1/3 hidden h-5 w-5 md:block"
+                      style={{ color: "rgba(13,158,110,0.3)" }}
+                    />
                   )}
                 </div>
               );
             })}
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* ========== CONTRACTOR IMPORTANT SECTION ========== */}
+      {/* ══════════════════════════════════════════════════
+          CONTRACTOR DASHBOARD
+      ══════════════════════════════════════════════════ */}
       {user && isContractor && (
-        <div className="py-16 md:py-24 px-4 bg-gradient-to-br from-secondary/10 via-accent/10 to-primary/5">
-          <div className="max-w-6xl mx-auto">
-            <div className="text-center mb-12 md:mb-16">
-              <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4">Manage Your Contracts</h2>
-              <p className="text-foreground/60 text-base md:text-lg">Keep track of your active projects and earnings</p>
-              <div className="w-16 h-1 bg-gradient-to-r from-secondary to-accent mx-auto rounded-full mt-4"></div>
+        <section className="px-4 py-14 md:py-20 bg-white">
+          <div className="mx-auto max-w-5xl">
+            <SectionHeading title="Manage Your Contracts" subtitle="Track active projects and earnings" />
+            <div className="grid gap-4 md:grid-cols-3">
+              <DashCard
+                icon={Briefcase}
+                badge="Active"
+                badgeBg="rgba(13,158,110,0.12)"
+                badgeText={TEAL}
+                value="3"
+                label="Active Contracts"
+                btnLabel="View All"
+                topColor={HERO_GRADIENT}
+                iconBg="rgba(13,158,110,0.1)"
+                iconColor={TEAL}
+              />
+              <DashCard
+                icon={DollarSign}
+                badge="This Month"
+                badgeBg="rgba(26,122,158,0.12)"
+                badgeText={BLUE}
+                value="₹18,500"
+                label="Total Earnings"
+                btnLabel="Withdraw"
+                topColor={`linear-gradient(135deg,${BLUE},${TEAL})`}
+                iconBg="rgba(26,122,158,0.1)"
+                iconColor={BLUE}
+              />
+              <DashCard
+                icon={AlertCircle}
+                badge="Pending"
+                badgeBg="#fee2e2"
+                badgeText="#dc2626"
+                value="2"
+                label="Pending Projects"
+                btnLabel="Review"
+                topColor="linear-gradient(135deg,#dc2626,#f87171)"
+                iconBg="#fee2e2"
+                iconColor="#dc2626"
+              />
             </div>
-
-            <div className="grid md:grid-cols-3 gap-6">
-              {/* Active Contracts Card */}
-              <Card className="bg-white/90 backdrop-blur-sm border-2 border-secondary/30 hover:border-secondary/50 hover:shadow-xl transition-all rounded-2xl overflow-hidden group cursor-pointer">
-                <div className="h-2 bg-gradient-to-r from-secondary to-accent"></div>
-                <CardContent className="pt-8">
-                  <div className="flex items-start justify-between mb-6">
-                    <div className="inline-flex p-4 rounded-xl bg-gradient-to-br from-secondary/20 to-accent/20 group-hover:from-secondary/30 group-hover:to-accent/30 transition-colors">
-                      <Briefcase className="h-7 w-7 text-secondary" />
-                    </div>
-                    <span className="px-3 py-1 rounded-full bg-secondary/20 text-secondary font-bold text-xs">Active</span>
-                  </div>
-                  <h3 className="text-foreground font-bold text-2xl mb-2">3</h3>
-                  <p className="text-foreground/70 text-sm mb-4">Active Contracts</p>
-                  <Button className="w-full bg-gradient-to-r from-secondary to-accent hover:from-secondary/90 hover:to-accent/90 text-white rounded-lg h-10 transition-all">
-                    View All <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {/* Monthly Earnings Card */}
-              <Card className="bg-white/90 backdrop-blur-sm border-2 border-primary/30 hover:border-primary/50 hover:shadow-xl transition-all rounded-2xl overflow-hidden group cursor-pointer">
-                <div className="h-2 bg-gradient-to-r from-primary to-secondary"></div>
-                <CardContent className="pt-8">
-                  <div className="flex items-start justify-between mb-6">
-                    <div className="inline-flex p-4 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20 group-hover:from-primary/30 group-hover:to-secondary/30 transition-colors">
-                      <DollarSign className="h-7 w-7 text-primary" />
-                    </div>
-                    <span className="px-3 py-1 rounded-full bg-primary/20 text-primary font-bold text-xs">This Month</span>
-                  </div>
-                  <h3 className="text-foreground font-bold text-2xl mb-2">₹18,500</h3>
-                  <p className="text-foreground/70 text-sm mb-4">Total Earnings</p>
-                  <Button className="w-full bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-white rounded-lg h-10 transition-all">
-                    Withdraw <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {/* Pending Projects Card */}
-              <Card className="bg-white/90 backdrop-blur-sm border-2 border-red-500/30 hover:border-red-500/50 hover:shadow-xl transition-all rounded-2xl overflow-hidden group cursor-pointer">
-                <div className="h-2 bg-gradient-to-r from-red-500 to-rose-500"></div>
-                <CardContent className="pt-8">
-                  <div className="flex items-start justify-between mb-6">
-                    <div className="inline-flex p-4 rounded-xl bg-gradient-to-br from-red-100 to-rose-100 group-hover:from-red-200 group-hover:to-rose-200 transition-colors">
-                      <AlertCircle className="h-7 w-7 text-red-600" />
-                    </div>
-                    <span className="px-3 py-1 rounded-full bg-red-100 text-red-700 font-bold text-xs">Pending</span>
-                  </div>
-                  <h3 className="text-foreground font-bold text-2xl mb-2">2</h3>
-                  <p className="text-foreground/70 text-sm mb-4">Pending Projects</p>
-                  <Button className="w-full bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 text-white rounded-lg h-10 transition-all">
-                    Review <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Quick Stats */}
-            <div className="grid md:grid-cols-4 gap-4 mt-8">
-              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-6 border border-secondary/20 hover:border-secondary/40 transition-colors text-center">
-                <p className="text-foreground/60 text-sm font-medium mb-2">Completion Rate</p>
-                <p className="text-2xl font-bold text-secondary">96%</p>
-              </div>
-              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-6 border border-primary/20 hover:border-primary/40 transition-colors text-center">
-                <p className="text-foreground/60 text-sm font-medium mb-2">Average Rating</p>
-                <p className="text-2xl font-bold text-primary">4.9★</p>
-              </div>
-              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-6 border border-accent/20 hover:border-accent/40 transition-colors text-center">
-                <p className="text-foreground/60 text-sm font-medium mb-2">Total Projects</p>
-                <p className="text-2xl font-bold text-accent">28</p>
-              </div>
-              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-6 border border-secondary/20 hover:border-secondary/40 transition-colors text-center">
-                <p className="text-foreground/60 text-sm font-medium mb-2">Response Time</p>
-                <p className="text-2xl font-bold text-secondary">&lt;2 hr</p>
-              </div>
+            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <StatCard value="96%" label="Completion Rate" />
+              <StatCard value="4.9★" label="Average Rating" />
+              <StatCard value="28" label="Total Projects" />
+              <StatCard value="<2 hr" label="Response Time" />
             </div>
           </div>
-        </div>
+        </section>
       )}
 
-      {/* ========== WORKER IMPORTANT SECTION ========== */}
+      {/* ══════════════════════════════════════════════════
+          WORKER DASHBOARD
+      ══════════════════════════════════════════════════ */}
       {user && !isContractor && (
-        <div className="py-16 md:py-24 px-4 bg-gradient-to-br from-primary/10 via-secondary/10 to-accent/5">
-          <div className="max-w-6xl mx-auto">
-            <div className="text-center mb-12 md:mb-16">
-              <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4">Your Work Stats</h2>
-              <p className="text-foreground/60 text-base md:text-lg">Track your progress and opportunities</p>
-              <div className="w-16 h-1 bg-gradient-to-r from-secondary to-accent mx-auto rounded-full mt-4"></div>
+        <section className="px-4 py-14 md:py-20 bg-white">
+          <div className="mx-auto max-w-5xl">
+            <SectionHeading title="Your Work Stats" subtitle="Track your progress and opportunities" />
+            <div className="grid gap-4 md:grid-cols-3">
+              <DashCard
+                icon={Target}
+                badge="Pending"
+                badgeBg="rgba(26,122,158,0.12)"
+                badgeText={BLUE}
+                value="5"
+                label="Job Applications"
+                btnLabel="View All"
+                topColor={`linear-gradient(135deg,${BLUE},${TEAL_L})`}
+                iconBg="rgba(26,122,158,0.1)"
+                iconColor={BLUE}
+              />
+              <DashCard
+                icon={DollarSign}
+                badge="Total"
+                badgeBg="rgba(13,158,110,0.12)"
+                badgeText={TEAL}
+                value="₹12,350"
+                label="Total Earnings"
+                btnLabel="History"
+                topColor={HERO_GRADIENT}
+                iconBg="rgba(13,158,110,0.1)"
+                iconColor={TEAL}
+              />
+              <DashCard
+                icon={Star}
+                badge="4.8★"
+                badgeBg="rgba(251,191,36,0.15)"
+                badgeText="#b45309"
+                value="87"
+                label="Profile Views"
+                btnLabel="Update Profile"
+                topColor="linear-gradient(135deg,#f59e0b,#fbbf24)"
+                iconBg="rgba(251,191,36,0.12)"
+                iconColor="#f59e0b"
+              />
             </div>
-
-            <div className="grid md:grid-cols-3 gap-6">
-              {/* Your Applications Card */}
-              <Card className="bg-white/90 backdrop-blur-sm border-2 border-primary/30 hover:border-primary/50 hover:shadow-xl transition-all rounded-2xl overflow-hidden group cursor-pointer">
-                <div className="h-2 bg-gradient-to-r from-primary to-accent"></div>
-                <CardContent className="pt-8">
-                  <div className="flex items-start justify-between mb-6">
-                    <div className="inline-flex p-4 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 group-hover:from-primary/30 group-hover:to-accent/30 transition-colors">
-                      <Target className="h-7 w-7 text-primary" />
-                    </div>
-                    <span className="px-3 py-1 rounded-full bg-primary/20 text-primary font-bold text-xs">Pending</span>
-                  </div>
-                  <h3 className="text-foreground font-bold text-2xl mb-2">5</h3>
-                  <p className="text-foreground/70 text-sm mb-4">Job Applications</p>
-                  <Button className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white rounded-lg h-10 transition-all">
-                    View All <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {/* Earnings Card */}
-              <Card className="bg-white/90 backdrop-blur-sm border-2 border-secondary/30 hover:border-secondary/50 hover:shadow-xl transition-all rounded-2xl overflow-hidden group cursor-pointer">
-                <div className="h-2 bg-gradient-to-r from-secondary to-primary"></div>
-                <CardContent className="pt-8">
-                  <div className="flex items-start justify-between mb-6">
-                    <div className="inline-flex p-4 rounded-xl bg-gradient-to-br from-secondary/20 to-primary/20 group-hover:from-secondary/30 group-hover:to-primary/30 transition-colors">
-                      <DollarSign className="h-7 w-7 text-secondary" />
-                    </div>
-                    <span className="px-3 py-1 rounded-full bg-secondary/20 text-secondary font-bold text-xs">Total</span>
-                  </div>
-                  <h3 className="text-foreground font-bold text-2xl mb-2">₹12,350</h3>
-                  <p className="text-foreground/70 text-sm mb-4">Total Earnings</p>
-                  <Button className="w-full bg-gradient-to-r from-secondary to-primary hover:from-secondary/90 hover:to-primary/90 text-white rounded-lg h-10 transition-all">
-                    History <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {/* Profile Rating Card */}
-              <Card className="bg-white/90 backdrop-blur-sm border-2 border-accent/30 hover:border-accent/50 hover:shadow-xl transition-all rounded-2xl overflow-hidden group cursor-pointer">
-                <div className="h-2 bg-gradient-to-r from-accent to-secondary"></div>
-                <CardContent className="pt-8">
-                  <div className="flex items-start justify-between mb-6">
-                    <div className="inline-flex p-4 rounded-xl bg-gradient-to-br from-accent/20 to-secondary/20 group-hover:from-accent/30 group-hover:to-secondary/30 transition-colors">
-                      <Star className="h-7 w-7 text-accent" />
-                    </div>
-                    <span className="px-3 py-1 rounded-full bg-accent/20 text-accent font-bold text-xs">4.8★</span>
-                  </div>
-                  <h3 className="text-foreground font-bold text-2xl mb-2">87</h3>
-                  <p className="text-foreground/70 text-sm mb-4">Profile Views</p>
-                  <Button className="w-full bg-gradient-to-r from-accent to-secondary hover:from-accent/90 hover:to-secondary/90 text-white rounded-lg h-10 transition-all">
-                    Update Profile <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Quick Stats */}
-            <div className="grid md:grid-cols-4 gap-4 mt-8">
-              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-6 border border-primary/20 hover:border-primary/40 transition-colors text-center">
-                <p className="text-foreground/60 text-sm font-medium mb-2">Jobs Completed</p>
-                <p className="text-2xl font-bold text-primary">12</p>
-              </div>
-              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-6 border border-secondary/20 hover:border-secondary/40 transition-colors text-center">
-                <p className="text-foreground/60 text-sm font-medium mb-2">Your Rating</p>
-                <p className="text-2xl font-bold text-secondary">4.8★</p>
-              </div>
-              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-6 border border-accent/20 hover:border-accent/40 transition-colors text-center">
-                <p className="text-foreground/60 text-sm font-medium mb-2">Response Time</p>
-                <p className="text-2xl font-bold text-accent">&lt;1 hr</p>
-              </div>
-              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-6 border border-primary/20 hover:border-primary/40 transition-colors text-center">
-                <p className="text-foreground/60 text-sm font-medium mb-2">Success Rate</p>
-                <p className="text-2xl font-bold text-primary">92%</p>
-              </div>
+            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <StatCard value="42" label="Jobs Completed" />
+              <StatCard value="98%" label="On-time Rate" />
+              <StatCard value="15" label="Repeat Clients" />
+              <StatCard value="30 min" label="Avg Response" />
             </div>
           </div>
-        </div>
+        </section>
       )}
 
-      {/* ========== CTA SECTION ========== */}
-      <div className="py-16 md:py-24 px-4 bg-gradient-to-br from-secondary via-primary to-accent">
-        <div className="max-w-4xl mx-auto text-center space-y-6 md:space-y-8">
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white leading-tight">Ready to Find Your Next Opportunity?</h2>
-          <p className="text-lg md:text-xl text-white/80">Join thousands of workers who have found their dream jobs on VaaniKaam</p>
-          {!user && (
-            <Button
-              onClick={() => router.push(`/${locale}/create-account`)}
-              size="lg"
-              className="bg-white text-secondary hover:bg-white/90 px-8 md:px-12 py-6 md:py-7 text-base md:text-lg h-auto rounded-xl font-semibold shadow-xl hover:shadow-2xl transition-all"
-            >
-              Create Account Now <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
-          )}
+      {/* ══════════════════════════════════════════════════
+          TRENDING CATEGORIES
+      ══════════════════════════════════════════════════ */}
+      <section className="px-4 py-14 md:py-20" style={{ background: "rgba(13,158,110,0.03)" }}>
+        <div className="mx-auto max-w-5xl">
+          <SectionHeading title="Trending Categories" />
+          <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+            <CategoryChip icon={Wrench} label="Plumbing" />
+            <CategoryChip icon={HardHat} label="Construction" />
+            <CategoryChip icon={Layers} label="Cleaning" />
+            <CategoryChip icon={Paintbrush} label="Painting" />
+            <CategoryChip icon={Lightbulb} label="Electrical" />
+            <CategoryChip icon={Hammer} label="Carpentry" />
+          </div>
         </div>
-      </div>
+      </section>
+
+      {/* ══════════════════════════════════════════════════
+          FOOTER
+      ══════════════════════════════════════════════════ */}
+      <footer className="border-t px-4 py-10" style={{ borderColor: "rgba(13,158,110,0.15)", background: "rgba(13,158,110,0.03)" }}>
+        <div className="mx-auto max-w-5xl text-center">
+          <Logo size={44} showText />
+          <p className="mt-3 text-[13px] text-foreground/45">Empowering workers and businesses across India</p>
+          <div className="mt-4 flex justify-center gap-5 text-[13px]">
+            {["About", "Contact", "Terms", "Privacy"].map((l) => (
+              <button key={l} className="text-foreground/45 transition-colors hover:text-foreground">
+                {l}
+              </button>
+            ))}
+          </div>
+          <p className="mt-5 text-[11px] text-foreground/30">© 2026 VaaniKaam. All rights reserved.</p>
+        </div>
+      </footer>
     </div>
   );
 };
