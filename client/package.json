@@ -23,6 +23,7 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
     "firebase": "^12.8.0",
     "framer-motion": "^12.28.1",
     "geolib": "^3.3.14",
@@ -35,6 +36,7 @@
     "react-dom": "19.2.3",
     "react-hook-form": "^7.71.1",
     "react-leaflet": "^5.0.0",
+    "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
     "zod": "^4.3.5"
   },

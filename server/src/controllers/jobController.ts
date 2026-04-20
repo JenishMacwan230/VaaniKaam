@@ -1,6 +1,8 @@
 import { Request, Response } from "express";
 import Job from "../models/Job";
 import JobApplication from "../models/JobApplication";
+import User from "../models/User";
+import { createNotification } from "../utils/notificationHelper";
 
 const syncJobStatusFromApplications = async (jobId: any) => {
   const job = await Job.findById(jobId);
@@ -115,6 +117,25 @@ export const applyToJob = async (req: Request & any, res: Response) => {
     const existing = await JobApplication.findOne({ jobId, workerId: user._id });
     if (existing) return res.status(409).json({ message: "Already applied" });
     const application = await JobApplication.create({ jobId, workerId: user._id, status: "applied" });
+    
+    // 📬 Create notification for job poster
+    try {
+      await createNotification({
+        userId: job.postedBy.toString(),
+        type: "application",
+        title: "New Application Received",
+        message: `${user.name || "Someone"} applied for "${job.title}"`,
+        data: {
+          jobId: job._id.toString(),
+          applicationId: application._id.toString(),
+          workerId: user._id.toString(),
+        },
+      });
+    } catch (notifError) {
+      console.error("Failed to create notification:", notifError);
+      // Don't fail the request if notification creation fails
+    }
+    
     return res.status(201).json({ application });
   } catch (error: any) {
     if (error.code === 11000) return res.status(409).json({ message: "Already applied" });
@@ -261,6 +282,25 @@ export const updateApplicationStatus = async (req: Request & any, res: Response)
 
     await syncJobStatusFromApplications(application.jobId);
 
+    // 📬 Create notification when application is accepted
+    if (action === "accept") {
+      try {
+        const worker = await User.findById(application.workerId);
+        await createNotification({
+          userId: application.workerId.toString(),
+          type: "job_update",
+          title: "Application Accepted!",
+          message: `Your application for "${job.title}" has been accepted. You can now start the work.`,
+          data: {
+            jobId: job._id.toString(),
+            applicationId: application._id.toString(),
+          },
+        });
+      } catch (notifError) {
+        console.error("Failed to create notification:", notifError);
+      }
+    }
+
     return res.json({ application });
   } catch (error) {
     console.error("Update application error:", error);
@@ -365,6 +405,22 @@ export const markJobComplete = async (req: Request & any, res: Response) => {
 
     await syncJobStatusFromApplications(application.jobId);
 
+    // 📬 Create notification for worker to confirm completion
+    try {
+      await createNotification({
+        userId: application.workerId.toString(),
+        type: "job_update",
+        title: "Job Completion Review",
+        message: `${user.name || "Contractor"} marked "${job.title}" as complete. Please confirm the work is done.`,
+        data: {
+          jobId: job._id.toString(),
+          applicationId: application._id.toString(),
+        },
+      });
+    } catch (notifError) {
+      console.error("Failed to create notification:", notifError);
+    }
+
     return res.json({ application });
   } catch (error) {
     console.error("Mark job complete error:", error);
@@ -421,6 +477,25 @@ export const confirmJobCompletion = async (req: Request & any, res: Response) =>
     await application.save();
 
     await syncJobStatusFromApplications(application.jobId);
+
+    // 📬 Create notification for contractor - job is completed
+    try {
+      const job = await Job.findById(application.jobId);
+      const contractor = await User.findById(job?.postedBy);
+      await createNotification({
+        userId: job?.postedBy.toString() as string,
+        type: "job_update",
+        title: "Job Completed ✓",
+        message: `${user.name || "Worker"} confirmed completion of "${job?.title}". Payment can now be processed.`,
+        data: {
+          jobId: job?._id.toString(),
+          applicationId: application._id.toString(),
+          workerId: user._id.toString(),
+        },
+      });
+    } catch (notifError) {
+      console.error("Failed to create notification:", notifError);
+    }
 
     return res.json({ application });
   } catch (error) {

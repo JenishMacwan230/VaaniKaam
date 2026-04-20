@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Phone, Lock, Mail, User, Shield, AlertCircle, CheckCircle, Building2, Hammer, MapPin } from "lucide-react";
 import { getAuth, signInWithPhoneNumber, RecaptchaVerifier, ConfirmationResult } from "firebase/auth";
 import { app } from "@/lib/firebase";
+import VoicePhoneInput from "@/components/VoicePhoneInput";
+import VoiceTextInput from "@/components/VoiceTextInput";
 
 // Extend Window interface for RecaptchaVerifier
 declare global {
@@ -22,6 +25,16 @@ interface PhoneAuthCardProps {
 }
 
 type AccountType = "worker" | "contractor";
+
+// Language code mapping for voice
+const getVoiceLanguage = (locale: string): string => {
+  const mapping: Record<string, string> = {
+    en: "en",
+    hi: "hi",
+    gu: "gu",
+  };
+  return mapping[locale] || "en";
+};
 
 const accountTypeOptions: Array<{
   value: AccountType;
@@ -50,6 +63,10 @@ const accountTypeOptions: Array<{
 ];
 
 export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
+  const params = useParams();
+  const locale = (params?.locale as string) || "en";
+  const voiceLanguage = getVoiceLanguage(locale);
+  console.log("[PhoneAuthCard] Locale:", locale, "→ Voice Language:", voiceLanguage);
   const auth = getAuth(app);
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otp, setOtp] = useState("");
@@ -392,19 +409,15 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
           <div className="space-y-5">
             <div className="flex items-center gap-2">
               <Phone className="w-4 h-4 text-primary" />
-              <Label className="text-sm font-medium">Mobile number</Label>
             </div>
-            <Input
-              type="tel"
+            <VoicePhoneInput
+              phoneNumber={phoneNumber}
+              onPhoneNumberChange={setPhoneNumber}
+              language={voiceLanguage}
               placeholder="Enter 10 digit number"
-              value={phoneNumber}
-              onChange={(e) => {
-                const digitsOnly = e.target.value.replace(/\D/g, "").slice(0, 10);
-                setPhoneNumber(digitsOnly);
-              }}
               disabled={loading}
-              maxLength={10}
-              className="rounded-2xl border border-input bg-background/40 px-4 py-6 text-base font-semibold shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+              showHelper={true}
+              autoSpeak={true}
             />
 
             {/* Firebase RecaptchaVerifier Container - Empty for invisible mode */}
@@ -430,14 +443,18 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
               <Shield className="w-4 h-4 text-primary" />
               <Label className="text-sm font-medium">Enter verification code</Label>
             </div>
-            <Input
-              type="text"
-              placeholder="Enter 6-digit code from SMS"
+            <VoiceTextInput
               value={otp}
-              onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              maxLength={6}
+              onChange={setOtp}
+              label=""
+              placeholder="Enter 6-digit code from SMS"
+              language={voiceLanguage}
               disabled={loading}
-              className="rounded-2xl border border-input bg-background/40 px-4 py-6 text-base font-semibold shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+              type="number"
+              maxLength={6}
+              showHelper={true}
+              autoSpeak={false}
+              hint="Please say the 6-digit verification code from your SMS"
             />
 
             <Button
@@ -517,26 +534,36 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
               <User className="w-4 h-4 text-primary" />
               <Label className="text-sm font-medium">Name</Label>
             </div>
-            <Input
-              type="text"
-              placeholder="Your name"
+            <VoiceTextInput
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={setName}
+              label=""
+              placeholder="Your name"
+              language={voiceLanguage}
               disabled={loading}
-              className="rounded-2xl border border-input bg-background/40 px-4 py-3 text-base font-semibold shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+              type="text"
+              showHelper={true}
+              autoSpeak={false}
+              icon={null}
+              hint="Please speak your full name"
             />
 
             <div className="flex items-center gap-2">
               <MapPin className="w-4 h-4 text-primary" />
               <Label className="text-sm font-medium">Location</Label>
             </div>
-            <Input
-              type="text"
-              placeholder="City or area"
+            <VoiceTextInput
               value={location}
-              onChange={(e) => setLocation(e.target.value)}
+              onChange={setLocation}
+              label=""
+              placeholder="City or area"
+              language={voiceLanguage}
               disabled={loading}
-              className="rounded-2xl border border-input bg-background/40 px-4 py-3 text-base font-semibold shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+              type="text"
+              showHelper={true}
+              autoSpeak={false}
+              icon={null}
+              hint="Please speak your city or area name"
             />
 
             <div className="flex items-center gap-2">

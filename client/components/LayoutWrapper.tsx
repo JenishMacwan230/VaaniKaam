@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { Toaster } from "sonner";
 import BlogHeader from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import Logo from "@/components/ui/logo";
@@ -18,21 +19,25 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
 
   if (isAuthPage) {
     return (
-      <div className="flex flex-col min-h-screen bg-background">
-        <header className="flex justify-center pt-10">
-           <Link href="/">
-             <Logo showText={true} size={80} />
-           </Link>
-        </header>
-        <main className="flex-1 flex items-center justify-center px-4 pb-12">
-          {children}
-        </main>
-      </div>
+      <>
+        <Toaster position="top-center" />
+        <div className="flex flex-col min-h-screen bg-background">
+          <header className="flex justify-center pt-10">
+             <Link href="/">
+               <Logo showText={true} size={80} />
+             </Link>
+          </header>
+          <main className="flex-1 flex items-center justify-center px-4 pb-12">
+            {children}
+          </main>
+        </div>
+      </>
     );
   }
 
   return (
     <>
+      <Toaster position="top-center" />
       <BlogHeader />
       {/* Page Content */}
       <main className="min-h-screen">
