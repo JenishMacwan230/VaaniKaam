@@ -36,7 +36,8 @@ export default function VoicePhoneInput({
   disabled = false,
   showHelper = true,
   autoSpeak = true,
-}: Readonly<VoicePhoneInputProps>) {  console.log("[VoicePhoneInput] Received language prop:", language);  const { isListening, isSpeaking, isSupported, transcribedText, error, startListening, stopListening, speak, clearError } = useSpeechInput({
+}: Readonly<VoicePhoneInputProps>) {
+  const { isListening, isSpeaking, isSupported, transcribedText, error, startListening, stopListening, speak, clearError } = useSpeechInput({
     language,
     onPhoneNumberChange,
     autoSpeakOnMount: autoSpeak,
@@ -51,6 +52,7 @@ export default function VoicePhoneInput({
     const cleaned = phoneNumber.replaceAll(/\D/g, "");
     const valid = cleaned.length === 10;
     setIsValid(valid);
+    if (valid) setShowError(false); // auto-clear error on valid
   }, [phoneNumber]);
 
   const handleMicClick = async () => {
@@ -59,6 +61,7 @@ export default function VoicePhoneInput({
     } else {
       try {
         clearError();
+        setShowError(false); // clear stale errors before new attempt
         await startListening();
       } catch {
         setShowError(true);
@@ -67,7 +70,9 @@ export default function VoicePhoneInput({
   };
 
   const handleSpeakClick = async () => {
-    await speak(getGreeting(language));
+    if (!isSpeaking) {
+      await speak(getGreeting(language));
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -77,8 +82,8 @@ export default function VoicePhoneInput({
   };
 
   const handleBlur = () => {
-    if (phoneNumber && !isValid) {
-      setShowError(true);
+    if (phoneNumber) {
+      setShowError(!isValid); // clears automatically when valid
     }
   };
 
@@ -99,7 +104,7 @@ export default function VoicePhoneInput({
             value={phoneNumber}
             onChange={handleInputChange}
             onBlur={handleBlur}
-            disabled={disabled || isListening}
+            disabled={disabled}
             maxLength={10}
             className={cn(
               "rounded-2xl border border-input bg-background/40 px-4 py-6 text-base font-semibold shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20",
@@ -167,9 +172,9 @@ export default function VoicePhoneInput({
               title="Replay instructions"
             >
               {isSpeaking ? (
-                <VolumeX className="w-5 h-5" />
+                <Volume2 className="w-5 h-5 animate-pulse" />
               ) : (
-                <Volume2 className="w-5 h-5" />
+                <VolumeX className="w-5 h-5" />
               )}
             </Button>
           </>
@@ -181,7 +186,7 @@ export default function VoicePhoneInput({
         <p className="text-xs text-muted-foreground flex items-center gap-1.5">
           <span className="text-base">🎤</span>
           {" "}
-          You can use your keyboard mic to speak your number
+          {getHelperText(language)}
         </p>
       )}
 
@@ -230,4 +235,17 @@ function getGreeting(language: string): string {
   };
 
   return greetings[language] || greetings.en;
+}
+
+/**
+ * Get localized helper text
+ */
+function getHelperText(language: string): string {
+  const helperTexts: Record<string, string> = {
+    en: "You can use your keyboard mic to speak your number",
+    hi: "अपना नंबर बोलने के लिए माइक का उपयोग करें",
+    gu: "તમારો નંબર બોલવા માટે માઇક વાપરો",
+  };
+
+  return helperTexts[language] || helperTexts.en;
 }

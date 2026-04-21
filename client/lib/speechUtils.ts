@@ -39,6 +39,30 @@ const getSpeechRecognition = (): any => {
   return new SpeechRecognitionAPI();
 };
 
+let activeRecognition: any = null;
+
+const waitForVoices = async (synth: SpeechSynthesis): Promise<SpeechSynthesisVoice[]> => {
+  const existing = synth.getVoices();
+  if (existing.length > 0) {
+    return existing;
+  }
+
+  return new Promise((resolve) => {
+    const timeout = globalThis.setTimeout(() => {
+      synth.removeEventListener("voiceschanged", handleVoicesChanged);
+      resolve(synth.getVoices());
+    }, 400);
+
+    const handleVoicesChanged = () => {
+      globalThis.clearTimeout(timeout);
+      synth.removeEventListener("voiceschanged", handleVoicesChanged);
+      resolve(synth.getVoices());
+    };
+
+    synth.addEventListener("voiceschanged", handleVoicesChanged);
+  });
+};
+
 /**
  * Extract digits from text (handles spoken numbers)
  * Converts number words to digits for multiple languages
@@ -46,14 +70,17 @@ const getSpeechRecognition = (): any => {
 export const extractDigitsFromSpeech = (text: string): string => {
   const normalizedText = normalizeIndicDigits(text);
 
-  // First, try to extract existing digits (including normalized Gujarati/Devanagari numerals)
+  // First pass: extract already-digit characters (handles space-separated digits from STT)
   const digits = normalizedText.replaceAll(/\D/g, "");
-  if (digits.length > 0) return digits.slice(0, 10);
+  if (digits.length > 0) {
+    console.log(`[Speech] Extracted digits from STT: "${text}" → "${digits}"`);
+    return digits.slice(0, 10);
+  }
 
-  // Map of number words to digits (English, Hindi, Gujarati)
   const numberWords: Record<string, string> = {
     // English
     zero: "0",
+    oh: "0",
     one: "1",
     two: "2",
     three: "3",
@@ -82,20 +109,25 @@ export const extractDigitsFromSpeech = (text: string): string => {
     seventy: "70",
     eighty: "80",
     ninety: "90",
-    // Hindi numbers
+
+    // Hindi
     शून्य: "0",
     सून्य: "0",
+    जीरो: "0",
+    ओ: "0",
     एक: "1",
     दो: "2",
     तीन: "3",
     चार: "4",
     पाँच: "5",
     पांच: "5",
+    पच: "5",
     छः: "6",
     छह: "6",
     सात: "7",
     आठ: "8",
     नौ: "9",
+    नो: "9",
     दस: "10",
     ग्यारह: "11",
     गयारह: "11",
@@ -115,11 +147,12 @@ export const extractDigitsFromSpeech = (text: string): string => {
     सत्तर: "70",
     अस्सी: "80",
     नब्बे: "90",
-    // Hindi speech variants
-    जीरो: "0",
-    // Gujarati numbers
+
+    // Gujarati
     શૂન્ય: "0",
     જીરો: "0",
+    સીફર: "0",
+    ઝીરો: "0",
     એક: "1",
     બે: "2",
     ત્રણ: "3",
@@ -147,44 +180,128 @@ export const extractDigitsFromSpeech = (text: string): string => {
     સિત્તેર: "70",
     આશી: "80",
     નેવું: "90",
-    // Gujarati common speech variants
-    સીફર: "0",
-    ઝીરો: "0",
-    એકમ: "1",
-    છઠ્ઠું: "6",
-    સાતમું: "7",
-    નવમું: "9",
-    // Latin transliteration fallbacks
+
+    // Latin transliterations + STT variants
     shunya: "0",
+    sifar: "0",
+    jeero: "0",
     ek: "1",
+    ekk: "1",
     do: "2",
+    be: "2",
     teen: "3",
+    tran: "3",
+    trin: "3",
     char: "4",
+    chaar: "4",
     panch: "5",
+    paanch: "5",
+    pach: "5",
     chah: "6",
+    chh: "6",
+    chhah: "6",
     sat: "7",
+    saat: "7",
     aath: "8",
+    aat: "8",
     nau: "9",
+    nav: "9",
+    nao: "9",
+    nava: "9",
     das: "10",
     gyarah: "11",
     barah: "12",
-    sifar: "0",
-    jeero: "0",
-    be: "2",
-    tran: "3",
-    chh: "6",
-    nav: "9",
   };
 
-  const lowerText = normalizedText.toLowerCase();
-  const words = lowerText
+  // Single digit words only (for phone number building)
+  const singleDigitKeys = new Set([
+    "zero",
+    "oh",
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "शून्य",
+    "सून्य",
+    "जीरो",
+    "ओ",
+    "एक",
+    "दो",
+    "तीन",
+    "चार",
+    "पाँच",
+    "पांच",
+    "पच",
+    "छः",
+    "छह",
+    "सात",
+    "आठ",
+    "नौ",
+    "नो",
+    "શૂન્ય",
+    "જીરો",
+    "સીફર",
+    "ઝીરો",
+    "એક",
+    "બે",
+    "ત્રણ",
+    "ચાર",
+    "પાંચ",
+    "છ",
+    "સાત",
+    "આઠ",
+    "નવ",
+    "shunya",
+    "sifar",
+    "jeero",
+    "ek",
+    "ekk",
+    "do",
+    "be",
+    "teen",
+    "tran",
+    "trin",
+    "char",
+    "chaar",
+    "panch",
+    "paanch",
+    "pach",
+    "chah",
+    "chh",
+    "chhah",
+    "sat",
+    "saat",
+    "aath",
+    "aat",
+    "nau",
+    "nav",
+    "nao",
+    "nava",
+    "oh",
+  ]);
+
+  const words = normalizedText
+    .toLowerCase()
     .split(/[^\p{L}\p{N}]+/u)
     .filter(Boolean);
+
   let result = "";
 
   for (const word of words) {
-    if (numberWords[word]) {
-      result += numberWords[word];
+    const nfc = word.normalize("NFC");
+    const mapped = numberWords[nfc] ?? numberWords[word];
+    if (!mapped) continue;
+
+    if (singleDigitKeys.has(nfc) || singleDigitKeys.has(word)) {
+      // Phone digit mode: always single digit
+      result += mapped.length > 1 ? mapped[mapped.length - 1] : mapped;
+    } else {
+      result += mapped;
     }
   }
 
@@ -248,7 +365,10 @@ export const speakText = (
   options: TextToSpeechOptions = {}
 ): Promise<void> => {
   return new Promise((resolve, reject) => {
-    const { language = "en-US", rate = 0.9, pitch = 1, volume = 1 } = options;
+    const { language = "en-US", pitch = 1, volume = 1 } = options;
+    // Slower rate for Indic languages for clarity
+    const defaultRate = language.startsWith("en") ? 0.9 : 0.8;
+    const { rate = defaultRate } = options;
 
     if (!("speechSynthesis" in globalThis)) {
       reject(new Error("Text-to-Speech API not supported in this browser"));
@@ -270,21 +390,6 @@ export const speakText = (
     utterance.pitch = pitch;
     utterance.volume = volume;
 
-    const voices = synth.getVoices();
-    const requestedBase = language.split("-")[0]?.toLowerCase() ?? "en";
-    const exactVoice = voices.find((voice) => voice.lang.toLowerCase() === language.toLowerCase());
-    const baseVoice = voices.find((voice) => voice.lang.toLowerCase().startsWith(`${requestedBase}-`));
-    const fallbackVoice = voices.find((voice) => voice.lang.toLowerCase().startsWith("en-"));
-    const selectedVoice = exactVoice || baseVoice || fallbackVoice;
-
-    if (selectedVoice) {
-      utterance.voice = selectedVoice;
-      utterance.lang = selectedVoice.lang;
-    } else {
-      // If no matching voice exists for hi/gu, force a reliable English fallback.
-      utterance.lang = "en-US";
-    }
-
     utterance.onend = () => resolve();
     utterance.onerror = (event) => {
       if (event.error === "not-allowed") {
@@ -296,15 +401,29 @@ export const speakText = (
       }
     };
 
-    // Defer speak to next frame so browsers have time to resolve voices.
-    globalThis.setTimeout(() => {
+    void (async () => {
+      const voices = await waitForVoices(synth);
+      const requestedBase = language.split("-")[0]?.toLowerCase() ?? "en";
+      const exactVoice = voices.find((voice) => voice.lang.toLowerCase() === language.toLowerCase());
+      const baseVoice = voices.find((voice) => voice.lang.toLowerCase().startsWith(`${requestedBase}-`));
+      const selectedVoice = exactVoice || baseVoice;
+
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+      } else if (!language.startsWith("en")) {
+        // ✅ Warn if no Indic voice found on this device
+        console.warn(`No TTS voice found for ${language}. Using browser default. User may need to install ${language} TTS in device settings.`);
+      }
+      // Always set the requested language — browser will use it even without a named voice
+      utterance.lang = language;
+
       try {
         synth.speak(utterance);
       } catch (error) {
         console.warn("Speech synthesis speak() failed", error);
         resolve();
       }
-    }, 0);
+    })();
   });
 };
 
@@ -319,36 +438,37 @@ export const startSpeechRecognition = (
 
     try {
       const recognition = getSpeechRecognition();
-      console.log("[Speech Recognition] Setting language to:", language);
-      recognition.language = language;
-      console.log("[Speech Recognition] Language set to:", recognition.language);
+      activeRecognition = recognition;
+      recognition.lang = language;
+      recognition.continuous = false;
       recognition.interimResults = true;
-      recognition.maxAlternatives = 1;
-      
-      // Increase timeout for continuous speech and non-English languages
-      recognition.maxSpeechTimeout = 30000; // 30 seconds
-      recognition.maxAbsoluteSilenceTimeout = 15000; // 15 seconds silence before stopping
-      
+      recognition.maxAlternatives = 3;
+
       let finalTranscript = "";
 
       recognition.onstart = () => {
-        console.log("[Speech Recognition] Started with language:", recognition.language);
-        console.log("[Speech Recognition] Listening... speak now (up to 30 seconds)");
+        // no-op; kept for lifecycle consistency
       };
 
       recognition.onresult = (event: any) => {
         let interimTranscript = "";
 
         for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript;
-          const confidence = event.results[i][0].confidence;
+          // Pick the highest confidence alternative, or the first one if all have 0 confidence
+          let bestTranscript = event.results[i][0]?.transcript ?? "";
+          let bestConfidence = event.results[i][0]?.confidence ?? 0;
+
+          for (let j = 1; j < event.results[i].length; j++) {
+            if (event.results[i][j].confidence > bestConfidence) {
+              bestConfidence = event.results[i][j].confidence;
+              bestTranscript = event.results[i][j].transcript;
+            }
+          }
 
           if (event.results[i].isFinal) {
-            finalTranscript += transcript + " ";
-            console.log("[Speech Recognition] Final result:", transcript, "Confidence:", confidence);
+            finalTranscript += bestTranscript + " ";
           } else {
-            interimTranscript += transcript;
-            console.log("[Speech Recognition] Interim result:", transcript);
+            interimTranscript += bestTranscript;
           }
         }
 
@@ -361,31 +481,22 @@ export const startSpeechRecognition = (
       };
 
       recognition.onerror = (event: any) => {
-        console.error("Speech recognition error:", event.error);
         const errorMessage = mapSpeechErrorToMessage(event.error);
         if (errorMessage) {
           onError?.(errorMessage);
           reject(new Error(errorMessage));
         } else {
-          reject(new Error(event.error));
+          onEnd?.();
+          resolve(finalTranscript.trim());
         }
       };
 
       recognition.onend = () => {
-        console.log("[Speech Recognition] Ended. Final transcript:", finalTranscript);
+        activeRecognition = null;
         onEnd?.();
         resolve(finalTranscript);
       };
 
-      recognition.onaudiostart = () => {
-        console.log("[Speech Recognition] Audio input started");
-      };
-
-      recognition.onaudioend = () => {
-        console.log("[Speech Recognition] Audio input ended");
-      };
-
-      console.log("[Speech Recognition] Starting recognition with language:", language);
       recognition.start();
     } catch (error) {
       reject(error);
@@ -398,8 +509,10 @@ export const startSpeechRecognition = (
  */
 export const stopSpeechRecognition = (): void => {
   try {
-    const recognition = getSpeechRecognition();
-    recognition.stop();
+    if (activeRecognition) {
+      activeRecognition.stop();
+      activeRecognition = null;
+    }
   } catch (error) {
     console.error("Error stopping speech recognition:", error);
   }
@@ -410,7 +523,7 @@ export const stopSpeechRecognition = (): void => {
  */
 const mapSpeechErrorToMessage = (error: string): string | null => {
   const errorMap: Record<string, string | null> = {
-    "no-speech": "No speech detected. Please try again.",
+    "no-speech": null,
     "audio-capture": "No microphone found. Please check your device.",
     "network": "Network error. Please try again.",
     "not-allowed": null,

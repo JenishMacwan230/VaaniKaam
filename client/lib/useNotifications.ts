@@ -31,7 +31,7 @@ export function useNotifications() {
 
   const getAuthToken = useCallback(() => {
     if (globalThis.window === undefined) return null;
-    return localStorage.getItem("firebaseToken") || localStorage.getItem("token");
+    return localStorage.getItem("token");
   }, []);
 
   const buildRequestHeaders = useCallback(() => {
@@ -48,14 +48,38 @@ export function useNotifications() {
     return headers;
   }, [getAuthToken]);
 
+  const requestWithAuthFallback = useCallback(
+    async (url: string, init: RequestInit = {}) => {
+      const headers = buildRequestHeaders();
+      const hadAuthorizationHeader = Boolean(headers.Authorization);
+
+      const response = await fetch(url, {
+        ...init,
+        headers,
+        credentials: "include",
+      });
+
+      if (response.status === 401 && hadAuthorizationHeader) {
+        return fetch(url, {
+          ...init,
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+        });
+      }
+
+      return response;
+    },
+    [buildRequestHeaders]
+  );
+
   const fetchNotifications = useCallback(async () => {
     try {
       if (!API_BASE_URL) return;
 
-      const response = await fetch(`${API_BASE_URL}/api/notifications`, {
+      const response = await requestWithAuthFallback(`${API_BASE_URL}/api/notifications`, {
         method: "GET",
-        headers: buildRequestHeaders(),
-        credentials: "include",
       });
 
       if (!response.ok) {
@@ -96,10 +120,8 @@ export function useNotifications() {
     try {
       if (!API_BASE_URL) return;
 
-      const response = await fetch(`${API_BASE_URL}/api/notifications/unread-count`, {
+      const response = await requestWithAuthFallback(`${API_BASE_URL}/api/notifications/unread-count`, {
         method: "GET",
-        headers: buildRequestHeaders(),
-        credentials: "include",
       });
 
       if (!response.ok) {
@@ -121,10 +143,8 @@ export function useNotifications() {
       try {
         if (!API_BASE_URL) return;
 
-        const response = await fetch(`${API_BASE_URL}/api/notifications/${notificationId}/read`, {
+        const response = await requestWithAuthFallback(`${API_BASE_URL}/api/notifications/${notificationId}/read`, {
           method: "PATCH",
-          headers: buildRequestHeaders(),
-          credentials: "include",
         });
 
         if (response.ok) {
@@ -138,17 +158,15 @@ export function useNotifications() {
         console.error("Error marking notification as read:", err);
       }
     },
-    [buildRequestHeaders]
+    [requestWithAuthFallback]
   );
 
   const markAllAsRead = useCallback(async () => {
     try {
       if (!API_BASE_URL) return;
 
-      const response = await fetch(`${API_BASE_URL}/api/notifications/read/all`, {
+      const response = await requestWithAuthFallback(`${API_BASE_URL}/api/notifications/read/all`, {
         method: "PATCH",
-        headers: buildRequestHeaders(),
-        credentials: "include",
       });
 
       if (response.ok) {
@@ -159,17 +177,15 @@ export function useNotifications() {
     } catch (err) {
       console.error("Error marking all notifications as read:", err);
     }
-  }, [buildRequestHeaders]);
+  }, [requestWithAuthFallback]);
 
   const deleteNotification = useCallback(
     async (notificationId: string) => {
       try {
         if (!API_BASE_URL) return;
 
-        const response = await fetch(`${API_BASE_URL}/api/notifications/${notificationId}`, {
+        const response = await requestWithAuthFallback(`${API_BASE_URL}/api/notifications/${notificationId}`, {
           method: "DELETE",
-          headers: buildRequestHeaders(),
-          credentials: "include",
         });
 
         if (response.ok) {
@@ -181,7 +197,7 @@ export function useNotifications() {
         console.error("Error deleting notification:", err);
       }
     },
-    [buildRequestHeaders, fetchUnreadCount]
+    [fetchUnreadCount, requestWithAuthFallback]
   );
 
   // Initial fetch + polling

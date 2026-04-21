@@ -56,21 +56,18 @@ export default function VoiceTextInput({
 
   const handleMicClick = async () => {
     if (isListening) {
-      console.log("[VoiceTextInput] Stopping listening");
       stopListening();
     } else {
       try {
-        console.log("[VoiceTextInput] Starting listening in text mode");
         clearError();
         await startListening();
       } catch {
-        console.error("[VoiceTextInput] Error starting listening");
+        // Ignore and keep UI responsive
       }
     }
   };
 
   const handleSpeakClick = async () => {
-    console.log("[VoiceTextInput] Speak button clicked, speaking:", hint || `Please enter ${label.toLowerCase()}`);
     await speak(hint || `Please enter ${label.toLowerCase()}`);
   };
 

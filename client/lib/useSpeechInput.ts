@@ -50,22 +50,27 @@ export const useSpeechInput = (
   const [transcribedText, setTranscribedText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSupported, setIsSupported] = useState(false);
-  const recognitionRef = useRef<any>(null);
   const mountedRef = useRef(true);
+  const finalProcessedRef = useRef(false);
+  const greetingSpokenRef = useRef(false);
+  const speakRef = useRef<(text: string) => Promise<void>>(async () => {});
 
   const languageCode = getLanguageCode(language);
-  console.log("[useSpeechInput] Language received:", language, "→ Language code:", languageCode);
+
+  const successMessages: Record<string, string> = {
+    "en-US": "Phone number recorded successfully",
+    "hi-IN": "मोबाइल नंबर सफलतापूर्वक दर्ज किया गया",
+    "gu-IN": "મોબાઈલ નંબર સફળતાપૂર્વક દાખલ થયો",
+  };
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       mountedRef.current = false;
-      if (recognitionRef.current) {
-        try {
-          stopSpeechRecognition();
-        } catch {
-          // Silently ignore cleanup errors
-        }
+      try {
+        stopSpeechRecognition();
+      } catch {
+        // Silently ignore cleanup errors
       }
     };
   }, []);
@@ -75,13 +80,6 @@ export const useSpeechInput = (
     const apiAvailability = isSpeechAPIAvailable();
     setIsSupported(apiAvailability.speechRecognition && apiAvailability.speechSynthesis);
   }, []);
-
-  // Auto-speak greeting on mount
-  useEffect(() => {
-    if (autoSpeakOnMount && isSupported && mountedRef.current) {
-      speak(initialGreeting);
-    }
-  }, [autoSpeakOnMount, isSupported, initialGreeting]);
 
   const speak = useCallback(
     async (text: string) => {
@@ -95,9 +93,16 @@ export const useSpeechInput = (
         setIsSpeaking(true);
         setError(null);
 
+        // Language-specific rate optimization
+        const rateMap: Record<string, number> = {
+          "en-US": 0.9,
+          "hi-IN": 0.82,
+          "gu-IN": 0.78, // Gujarati voices tend to be faster by default
+        };
+
         await speakText(text, {
           language: languageCode,
-          rate: 0.9,
+          rate: rateMap[languageCode] ?? 0.85,
           pitch: 1,
           volume: 1,
         });
@@ -115,6 +120,45 @@ export const useSpeechInput = (
     [isSupported, languageCode]
   );
 
+  // Keep speak ref in sync
+  useEffect(() => {
+    speakRef.current = speak;
+  }, [speak]);
+
+  // Auto-speak greeting on mount (only once)
+  useEffect(() => {
+    if (autoSpeakOnMount && isSupported && mountedRef.current && !greetingSpokenRef.current) {
+      greetingSpokenRef.current = true;
+      speak(initialGreeting);
+    }
+  }, [autoSpeakOnMount, isSupported, initialGreeting, speak]);
+
+  const processFinalResult = useCallback(
+    (text: string) => {
+      if (!mountedRef.current) return;
+
+      if (mode === "phone") {
+        const digits = extractDigitsFromSpeech(text);
+        console.log(`[useSpeechInput] processFinalResult called with text: "${text}" → digits: "${digits}"`);
+        
+        if (validatePhoneNumber(digits)) {
+          console.log(`[useSpeechInput] Valid phone number: "${digits}", calling onPhoneNumberChange`);
+          onPhoneNumberChange?.(digits);
+          speakRef.current(successMessages[languageCode] ?? successMessages["en-US"]);
+        } else if (digits.length > 0) {
+          console.log(`[useSpeechInput] Invalid phone (only ${digits.length} digits), still updating: "${digits}"`);
+          onPhoneNumberChange?.(digits);
+        } else {
+          console.log(`[useSpeechInput] No digits extracted from: "${text}"`);
+        }
+        return;
+      }
+
+      onPhoneNumberChange?.(text.trim());
+    },
+    [mode, onPhoneNumberChange, languageCode]
+  );
+
   const startListening = useCallback(async () => {
     if (!isSupported) {
       setError("Speech recognition not supported in this browser");
@@ -126,69 +170,57 @@ export const useSpeechInput = (
       setIsListening(true);
       setError(null);
       setTranscribedText("");
+      finalProcessedRef.current = false;
+      console.log(`[useSpeechInput] Starting speech recognition for language: ${languageCode}`);
 
       const result = await startSpeechRecognition({
         language: languageCode,
         onResult: (text, isFinal) => {
-          if (mountedRef.current) {
-            setTranscribedText(text);
-
-            // Handle based on mode
-            if (isFinal) {
-              if (mode === "phone") {
-                // Phone mode: extract digits and validate
-                const digits = extractDigitsFromSpeech(text);
-                if (validatePhoneNumber(digits)) {
-                  if (mountedRef.current) {
-                    onPhoneNumberChange?.(digits);
-                    // Speak confirmation
-                    speak("Phone number recorded successfully");
-                  }
-                }
-              } else if (mountedRef.current) {
-                // Text mode: pass raw transcription
-                onPhoneNumberChange?.(text.trim());
-              }
-            }
+          if (!mountedRef.current) return;
+          console.log(`[useSpeechInput] onResult: text="${text}", isFinal=${isFinal}`);
+          setTranscribedText(text);
+          if (!isFinal) return;
+          if (!finalProcessedRef.current) {
+            finalProcessedRef.current = true;
+            console.log(`[useSpeechInput] Processing final result: "${text}"`);
+            processFinalResult(text);
           }
         },
         onError: (errorMsg) => {
           if (mountedRef.current) {
+            console.error(`[useSpeechInput] Speech error: ${errorMsg}`);
             setError(errorMsg);
           }
         },
         onEnd: () => {
           if (mountedRef.current) {
+            console.log(`[useSpeechInput] Speech recognition ended`);
             setIsListening(false);
           }
         },
       });
 
       // If no final result was obtained, try to extract from what we have
-      if (result && mountedRef.current) {
-        if (mode === "phone") {
-          const digits = extractDigitsFromSpeech(result);
-          if (digits.length > 0) {
-            onPhoneNumberChange?.(digits);
-          }
-        } else {
-          // Text mode: pass raw result
-          onPhoneNumberChange?.(result.trim());
-        }
+      if (result && mountedRef.current && !finalProcessedRef.current) {
+        finalProcessedRef.current = true;
+        console.log(`[useSpeechInput] Using fallback result: "${result}"`);
+        processFinalResult(result);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to start listening";
+      console.error(`[useSpeechInput] startListening error: ${errorMessage}`);
       if (mountedRef.current) {
         setError(errorMessage);
         setIsListening(false);
       }
     }
-  }, [isSupported, languageCode, onPhoneNumberChange, speak, mode]);
+  }, [isSupported, languageCode, processFinalResult]);
 
   const stopListening = useCallback(() => {
     try {
       stopSpeechRecognition();
       setIsListening(false);
+      setTranscribedText(""); // clear stale transcript
     } catch (err) {
       console.error("Error stopping listening:", err);
     }
