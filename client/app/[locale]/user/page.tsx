@@ -141,16 +141,6 @@ export default function UserHubPage() {
         <div className="pointer-events-none absolute bottom-0 -left-8 h-36 w-36 rounded-full bg-teal-400/20 blur-2xl" />
 
         <div className="relative mx-auto max-w-lg">
-          {/* Back */}
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="mb-5 flex items-center gap-1.5 text-sm text-white/80 hover:text-white transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </button>
-
           {/* ── Side-by-side layout: avatar left, info right ── */}
           <div className="flex items-center gap-4 sm:gap-5">
             <div className="relative shrink-0 ml-7">

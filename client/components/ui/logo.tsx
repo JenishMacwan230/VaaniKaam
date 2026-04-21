@@ -12,7 +12,7 @@ export default function Logo({ size = 40, showText = true }: LogoProps) {
       <div className="flex items-center justify-center rounded-xl bg-[var(--brand-gradient)] p-1">
         <div className="bg-background rounded-lg p-1">
           <Image
-            src="/logo.png"
+            src="/logo1.png"
             alt="Logo"
             width={size}
             height={size}
