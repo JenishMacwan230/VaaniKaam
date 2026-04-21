@@ -212,7 +212,7 @@ export default function WorkersPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* ── Gradient Hero Header ── */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-cyan-600 to-teal-600 dark:from-blue-700 dark:via-cyan-700 dark:to-teal-700 px-4 pt-10 pb-20 sm:pt-14 sm:pb-24">
+      <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-cyan-600 to-teal-600 dark:from-blue-700 dark:via-cyan-700 dark:to-teal-700 px-4 pt-10 pb-16 sm:pt-14 sm:pb-20">
         {/* Decorative blobs */}
         <div className="pointer-events-none absolute -top-10 -right-10 h-52 w-52 rounded-full bg-white/10 blur-3xl" />
         <div className="pointer-events-none absolute bottom-0 -left-8 h-40 w-40 rounded-full bg-cyan-400/20 blur-2xl" />
@@ -252,7 +252,7 @@ export default function WorkersPage() {
       </div>
 
       {/* ── Main Content — overlaps header ── */}
-      <div className="relative z-10 mx-auto -mt-10 max-w-2xl px-4 pb-16 sm:px-6">
+      <div className="relative z-10 mx-auto -mt-14 max-w-2xl px-4 pb-16 sm:-mt-16 sm:px-6">
         <Card className="border-0 shadow-2xl shadow-black/10 dark:shadow-black/30 rounded-2xl overflow-hidden">
           <CardContent className="p-5 sm:p-8 space-y-6">
 
@@ -312,86 +312,72 @@ export default function WorkersPage() {
                     </Button>
                   </SheetTrigger>
 
-                  <SheetContent
-                    side="bottom"
-                    className="rounded-t-2xl border-0 bg-background shadow-2xl max-h-[85vh] overflow-y-auto px-0"
-                  >
-                    <SheetHeader className="px-5 pb-2 pt-4">
-                      <div className="flex items-center justify-between">
+                  <SheetContent side="bottom" className="border-0 bg-transparent shadow-none px-3 pb-4">
+                    <div className="mx-auto w-full max-w-2xl rounded-2xl border border-white/20 bg-white/85 dark:bg-slate-900/75 backdrop-blur-xl shadow-2xl">
+                      <SheetHeader className="px-4 pb-2 pt-4">
                         <SheetTitle className="text-lg font-bold">Filter Workers</SheetTitle>
-                        <button
-                          onClick={() => setSheetOpen(false)}
-                          className="rounded-lg p-1.5 hover:bg-muted transition-colors"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </SheetHeader>
+                      </SheetHeader>
 
-                    <div className="space-y-4 px-5 pb-6">
-                      {/* Distance */}
-                      <FilterBlock
-                        label="Distance"
-                        emoji="📍"
-                        color="blue"
-                      >
-                        <Select value={tempDistance} onValueChange={setTempDistance}>
-                          <SelectTrigger className="h-11 rounded-xl border-border/60 bg-muted/40">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="rounded-xl">
-                            <SelectItem value="3">Within 3 km</SelectItem>
-                            <SelectItem value="5">Within 5 km</SelectItem>
-                            <SelectItem value="10">Within 10 km</SelectItem>
-                            <SelectItem value="20">Within 20 km</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </FilterBlock>
+                      <div className="grid grid-cols-1 gap-2 px-4 pb-4 sm:grid-cols-2">
+                        <div className="rounded-xl border border-border/40 bg-white/70 dark:bg-slate-900/40 p-2">
+                          <p className="text-[11px] font-semibold text-foreground mb-1.5">📍 Distance</p>
+                          <Select value={tempDistance} onValueChange={setTempDistance}>
+                            <SelectTrigger className="h-9 rounded-lg border-border/60 bg-background/70">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-xl">
+                              <SelectItem value="3">Within 3 km</SelectItem>
+                              <SelectItem value="5">Within 5 km</SelectItem>
+                              <SelectItem value="10">Within 10 km</SelectItem>
+                              <SelectItem value="20">Within 20 km</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
 
-                      {/* Rating */}
-                      <FilterBlock label="Minimum Rating" emoji="⭐" color="amber">
-                        <Select value={tempRating} onValueChange={setTempRating}>
-                          <SelectTrigger className="h-11 rounded-xl border-border/60 bg-muted/40">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="rounded-xl">
-                            <SelectItem value="0">Any rating</SelectItem>
-                            <SelectItem value="4">4.0 and above</SelectItem>
-                            <SelectItem value="4.5">4.5 and above</SelectItem>
-                            <SelectItem value="4.8">4.8 and above</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </FilterBlock>
+                        <div className="rounded-xl border border-border/40 bg-white/70 dark:bg-slate-900/40 p-2">
+                          <p className="text-[11px] font-semibold text-foreground mb-1.5">⭐ Minimum Rating</p>
+                          <Select value={tempRating} onValueChange={setTempRating}>
+                            <SelectTrigger className="h-9 rounded-lg border-border/60 bg-background/70">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-xl">
+                              <SelectItem value="0">Any rating</SelectItem>
+                              <SelectItem value="4">4.0 and above</SelectItem>
+                              <SelectItem value="4.5">4.5 and above</SelectItem>
+                              <SelectItem value="4.8">4.8 and above</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
 
-                      {/* Availability */}
-                      <FilterBlock label="Availability" emoji="🟢" color="emerald">
-                        <Select value={tempAvailability} onValueChange={setTempAvailability}>
-                          <SelectTrigger className="h-11 rounded-xl border-border/60 bg-muted/40">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="rounded-xl">
-                            <SelectItem value="all">All workers</SelectItem>
-                            <SelectItem value="available">Available now</SelectItem>
-                            <SelectItem value="unavailable">Unavailable</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </FilterBlock>
+                        <div className="rounded-xl border border-border/40 bg-white/70 dark:bg-slate-900/40 p-2">
+                          <p className="text-[11px] font-semibold text-foreground mb-1.5">🟢 Availability</p>
+                          <Select value={tempAvailability} onValueChange={setTempAvailability}>
+                            <SelectTrigger className="h-9 rounded-lg border-border/60 bg-background/70">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-xl">
+                              <SelectItem value="all">All workers</SelectItem>
+                              <SelectItem value="available">Available now</SelectItem>
+                              <SelectItem value="unavailable">Unavailable</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
 
-                      {/* Buttons */}
-                      <div className="flex gap-3 pt-2">
-                        <Button
-                          onClick={applyFilters}
-                          className="flex-1 h-12 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white font-semibold shadow-lg shadow-blue-500/30"
-                        >
-                          Apply Filters
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={resetFilters}
-                          className="flex-1 h-12 rounded-xl border-border/60 font-medium"
-                        >
-                          Reset
-                        </Button>
+                        <div className="flex gap-2 sm:col-span-2">
+                          <Button
+                            onClick={applyFilters}
+                            className="flex-1 h-11 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white font-semibold shadow-lg shadow-blue-500/30"
+                          >
+                            Apply Filters
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={resetFilters}
+                            className="flex-1 h-11 rounded-xl border-border/60 font-medium"
+                          >
+                            Reset
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </SheetContent>
@@ -534,34 +520,6 @@ function WorkerCard({ worker }: { worker: Worker }) {
           </Button>
         </div>
       </div>
-    </div>
-  );
-}
-
-/* ── Helpers ── */
-function FilterBlock({
-  label,
-  emoji,
-  color,
-  children,
-}: {
-  label: string;
-  emoji: string;
-  color: "blue" | "amber" | "emerald";
-  children: React.ReactNode;
-}) {
-  const colorMap = {
-    blue: "from-blue-500/20 to-cyan-500/20 border-blue-200 dark:border-blue-800",
-    amber: "from-amber-500/20 to-orange-500/20 border-amber-200 dark:border-amber-800",
-    emerald: "from-emerald-500/20 to-teal-500/20 border-emerald-200 dark:border-emerald-800",
-  };
-  return (
-    <div className={`rounded-xl border bg-gradient-to-r p-3 ${colorMap[color]}`}>
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-base">{emoji}</span>
-        <p className="text-sm font-semibold text-foreground">{label}</p>
-      </div>
-      {children}
     </div>
   );
 }

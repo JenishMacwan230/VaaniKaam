@@ -6,9 +6,9 @@ import { fetchSessionUser, getCurrentLocale, resolveAccountType } from "@/lib/au
 import {
   Bell, TrendingUp, Briefcase, CheckCircle, AlertCircle,
   MessageSquare, ArrowLeft, Plus, ChevronRight, Activity,
-  Users, Clock, BarChart3,
+  Users, Clock, BarChart3, Sparkles, LayoutDashboard,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -78,7 +78,7 @@ export default function ContractorDashboard() {
   if (isLoading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center flex-col gap-3">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-emerald-600" />
+        <div className="h-10 w-10 rounded-full border-4 border-blue-500/20 border-t-blue-500 animate-spin" />
         <p className="text-sm text-muted-foreground">Loading your dashboard…</p>
       </div>
     );
@@ -91,32 +91,48 @@ export default function ContractorDashboard() {
   const fillRate = jobs.length > 0 ? Math.round(((jobs.length - openJobs.length) / jobs.length) * 100) : 0;
 
   return (
-    <div className="min-h-screen bg-muted/30">
-      <div className="mx-auto max-w-2xl px-4 py-6 pb-24 md:pb-8">
+    <div className="min-h-screen bg-background">
+      {/* ── Gradient Hero Header ── */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-cyan-600 to-teal-600 px-4 pt-10 pb-8 sm:pt-14 sm:pb-12">
+        <div className="pointer-events-none absolute -top-10 -right-10 h-52 w-52 rounded-full bg-white/10 blur-3xl" />
+        <div className="pointer-events-none absolute bottom-0 -left-8 h-40 w-40 rounded-full bg-cyan-400/20 blur-2xl" />
 
-        {/* Back */}
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="mb-4 inline-flex items-center gap-1.5 rounded-full border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent/50 transition-colors"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" /> Back
-        </button>
-
-        {/* Header */}
-        <div className="mb-6 flex items-start justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Overview, analytics & quick actions</p>
+        <div className="relative mx-auto max-w-2xl">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm shadow-lg">
+                <Activity className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold text-white leading-tight">My Dashboard</h1>
+                <p className="mt-1 text-sm sm:text-base text-white/75">Projects, analytics & quick actions</p>
+              </div>
+            </div>
+            <Button
+              onClick={() => router.push(`/${locale}/add-works`)}
+              size="sm"
+              className="gap-1.5 rounded-xl bg-white/20 hover:bg-white/30 text-white shadow-md backdrop-blur-sm shrink-0"
+            >
+              <Plus className="h-3.5 w-3.5" /> Post Job
+            </Button>
           </div>
-          <Button
-            onClick={() => router.push(`/${locale}/add-works`)}
-            size="sm"
-            className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 shrink-0"
-          >
-            <Plus className="h-3.5 w-3.5" /> Post Job
-          </Button>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            {[
+              `${jobs.length} Projects`,
+              `${openJobs.length} Open`,
+              `${inProgressJobs.length} Active`,
+            ].map((tag) => (
+              <span key={tag} className="flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-medium text-white backdrop-blur-sm">
+                <TrendingUp className="h-3 w-3" />{tag}
+              </span>
+            ))}
+          </div>
         </div>
+      </div>
+
+      {/* ── Main content overlapping header ── */}
+      <div className="relative z-10 mx-auto -mt-10 max-w-2xl px-4 pb-16 sm:px-6 space-y-5">
 
         {/* Error */}
         {error && (
@@ -127,27 +143,27 @@ export default function ContractorDashboard() {
 
         {/* ── New Applications Alert ── */}
         {recentApplications.length > 0 && (
-          <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900 p-4">
+          <div className="rounded-2xl border border-blue-200 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-900 p-4 shadow-md">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-white">
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-white">
                   <Bell className="h-3.5 w-3.5" />
                 </div>
-                <p className="text-sm font-bold text-amber-800 dark:text-amber-300">
+                <p className="text-sm font-bold text-blue-800 dark:text-blue-300">
                   {recentApplications.length} New Application{recentApplications.length > 1 ? "s" : ""}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => router.push(`/${locale}/dashboard/contractor/projects`)}
-                className="text-xs font-semibold text-amber-700 dark:text-amber-400 hover:underline"
+                className="text-xs font-semibold text-blue-700 dark:text-blue-400 hover:underline"
               >
                 View all →
               </button>
             </div>
             <div className="space-y-2">
               {recentApplications.map((app) => (
-                <div key={app._id} className="flex items-center justify-between rounded-xl bg-white dark:bg-amber-950/40 border border-amber-100 dark:border-amber-900/50 px-3 py-2.5 gap-3">
+                <div key={app._id} className="flex items-center justify-between rounded-xl bg-white dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/50 px-3 py-2.5 gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold truncate">{app.workerId.name}</p>
                     <p className="text-xs text-muted-foreground truncate">
@@ -166,114 +182,114 @@ export default function ContractorDashboard() {
         )}
 
         {/* ── Analytics ── */}
-        <div className="mb-5">
-          <div className="mb-3 flex items-center gap-2">
-            <Activity className="h-4 w-4 text-emerald-600" />
+        <div className="rounded-2xl border-0 shadow-2xl shadow-black/10 dark:shadow-black/30 bg-white dark:bg-card p-5 sm:p-8 space-y-4">
+          <div className="flex items-center gap-2">
+            <Activity className="h-4 w-4 text-blue-600" />
             <h2 className="text-base font-bold">Analytics</h2>
           </div>
 
           {/* Stats grid */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[
-              { label: "Total", value: jobs.length, Icon: Briefcase, color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-950/40" },
-              { label: "Open", value: openJobs.length, Icon: AlertCircle, color: "text-sky-600", bg: "bg-sky-50 dark:bg-sky-950/40" },
-              { label: "Active", value: inProgressJobs.length, Icon: Clock, color: "text-amber-600", bg: "bg-amber-50 dark:bg-amber-950/40" },
-              { label: "Done", value: completedJobs.length, Icon: CheckCircle, color: "text-emerald-600", bg: "bg-emerald-50 dark:bg-emerald-950/40" },
+              { label: "Total", value: jobs.length, Icon: Briefcase, color: "text-blue-600", bg: "from-blue-500/10 to-cyan-500/10" },
+              { label: "Open", value: openJobs.length, Icon: AlertCircle, color: "text-cyan-600", bg: "from-cyan-500/10 to-teal-500/10" },
+              { label: "Active", value: inProgressJobs.length, Icon: Clock, color: "text-teal-600", bg: "from-teal-500/10 to-cyan-500/10" },
+              { label: "Done", value: completedJobs.length, Icon: CheckCircle, color: "text-blue-600", bg: "from-blue-500/10 to-cyan-500/10" },
             ].map(({ label, value, Icon, color, bg }) => (
-              <Card key={label} className="border shadow-sm">
-                <CardContent className="p-4">
-                  <div className={`mb-2 inline-flex h-8 w-8 items-center justify-center rounded-lg ${bg}`}>
-                    <Icon className={`h-4 w-4 ${color}`} />
-                  </div>
-                  <p className="text-xl font-bold leading-none">{value}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{label}</p>
-                </CardContent>
-              </Card>
+              <div key={label} className="rounded-2xl border border-border/50 bg-card p-4">
+                <div className={`mb-2 inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br ${bg}`}>
+                  <Icon className={`h-4 w-4 ${color}`} />
+                </div>
+                <p className="text-xl font-bold leading-none">{value}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{label}</p>
+              </div>
             ))}
           </div>
 
           {/* Applications + rates row */}
           <div className="grid grid-cols-2 gap-3">
-            <Card className="border shadow-sm">
-              <CardContent className="p-4">
-                <div className="mb-2 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50 dark:bg-purple-950/40">
-                  <MessageSquare className="h-4 w-4 text-purple-600" />
-                </div>
-                <p className="text-xl font-bold leading-none">{stats?.totalApplications ?? 0}</p>
-                <p className="mt-1 text-xs text-muted-foreground">Total Applications</p>
-              </CardContent>
-            </Card>
-            <Card className="border shadow-sm">
-              <CardContent className="p-4">
-                <div className="mb-2 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-teal-50 dark:bg-teal-950/40">
-                  <Users className="h-4 w-4 text-teal-600" />
-                </div>
-                <p className="text-xl font-bold leading-none">{completionRate}%</p>
-                <p className="mt-1 text-xs text-muted-foreground">Completion Rate</p>
-              </CardContent>
-            </Card>
+            <div className="rounded-2xl border border-border/50 bg-card p-4">
+              <div className="mb-2 inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500/10 to-cyan-500/10">
+                <MessageSquare className="h-4 w-4 text-blue-600" />
+              </div>
+              <p className="text-xl font-bold leading-none">{stats?.totalApplications ?? 0}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Applications</p>
+            </div>
+            <div className="rounded-2xl border border-border/50 bg-card p-4">
+              <div className="mb-2 inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500/10 to-teal-500/10">
+                <Users className="h-4 w-4 text-cyan-600" />
+              </div>
+              <p className="text-xl font-bold leading-none">{completionRate}%</p>
+              <p className="mt-1 text-xs text-muted-foreground">Completion</p>
+            </div>
           </div>
 
           {/* Progress bars */}
           {jobs.length > 0 && (
-            <Card className="mt-3 border shadow-sm">
-              <CardContent className="px-4 py-4 space-y-3">
-                <div>
-                  <div className="flex justify-between text-xs mb-1.5">
-                    <span className="text-muted-foreground font-medium flex items-center gap-1">
-                      <CheckCircle className="h-3 w-3" /> Completion Rate
-                    </span>
-                    <span className="font-bold text-emerald-600">{completionRate}%</span>
+            <div className="rounded-2xl border border-border/50 bg-card px-4 py-3 space-y-3">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle className="h-3.5 w-3.5 text-blue-600" />
+                    <span className="text-sm font-semibold">Completion Rate</span>
                   </div>
-                  <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                    <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all" style={{ width: `${completionRate}%` }} />
-                  </div>
+                  <span className="text-sm font-bold text-blue-600 dark:text-cyan-400">{completionRate}%</span>
                 </div>
-                <div>
-                  <div className="flex justify-between text-xs mb-1.5">
-                    <span className="text-muted-foreground font-medium flex items-center gap-1">
-                      <TrendingUp className="h-3 w-3" /> Fill Rate
-                    </span>
-                    <span className="font-bold text-blue-600">{fillRate}%</span>
-                  </div>
-                  <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                    <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-sky-400 transition-all" style={{ width: `${fillRate}%` }} />
-                  </div>
+                <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all"
+                    style={{ width: `${completionRate}%` }}
+                  />
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <TrendingUp className="h-3.5 w-3.5 text-blue-600" />
+                    <span className="text-sm font-semibold">Fill Rate</span>
+                  </div>
+                  <span className="text-sm font-bold text-blue-600 dark:text-cyan-400">{fillRate}%</span>
+                </div>
+                <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all"
+                    style={{ width: `${fillRate}%` }}
+                  />
+                </div>
+              </div>
+            </div>
           )}
         </div>
 
         {/* ── Navigate to Projects ── */}
-        <div className="mb-5">
-          <div className="mb-3 flex items-center gap-2">
-            <Briefcase className="h-4 w-4 text-emerald-600" />
+        <div className="rounded-2xl border-0 shadow-2xl shadow-black/10 dark:shadow-black/30 bg-white dark:bg-card p-5 sm:p-8 space-y-3">
+          <div className="flex items-center gap-2">
+            <Briefcase className="h-4 w-4 text-blue-600" />
             <h2 className="text-base font-bold">My Projects</h2>
           </div>
           <button
             type="button"
             onClick={() => router.push(`/${locale}/dashboard/contractor/projects`)}
-            className="w-full flex items-center justify-between gap-4 rounded-2xl border bg-background p-4 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all group"
+            className="w-full flex items-center justify-between gap-4 rounded-2xl border border-border/50 bg-card p-4 hover:border-blue-300/60 hover:shadow-md hover:shadow-blue-500/10 transition-all group"
           >
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950/40">
-                <Briefcase className="h-5 w-5 text-emerald-600" />
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500/10 to-cyan-500/10 flex-shrink-0">
+                <Briefcase className="h-5 w-5 text-blue-600 dark:text-cyan-400" />
               </div>
               <div className="text-left">
-                <p className="font-semibold text-sm">Manage All Projects</p>
+                <p className="font-semibold text-sm">Jobs & Applications</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {openJobs.length} open · {inProgressJobs.length} active · {completedJobs.length} completed
                 </p>
               </div>
             </div>
-            <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-emerald-600 transition-colors flex-shrink-0" />
+            <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-blue-600 transition-colors flex-shrink-0" />
           </button>
         </div>
 
         {/* ── Quick Actions ── */}
-        <div>
-          <div className="mb-3 flex items-center gap-2">
+        <div className="rounded-2xl border-0 shadow-2xl shadow-black/10 dark:shadow-black/30 bg-white dark:bg-card p-5 sm:p-8 space-y-3">
+          <div className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4 text-muted-foreground" />
             <h2 className="text-base font-bold">Quick Actions</h2>
           </div>
@@ -283,24 +299,24 @@ export default function ContractorDashboard() {
                 icon: Plus,
                 label: "Post New Job",
                 desc: "Create a new project",
-                color: "text-emerald-600",
-                bg: "bg-emerald-50 dark:bg-emerald-950/40",
+                color: "text-blue-600",
+                bg: "from-blue-500/10 to-cyan-500/10",
                 action: () => router.push(`/${locale}/add-works`),
               },
               {
                 icon: Users,
-                label: "Browse Workers",
+                label: "Browse Helpers",
                 desc: "Find skilled labour",
-                color: "text-purple-600",
-                bg: "bg-purple-50 dark:bg-purple-950/40",
-                action: () => router.push(`/${locale}/projects`),
+                color: "text-cyan-600",
+                bg: "from-cyan-500/10 to-teal-500/10",
+                action: () => router.push(`/${locale}/helpers`),
               },
               {
                 icon: CheckCircle,
                 label: "View Profile",
                 desc: "Your public profile",
-                color: "text-blue-600",
-                bg: "bg-blue-50 dark:bg-blue-950/40",
+                color: "text-teal-600",
+                bg: "from-teal-500/10 to-blue-500/10",
                 action: () => router.push(`/${locale}/dashboard?editProfile=1`),
               },
             ].map(({ icon: Icon, label, desc, color, bg, action }) => (
@@ -308,9 +324,9 @@ export default function ContractorDashboard() {
                 key={label}
                 type="button"
                 onClick={action}
-                className="flex flex-col items-start gap-3 rounded-2xl border bg-background p-4 shadow-sm hover:shadow-md hover:border-primary/30 transition-all text-left"
+                className="flex flex-col items-start gap-3 rounded-2xl border border-border/50 bg-card p-4 hover:border-blue-300/60 hover:shadow-md hover:shadow-blue-500/10 transition-all text-left group"
               >
-                <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${bg}`}>
+                <div className={`flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br ${bg}`}>
                   <Icon className={`h-4.5 w-4.5 ${color}`} />
                 </div>
                 <div>

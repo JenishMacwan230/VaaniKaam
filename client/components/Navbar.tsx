@@ -76,12 +76,12 @@ const BlogHeader = () => {
   const getNavLinks = () => {
     const baseLinks = [
       { href: "/", text: t("home"), icon: Home },
-      { href: "/workers", text: t("workers"), icon: Users },
+      { href: "/helpers", text: t("workers"), icon: Users },
     ];
 
     // Add projects or add-works based on account type
     baseLinks.push({
-      href: isContractor ? "/add-works" : "/projects",
+      href: isContractor ? "/add-works" : "/find-work",
       text: isContractor ? t("add-works") : t("projects"),
       icon: FolderKanban,
     });

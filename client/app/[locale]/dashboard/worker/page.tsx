@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Briefcase, CheckCircle, Clock, AlertCircle,
   MapPin, IndianRupee, ArrowRight, ArrowLeft,
-  ChevronRight, Search,
+  ChevronRight, Search, TrendingUp, Sparkles, LayoutDashboard,
 } from "lucide-react";
 
 interface Job {
@@ -131,7 +131,7 @@ export default function WorkerDashboardPage() {
 
   if (loading) return (
     <div className="flex min-h-[60vh] items-center justify-center flex-col gap-3">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-emerald-600" />
+      <div className="h-10 w-10 rounded-full border-4 border-blue-500/20 border-t-blue-500 animate-spin" />
       <p className="text-sm text-muted-foreground">Loading your jobs…</p>
     </div>
   );
@@ -154,9 +154,9 @@ export default function WorkerDashboardPage() {
 
   const statusColors: Record<string, string> = {
     applied: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400",
-    accepted: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400",
+    accepted: "bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950/40 dark:text-cyan-400",
     completion_pending: "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-400",
-    completed: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400",
+    completed: "bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/40 dark:text-teal-400",
   };
   const statusLabels: Record<string, string> = {
     applied: "Applied",
@@ -166,56 +166,76 @@ export default function WorkerDashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-muted/30">
-      <div className="mx-auto max-w-2xl px-4 py-6 pb-24 md:pb-8">
+    <div className="min-h-screen bg-background">
+      {/* ── Gradient Hero Header ── */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-cyan-600 to-teal-600 px-4 pt-10 pb-28 sm:pt-14 sm:pb-32">
+        <div className="pointer-events-none absolute -top-10 -right-10 h-52 w-52 rounded-full bg-white/10 blur-3xl" />
+        <div className="pointer-events-none absolute bottom-0 -left-8 h-40 w-40 rounded-full bg-cyan-400/20 blur-2xl" />
 
-        {/* Back */}
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="mb-4 inline-flex items-center gap-1.5 rounded-full border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent/50 transition-colors"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" /> Dashboard
-        </button>
-
-        {/* Header */}
-        <div className="mb-5 flex items-start justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">My Work</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Jobs, applications & earnings</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => router.push(`/${locale}/projects`)}
-            className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors shrink-0"
-          >
-            <Search className="h-3.5 w-3.5" /> Find Jobs
-          </button>
-        </div>
-
-        {/* Summary row */}
-        <div className="mb-5 grid grid-cols-4 gap-2">
-          {[
-            { label: "Applied",  value: appliedJobs.length,   color: "text-blue-600" },
-            { label: "Active",   value: activeJobs.length + pendingJobs.length, color: "text-amber-600" },
-            { label: "Done",     value: completedJobs.length, color: "text-emerald-600" },
-            {
-              label: "Earned",
-              value: totalEarned > 0
-                ? totalEarned >= 1000 ? `₹${(totalEarned / 1000).toFixed(1)}K` : `₹${totalEarned}`
-                : "₹0",
-              color: "text-emerald-600",
-            },
-          ].map(({ label, value, color }) => (
-            <div key={label} className="rounded-xl border bg-background p-3 text-center shadow-sm">
-              <p className={`text-lg font-bold leading-none ${color}`}>{value}</p>
-              <p className="mt-1 text-[10px] text-muted-foreground">{label}</p>
+        <div className="relative mx-auto max-w-2xl">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm shadow-lg">
+                <Briefcase className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold text-white leading-tight">My Work</h1>
+                <p className="mt-1 text-sm sm:text-base text-white/75">Jobs, applications & earnings</p>
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={() => router.push(`/${locale}/find-work`)}
+              className="flex items-center gap-1.5 rounded-xl bg-white/20 hover:bg-white/30 px-3 py-2 text-xs font-semibold text-white transition-all backdrop-blur-sm shrink-0"
+            >
+              <Search className="h-3.5 w-3.5" /> Find Jobs
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Main content overlapping header ── */}
+      <div className="relative z-10 mx-auto -mt-20 max-w-2xl px-4 pb-16 sm:-mt-24 sm:px-6 space-y-5">
+
+        {/* Badges */}
+        <div className="flex flex-wrap gap-2 px-1">
+          {[
+            `${appliedJobs.length} Applied`,
+            `${activeJobs.length + pendingJobs.length} Active`,
+            `${completedJobs.length} Done`,
+          ].map((tag) => (
+            <span key={tag} className="flex items-center gap-1.5 rounded-full bg-blue-100 dark:bg-blue-900/30 px-3 py-1.5 text-xs font-medium text-blue-700 dark:text-blue-300">
+              <Sparkles className="h-3 w-3" />{tag}
+            </span>
           ))}
         </div>
 
-        {/* ── Tabs ── */}
-        <div className="mb-4 flex gap-1 rounded-xl border bg-muted/60 p-1">
+        {/* Summary Card */}
+        <div className="rounded-2xl border-0 shadow-2xl shadow-black/10 dark:shadow-black/30 bg-white dark:bg-card p-5 sm:p-8">
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              { label: "Applied",  value: appliedJobs.length,   color: "text-blue-600" },
+              { label: "Active",   value: activeJobs.length + pendingJobs.length, color: "text-cyan-600" },
+              { label: "Done",     value: completedJobs.length, color: "text-teal-600" },
+              {
+                label: "Earned",
+                value: totalEarned > 0
+                  ? totalEarned >= 1000 ? `₹${(totalEarned / 1000).toFixed(1)}K` : `₹${totalEarned}`
+                  : "₹0",
+                color: "text-blue-600",
+              },
+            ].map(({ label, value, color }) => (
+              <div key={label} className="rounded-2xl border border-border/50 bg-card p-3 text-center shadow-sm">
+                <p className={`text-lg font-bold leading-none ${color}`}>{value}</p>
+                <p className="mt-1 text-[10px] text-muted-foreground">{label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Tabs & Jobs ── */}
+        <div className="rounded-2xl border-0 shadow-2xl shadow-black/10 dark:shadow-black/30 bg-white dark:bg-card p-5 sm:p-8 space-y-3">
+          <div className="flex gap-1 rounded-xl border border-border/50 bg-muted/60 p-1">
           {TABS.map(({ id, label, icon: Icon }) => {
             const count = tabData[id].length;
             return (
@@ -233,7 +253,7 @@ export default function WorkerDashboardPage() {
                 <span className="hidden sm:inline">{label}</span>
                 {count > 0 && (
                   <span className={`absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-white ${
-                    id === "pending" ? "bg-orange-500" : "bg-emerald-600"
+                    id === "pending" ? "bg-orange-500" : "bg-blue-600"
                   }`}>
                     {count}
                   </span>
@@ -306,13 +326,13 @@ export default function WorkerDashboardPage() {
                   </div>
 
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-base font-bold text-emerald-600">
+                    <p className="text-base font-bold text-blue-600">
                       {fmt(job.pricingAmount, job.pricingType)}
                     </p>
 
                     {job.status === "completion_pending" ? (
                       <div className="flex gap-2">
-                        <Button size="sm" className="h-8 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-xs" onClick={() => handleConfirm(job)}>
+                        <Button size="sm" className="h-8 gap-1.5 bg-blue-600 hover:bg-blue-700 text-xs" onClick={() => handleConfirm(job)}>
                           <CheckCircle className="h-3.5 w-3.5" /> Confirm
                         </Button>
                         <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => handleReject(job)}>
@@ -330,22 +350,21 @@ export default function WorkerDashboardPage() {
             ))}
           </div>
         )}
+        </div>
 
         {/* Find more jobs CTA (bottom) */}
-        <div className="mt-6 pt-5 border-t">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold">Looking for more work?</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Browse jobs that match your skills</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => router.push(`/${locale}/projects`)}
-              className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors"
-            >
-              Find Jobs <ArrowRight className="h-4 w-4" />
-            </button>
+        <div className="rounded-2xl border-0 shadow-2xl shadow-black/10 dark:shadow-black/30 bg-white dark:bg-card p-5 sm:p-8 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold">Looking for more work?</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Browse jobs that match your skills</p>
           </div>
+          <button
+            type="button"
+            onClick={() => router.push(`/${locale}/find-work`)}
+            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 px-4 py-2.5 text-sm font-semibold text-white hover:from-blue-600 hover:to-cyan-600 transition-all shadow-md shadow-blue-500/25 flex-shrink-0"
+          >
+            Find Jobs <ArrowRight className="h-4 w-4" />
+          </button>
         </div>
       </div>
     </div>

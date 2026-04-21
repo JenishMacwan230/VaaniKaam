@@ -131,7 +131,7 @@ export default function DashboardPage() {
         const accountType = resolveAccountType(userData);
         if (accountType === "contractor") {
           const locale = getCurrentLocale(window.location.pathname);
-          router.push(`/${locale}/dashboard/contractor`);
+          router.replace(`/${locale}/dashboard/contractor`);
           return;
         }
         setUser(userData);
@@ -199,6 +199,13 @@ export default function DashboardPage() {
     } finally { setUploading(false); }
   };
 
+  const handleEditDialogChange = (open: boolean) => {
+    setShowEditDialog(open);
+    if (!open && searchParams.get("editProfile") === "1") {
+      router.back();
+    }
+  };
+
   const handleEditProfile = async () => {
     const parsedAmount: number | "" =
       editFormData.pricingAmount.trim() === "" ? "" : Number(editFormData.pricingAmount);
@@ -214,7 +221,7 @@ export default function DashboardPage() {
       if (!updated) { alert("Failed to update profile"); return; }
       localStorage.setItem("user", JSON.stringify(updated));
       setUser(updated);
-      setShowEditDialog(false);
+      handleEditDialogChange(false);
     } catch { alert("Failed to update profile"); }
   };
 
@@ -257,15 +264,6 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-muted/30">
       <div className="mx-auto max-w-2xl px-4 py-6 pb-24 md:pb-8">
-
-        {/* Back */}
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="mb-4 inline-flex items-center gap-1.5 rounded-full border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent/50 transition-colors"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" /> Back
-        </button>
 
         {/* Page title */}
         <div className="mb-6">
@@ -380,7 +378,7 @@ export default function DashboardPage() {
 
             {/* Actions */}
             <div className="mt-4 flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" onClick={() => setShowEditDialog(true)} className="gap-1.5">
+              <Button size="sm" variant="outline" onClick={() => handleEditDialogChange(true)} className="gap-1.5">
                 <Edit className="h-3.5 w-3.5" /> Edit Profile
               </Button>
               <Button size="sm" variant="ghost" onClick={handleLogout} className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10">
@@ -583,7 +581,7 @@ export default function DashboardPage() {
       </Dialog>
 
       {/* ── Edit Profile Dialog ── */}
-      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+      <Dialog open={showEditDialog} onOpenChange={handleEditDialogChange}>
         <DialogContent className="max-h-[92vh] w-[95vw] max-w-lg overflow-hidden p-0">
           <DialogHeader className="border-b px-5 py-4">
             <DialogTitle>Edit Profile</DialogTitle>
@@ -706,7 +704,7 @@ export default function DashboardPage() {
           </div>
 
           <DialogFooter className="border-t bg-background px-5 py-3 flex-row gap-2">
-            <Button variant="outline" onClick={() => setShowEditDialog(false)} className="flex-1">Cancel</Button>
+            <Button variant="outline" onClick={() => handleEditDialogChange(false)} className="flex-1">Cancel</Button>
             <Button onClick={handleEditProfile} className="flex-1 gap-2 bg-emerald-600 hover:bg-emerald-700">
               <Check className="h-4 w-4" /> Save Changes
             </Button>
