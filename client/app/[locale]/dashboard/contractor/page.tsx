@@ -134,6 +134,18 @@ export default function ContractorDashboard() {
       {/* ── Main content overlapping header ── */}
       <div className="relative z-10 mx-auto -mt-10 max-w-2xl px-4 pb-16 sm:px-6 space-y-5">
 
+        {/* Back button */}
+        <div className="mb-4 flex justify-start pt-2">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent/40"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span>Back</span>
+          </button>
+        </div>
+
         {/* Error */}
         {error && (
           <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900">

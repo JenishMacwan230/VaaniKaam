@@ -76,7 +76,7 @@ export function useNotifications() {
 
   const fetchNotifications = useCallback(async () => {
     try {
-      if (!API_BASE_URL) return;
+      if (!API_BASE_URL || !getAuthToken()) return;
 
       const response = await requestWithAuthFallback(`${API_BASE_URL}/api/notifications`, {
         method: "GET",
@@ -118,7 +118,7 @@ export function useNotifications() {
 
   const fetchUnreadCount = useCallback(async () => {
     try {
-      if (!API_BASE_URL) return;
+      if (!API_BASE_URL || !getAuthToken()) return;
 
       const response = await requestWithAuthFallback(`${API_BASE_URL}/api/notifications/unread-count`, {
         method: "GET",

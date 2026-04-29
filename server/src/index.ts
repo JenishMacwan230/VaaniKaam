@@ -9,6 +9,7 @@ import userRoutes from "./routes/users";
 import jobRoutes from "./routes/jobs";
 import adminRoutes from "./routes/admin";
 import notificationRoutes from "./routes/notifications";
+import contactRoutes from "./routes/contact";
 
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
@@ -27,6 +28,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/jobs", jobRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/contact", contactRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });

@@ -670,7 +670,7 @@ const HomePage: React.FC = () => {
           <Logo size={44} showText />
           <p className="mt-3 text-[13px] text-foreground/45">Empowering workers and businesses across India</p>
           <div className="mt-4 flex justify-center gap-5 text-[13px]">
-            {["About", "Contact", "Terms", "Privacy"].map((l) => (
+            {["About", "Terms", "Privacy"].map((l) => (
               <button key={l} className="text-foreground/45 transition-colors hover:text-foreground">
                 {l}
               </button>

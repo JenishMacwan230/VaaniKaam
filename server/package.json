@@ -18,7 +18,8 @@
     "firebase": "^12.8.0",
     "firebase-admin": "^13.6.0",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.8.4"
+    "mongoose": "^8.8.4",
+    "nodemailer": "^8.0.7"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",

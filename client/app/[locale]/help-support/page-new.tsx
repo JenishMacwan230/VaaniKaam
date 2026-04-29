@@ -23,24 +23,28 @@ const supportOptions = [
     title: "FAQs",
     description: "Quick answers",
     color: "from-blue-500/20 to-cyan-500/20 text-blue-600 dark:text-blue-400",
+    bgColor: "bg-blue-50 dark:bg-blue-950/40",
   },
   {
     icon: Shield,
     title: "Safety",
     description: "Report issues",
     color: "from-red-500/20 to-pink-500/20 text-red-600 dark:text-red-400",
+    bgColor: "bg-red-50 dark:bg-red-950/40",
   },
   {
     icon: MessageCircle,
     title: "Contact Us",
     description: "Send message",
     color: "from-emerald-500/20 to-teal-500/20 text-emerald-600 dark:text-emerald-400",
+    bgColor: "bg-emerald-50 dark:bg-emerald-950/40",
   },
   {
     icon: Clock,
     title: "Response Time",
     description: "1 business day",
     color: "from-amber-500/20 to-orange-500/20 text-amber-600 dark:text-amber-400",
+    bgColor: "bg-amber-50 dark:bg-amber-950/40",
   },
 ];
 

@@ -43,6 +43,7 @@ export function UserMenu({ user }: UserMenuProps) {
             src={user.profilePictureUrl || DEFAULT_PROFILE_PICTURE}
             alt={user.name || "Profile"}
             fill
+            sizes="40px"
             className="rounded-full object-cover"
           />
         </Button>

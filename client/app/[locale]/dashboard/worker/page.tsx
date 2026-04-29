@@ -197,6 +197,18 @@ export default function WorkerDashboardPage() {
       {/* ── Main content overlapping header ── */}
       <div className="relative z-10 mx-auto -mt-20 max-w-2xl px-4 pb-16 sm:-mt-24 sm:px-6 space-y-5">
 
+        {/* Back button */}
+        <div className="mb-2 flex justify-start">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent/40"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span>Back</span>
+          </button>
+        </div>
+
         {/* Badges */}
         <div className="flex flex-wrap gap-2 px-1">
           {[

@@ -95,14 +95,6 @@ export default function UserHubPage() {
       color: "amber",
     },
     {
-      key: "contact",
-      title: "Contact Us",
-      description: "Talk to our team for partnerships, jobs or support.",
-      href: `/${locale}/contact`,
-      icon: Mail,
-      color: "emerald",
-    },
-    {
       key: "about",
       title: "About Us",
       description: "Learn more about the VaaniKaam mission and vision.",
