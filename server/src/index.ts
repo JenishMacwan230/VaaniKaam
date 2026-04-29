@@ -15,10 +15,32 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const app = express();
 
-const allowedOrigins = process.env.CLIENT_URL 
-  ? [process.env.CLIENT_URL] 
-  : ["http://localhost:3000", "http://127.0.0.1:3000"];
-app.use(cors({ origin: allowedOrigins, credentials: true }));
+const allowedOrigins = [
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  "https://vaanikaam.vercel.app",
+  // Support any *.vercel.app preview deployments
+  ...(process.env.CLIENT_URL
+    ? process.env.CLIENT_URL.split(",").map((u) => u.trim())
+    : []),
+];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (e.g. mobile apps, curl, Render health checks)
+      if (!origin) return callback(null, true);
+      if (
+        allowedOrigins.includes(origin) ||
+        /^https:\/\/vaanikaam(-[a-z0-9]+)?\.vercel\.app$/.test(origin)
+      ) {
+        return callback(null, true);
+      }
+      return callback(new Error(`CORS blocked: ${origin}`));
+    },
+    credentials: true,
+  })
+);
 app.use(cookieParser());
 app.use(express.json());
 
