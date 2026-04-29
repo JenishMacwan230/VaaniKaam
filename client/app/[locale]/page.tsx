@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { fetchSessionUser, resolveAccountType, AuthUser } from "@/lib/authClient";
 import Logo from "@/components/ui/logo";
 import { UserMenu } from "@/components/UserMenu";
+import { useTranslations } from "next-intl";
 import { locales } from "@/i18n";
 import {
   Select,
@@ -190,6 +191,7 @@ const CategoryChip: React.FC<{ icon: React.ElementType; label: string }> = ({ ic
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 const HomePage: React.FC = () => {
+  const t = useTranslations("home");
   const router = useRouter();
   const params = useParams();
   const pathname = usePathname();
@@ -223,7 +225,7 @@ const HomePage: React.FC = () => {
     return (
       <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white">
         <Logo size={72} showText />
-        <p className="mt-4 animate-pulse text-sm font-medium" style={{ color: TEAL }}>Loading…</p>
+        <p className="mt-4 animate-pulse text-sm font-medium" style={{ color: TEAL }}>{t("loading")}</p>
       </div>
     );
   }
@@ -361,13 +363,13 @@ const HomePage: React.FC = () => {
           </div>
 
           <h1 className="mb-4 text-3xl font-extrabold leading-tight tracking-tight md:text-5xl">
-            <GradientText>Find Your Perfect</GradientText>
+            <GradientText>{t("heroTitle1")}</GradientText>
             <br />
-            <span className="text-foreground">Opportunity Today</span>
+            <span className="text-foreground">{t("heroTitle2")}</span>
           </h1>
 
           <p className="mx-auto mb-8 max-w-xl text-base text-foreground/55 md:text-lg leading-relaxed">
-            Connect talented workers with amazing opportunities. Build your career with India's most trusted work platform.
+            {t("heroDesc")}
           </p>
 
           <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
@@ -410,9 +412,9 @@ const HomePage: React.FC = () => {
 
           {/* Quick stats */}
           <div className="mt-12 grid grid-cols-3 gap-3">
-            <StatCard value="10K+" label="Active Users" />
-            <StatCard value="5K+" label="Jobs Posted" />
-            <StatCard value="4.8★" label="Avg Rating" />
+            <StatCard value="10K+" label={t("activeUsers")} />
+            <StatCard value="5K+" label={t("jobsPosted")} />
+            <StatCard value="4.8★" label={t("avgRating")} />
           </div>
         </div>
       </section>
@@ -422,12 +424,12 @@ const HomePage: React.FC = () => {
       ══════════════════════════════════════════════════ */}
       <section className="px-4 py-14 md:py-20" style={{ background: "rgba(13,158,110,0.03)" }}>
         <div className="mx-auto max-w-5xl">
-          <SectionHeading title="Why Choose VaaniKaam?" />
+          <SectionHeading title={t("whyChoose")} />
           <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
-            <FeatureCard icon={Zap} title="Quick Apply" desc="Apply in seconds with your verified profile" />
-            <FeatureCard icon={Shield} title="Verified Workers" desc="All workers pass background verification" />
-            <FeatureCard icon={Clock} title="24/7 Support" desc="Round-the-clock support for every query" />
-            <FeatureCard icon={Award} title="Ratings & Reviews" desc="Build reputation with genuine client reviews" />
+            <FeatureCard icon={Zap} title={t("quickApply")} desc={t("quickApplyDesc")} />
+            <FeatureCard icon={Shield} title={t("verifiedWorkers")} desc={t("verifiedWorkersDesc")} />
+            <FeatureCard icon={Clock} title={t("support")} desc={t("supportDesc")} />
+            <FeatureCard icon={Award} title={t("ratingsReviews")} desc={t("ratingsReviewsDesc")} />
           </div>
         </div>
       </section>
@@ -438,7 +440,7 @@ const HomePage: React.FC = () => {
       {user && (
         <section className="px-4 py-14 md:py-20 bg-white">
           <div className="mx-auto max-w-5xl">
-            <SectionHeading title="Popular Jobs Near You" subtitle="Opportunities matched to your location" />
+            <SectionHeading title={t("popularJobs")} subtitle={t("popularJobsDesc")} />
             <div className="grid gap-4 md:grid-cols-3">
               {[
                 { title: "Plumber Needed", location: "Bilimora", pay: "₹1,200/day", dist: "1.2 km", badge: "Urgent", badgeColor: "#dc2626" },
@@ -497,13 +499,13 @@ const HomePage: React.FC = () => {
       ══════════════════════════════════════════════════ */}
       <section className="px-4 py-14 md:py-20" style={{ background: "rgba(13,158,110,0.03)" }}>
         <div className="mx-auto max-w-5xl">
-          <SectionHeading title="How It Works" />
+          <SectionHeading title={t("howItWorks")} />
           <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
             {[
-              { step: "1", title: "Create Profile", desc: "Sign up in minutes", icon: Users },
-              { step: "2", title: "Browse Jobs", desc: "Find matching opportunities", icon: Target },
-              { step: "3", title: "Apply Instantly", desc: "One-tap job applications", icon: Smartphone },
-              { step: "4", title: "Get Hired", desc: "Start earning right away", icon: CheckCircle },
+              { step: "1", title: t("createProfile"), desc: t("createProfileDesc"), icon: Users },
+              { step: "2", title: t("browseJobs"), desc: t("browseJobsDesc"), icon: Target },
+              { step: "3", title: t("applyInstantly"), desc: t("applyInstantlyDesc"), icon: Smartphone },
+              { step: "4", title: t("getHired"), desc: t("getHiredDesc"), icon: CheckCircle },
             ].map((item, idx) => {
               const Icon = item.icon;
               return (
@@ -541,50 +543,50 @@ const HomePage: React.FC = () => {
       {user && isContractor && (
         <section className="px-4 py-14 md:py-20 bg-white">
           <div className="mx-auto max-w-5xl">
-            <SectionHeading title="Manage Your Contracts" subtitle="Track active projects and earnings" />
+            <SectionHeading title={t("manageContracts")} subtitle={t("manageContractsDesc")} />
             <div className="grid gap-4 md:grid-cols-3">
               <DashCard
                 icon={Briefcase}
-                badge="Active"
+                badge={t("active")}
                 badgeBg="rgba(13,158,110,0.12)"
                 badgeText={TEAL}
                 value="3"
-                label="Active Contracts"
-                btnLabel="View All"
+                label={t("activeContracts")}
+                btnLabel={t("viewAll")}
                 topColor={HERO_GRADIENT}
                 iconBg="rgba(13,158,110,0.1)"
                 iconColor={TEAL}
               />
               <DashCard
                 icon={DollarSign}
-                badge="This Month"
+                badge={t("thisMonth")}
                 badgeBg="rgba(26,122,158,0.12)"
                 badgeText={BLUE}
                 value="₹18,500"
-                label="Total Earnings"
-                btnLabel="Withdraw"
+                label={t("totalEarnings")}
+                btnLabel={t("withdraw")}
                 topColor={`linear-gradient(135deg,${BLUE},${TEAL})`}
                 iconBg="rgba(26,122,158,0.1)"
                 iconColor={BLUE}
               />
               <DashCard
                 icon={AlertCircle}
-                badge="Pending"
+                badge={t("pending")}
                 badgeBg="#fee2e2"
                 badgeText="#dc2626"
                 value="2"
-                label="Pending Projects"
-                btnLabel="Review"
+                label={t("pendingProjects")}
+                btnLabel={t("review")}
                 topColor="linear-gradient(135deg,#dc2626,#f87171)"
                 iconBg="#fee2e2"
                 iconColor="#dc2626"
               />
             </div>
             <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <StatCard value="96%" label="Completion Rate" />
-              <StatCard value="4.9★" label="Average Rating" />
-              <StatCard value="28" label="Total Projects" />
-              <StatCard value="<2 hr" label="Response Time" />
+              <StatCard value="96%" label={t("completionRate")} />
+              <StatCard value="4.9★" label={t("averageRating")} />
+              <StatCard value="28" label={t("totalProjects")} />
+              <StatCard value="<2 hr" label={t("responseTime")} />
             </div>
           </div>
         </section>
@@ -596,28 +598,28 @@ const HomePage: React.FC = () => {
       {user && !isContractor && (
         <section className="px-4 py-14 md:py-20 bg-white">
           <div className="mx-auto max-w-5xl">
-            <SectionHeading title="Your Work Stats" subtitle="Track your progress and opportunities" />
+            <SectionHeading title={t("yourWorkStats")} subtitle={t("yourWorkStatsDesc")} />
             <div className="grid gap-4 md:grid-cols-3">
               <DashCard
                 icon={Target}
-                badge="Pending"
+                badge={t("pending")}
                 badgeBg="rgba(26,122,158,0.12)"
                 badgeText={BLUE}
                 value="5"
-                label="Job Applications"
-                btnLabel="View All"
+                label={t("jobApplications")}
+                btnLabel={t("viewAll")}
                 topColor={`linear-gradient(135deg,${BLUE},${TEAL_L})`}
                 iconBg="rgba(26,122,158,0.1)"
                 iconColor={BLUE}
               />
               <DashCard
                 icon={DollarSign}
-                badge="Total"
+                badge={t("total")}
                 badgeBg="rgba(13,158,110,0.12)"
                 badgeText={TEAL}
                 value="₹12,350"
-                label="Total Earnings"
-                btnLabel="History"
+                label={t("totalEarnings")}
+                btnLabel={t("history")}
                 topColor={HERO_GRADIENT}
                 iconBg="rgba(13,158,110,0.1)"
                 iconColor={TEAL}
@@ -628,18 +630,18 @@ const HomePage: React.FC = () => {
                 badgeBg="rgba(251,191,36,0.15)"
                 badgeText="#b45309"
                 value="87"
-                label="Profile Views"
-                btnLabel="Update Profile"
+                label={t("profileViews")}
+                btnLabel={t("updateProfile")}
                 topColor="linear-gradient(135deg,#f59e0b,#fbbf24)"
                 iconBg="rgba(251,191,36,0.12)"
                 iconColor="#f59e0b"
               />
             </div>
             <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <StatCard value="42" label="Jobs Completed" />
-              <StatCard value="98%" label="On-time Rate" />
-              <StatCard value="15" label="Repeat Clients" />
-              <StatCard value="30 min" label="Avg Response" />
+              <StatCard value="42" label={t("jobsCompleted")} />
+              <StatCard value="98%" label={t("onTimeRate")} />
+              <StatCard value="15" label={t("repeatClients")} />
+              <StatCard value="30 min" label={t("avgResponse")} />
             </div>
           </div>
         </section>
@@ -650,14 +652,14 @@ const HomePage: React.FC = () => {
       ══════════════════════════════════════════════════ */}
       <section className="px-4 py-14 md:py-20" style={{ background: "rgba(13,158,110,0.03)" }}>
         <div className="mx-auto max-w-5xl">
-          <SectionHeading title="Trending Categories" />
+          <SectionHeading title={t("trendingCategories")} />
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
-            <CategoryChip icon={Wrench} label="Plumbing" />
-            <CategoryChip icon={HardHat} label="Construction" />
-            <CategoryChip icon={Layers} label="Cleaning" />
-            <CategoryChip icon={Paintbrush} label="Painting" />
-            <CategoryChip icon={Lightbulb} label="Electrical" />
-            <CategoryChip icon={Hammer} label="Carpentry" />
+            <CategoryChip icon={Wrench} label={t("plumbing")} />
+            <CategoryChip icon={HardHat} label={t("construction")} />
+            <CategoryChip icon={Layers} label={t("cleaning")} />
+            <CategoryChip icon={Paintbrush} label={t("painting")} />
+            <CategoryChip icon={Lightbulb} label={t("electrical")} />
+            <CategoryChip icon={Hammer} label={t("carpentry")} />
           </div>
         </div>
       </section>
@@ -668,15 +670,15 @@ const HomePage: React.FC = () => {
       <footer className="border-t px-4 py-10" style={{ borderColor: "rgba(13,158,110,0.15)", background: "rgba(13,158,110,0.03)" }}>
         <div className="mx-auto max-w-5xl text-center">
           <Logo size={44} showText />
-          <p className="mt-3 text-[13px] text-foreground/45">Empowering workers and businesses across India</p>
+          <p className="mt-3 text-[13px] text-foreground/45">{t("footerTagline")}</p>
           <div className="mt-4 flex justify-center gap-5 text-[13px]">
-            {["About", "Terms", "Privacy"].map((l) => (
+            {[t("footerAbout"), t("footerTerms"), t("footerPrivacy")].map((l) => (
               <button key={l} className="text-foreground/45 transition-colors hover:text-foreground">
                 {l}
               </button>
             ))}
           </div>
-          <p className="mt-5 text-[11px] text-foreground/30">© 2026 VaaniKaam. All rights reserved.</p>
+          <p className="mt-5 text-[11px] text-foreground/30">{t("footerCopyright")}</p>
         </div>
       </footer>
     </div>

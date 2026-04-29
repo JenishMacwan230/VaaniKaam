@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { fetchSessionUser, getCurrentLocale, resolveAccountType } from "@/lib/authClient";
+import { useTranslations } from "next-intl";
 import {
   Bell, TrendingUp, Briefcase, CheckCircle, AlertCircle,
   MessageSquare, ArrowLeft, Plus, ChevronRight, Activity,
@@ -38,6 +39,7 @@ export default function ContractorDashboard() {
   const router = useRouter();
   const pathname = usePathname();
   const locale = getCurrentLocale(pathname);
+  const t = useTranslations("contractorDashboard");
 
   const [jobs, setJobs] = useState<JobWithApplications[]>([]);
   const [recentApplications, setRecentApplications] = useState<JobApplication[]>([]);
@@ -69,7 +71,7 @@ export default function ContractorDashboard() {
             (d.applications || []).filter((a: JobApplication) => a.status === "applied").slice(0, 4)
           );
         }
-      } catch { setError("Failed to load dashboard data"); }
+      } catch { setError(t("loading")); }
       finally { setIsLoading(false); }
     };
     loadData();
@@ -79,7 +81,7 @@ export default function ContractorDashboard() {
     return (
       <div className="flex min-h-[60vh] items-center justify-center flex-col gap-3">
         <div className="h-10 w-10 rounded-full border-4 border-blue-500/20 border-t-blue-500 animate-spin" />
-        <p className="text-sm text-muted-foreground">Loading your dashboard…</p>
+        <p className="text-sm text-muted-foreground">{t("loading")}…</p>
       </div>
     );
   }
@@ -104,8 +106,8 @@ export default function ContractorDashboard() {
                 <Activity className="h-6 w-6 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-white leading-tight">My Dashboard</h1>
-                <p className="mt-1 text-sm sm:text-base text-white/75">Projects, analytics & quick actions</p>
+                <h1 className="text-2xl sm:text-3xl font-bold text-white leading-tight">{t("myDashboard")}</h1>
+                <p className="mt-1 text-sm sm:text-base text-white/75">{t("projectsAnalytics")}</p>
               </div>
             </div>
             <Button
@@ -113,15 +115,15 @@ export default function ContractorDashboard() {
               size="sm"
               className="gap-1.5 rounded-xl bg-white/20 hover:bg-white/30 text-white shadow-md backdrop-blur-sm shrink-0"
             >
-              <Plus className="h-3.5 w-3.5" /> Post Job
+              <Plus className="h-3.5 w-3.5" /> {t("postJob")}
             </Button>
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
             {[
-              `${jobs.length} Projects`,
-              `${openJobs.length} Open`,
-              `${inProgressJobs.length} Active`,
+              `${jobs.length} ${t("projects")}`,
+              `${openJobs.length} ${t("open")}`,
+              `${inProgressJobs.length} ${t("active")}`,
             ].map((tag) => (
               <span key={tag} className="flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-medium text-white backdrop-blur-sm">
                 <TrendingUp className="h-3 w-3" />{tag}

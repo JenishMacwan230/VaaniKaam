@@ -37,6 +37,7 @@ import {
 import type { Coordinates } from "@/lib/geolocation";
 import { calculateDistance, formatDistance } from "@/lib/distance";
 import { fetchSessionUser } from "@/lib/authClient";
+import { useTranslations } from "next-intl";
 
 type Worker = {
   id: string;
@@ -76,6 +77,7 @@ function maskPhone(phone: string): string {
 }
 
 export default function WorkersPage() {
+  const t = useTranslations("helpers");
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -268,10 +270,10 @@ export default function WorkersPage() {
             </div>
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-white leading-tight">
-                Find Workers
+                {t("pageTitle")}
               </h1>
               <p className="mt-1 text-sm sm:text-base text-white/75">
-                Search and connect with verified local workers
+                {t("pageSubtitle")}
               </p>
             </div>
           </div>
@@ -279,9 +281,9 @@ export default function WorkersPage() {
           {/* Quick stat chips */}
           <div className="mt-5 flex flex-wrap gap-2">
             {[
-              `${workers.length} Workers`,
-              `${workers.filter((w) => w.isAvailable).length} Available Now`,
-              "Verified Profiles",
+              `${workers.length} ${t("workers")}`,
+              `${workers.filter((w) => w.isAvailable).length} ${t("availableNow")}`,
+              t("verifiedProfiles"),
             ].map((tag, i) => (
               <span
                 key={tag}
@@ -308,7 +310,7 @@ export default function WorkersPage() {
                 <Input
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search by name or profession…"
+                  placeholder={t("searchPlaceholder")}
                   className="h-11 pl-9 rounded-xl border-border/60 bg-muted/40 focus:bg-background focus:border-blue-500 focus:ring-blue-500/20 transition-all"
                 />
               </div>
@@ -320,14 +322,14 @@ export default function WorkersPage() {
                   <Input
                     value={city}
                     onChange={(e) => setCity(e.target.value)}
-                    placeholder="City (e.g., Surat, Bilimora)"
+                    placeholder={t("cityPlaceholder")}
                     className="h-11 pl-9 pr-10 rounded-xl border-border/60 bg-muted/40 focus:bg-background focus:border-blue-500 focus:ring-blue-500/20 transition-all"
                   />
                   <button
                     type="button"
                     onClick={handleLocate}
                     disabled={isLocating}
-                    title="Use my current location"
+                    title={t("useLocation")}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-blue-500 transition-colors"
                   >
                     {isLocating ? (
@@ -347,7 +349,7 @@ export default function WorkersPage() {
                       className="relative h-11 px-4 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white shadow-md shadow-blue-500/25 font-medium shrink-0"
                     >
                       <SlidersHorizontal className="h-4 w-4 mr-2" />
-                      Filters
+                      {t("filters")}
                       {activeFilterCount > 0 && (
                         <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow">
                           {activeFilterCount}
@@ -359,34 +361,34 @@ export default function WorkersPage() {
                   <SheetContent side="bottom" className="border-0 bg-transparent shadow-none px-3 pb-4">
                     <div className="mx-auto w-full max-w-2xl rounded-2xl border border-white/20 bg-white/85 dark:bg-slate-900/75 backdrop-blur-xl shadow-2xl">
                       <SheetHeader className="px-4 pb-2 pt-4">
-                        <SheetTitle className="text-lg font-bold">Filter Workers</SheetTitle>
+                        <SheetTitle className="text-lg font-bold">{t("filterWorkers")}</SheetTitle>
                       </SheetHeader>
 
                       <div className="grid grid-cols-1 gap-2 px-4 pb-4 sm:grid-cols-2">
                         <div className="rounded-xl border border-border/40 bg-white/70 dark:bg-slate-900/40 p-2">
-                          <p className="text-[11px] font-semibold text-foreground mb-1.5">📍 Distance</p>
+                          <p className="text-[11px] font-semibold text-foreground mb-1.5">📍 {t("distance")}</p>
                           <Select value={tempDistance} onValueChange={setTempDistance}>
                             <SelectTrigger className="h-9 rounded-lg border-border/60 bg-background/70">
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent className="rounded-xl">
-                              <SelectItem value="all">Any distance</SelectItem>
-                              <SelectItem value="3">Within 3 km</SelectItem>
-                              <SelectItem value="5">Within 5 km</SelectItem>
-                              <SelectItem value="10">Within 10 km</SelectItem>
-                              <SelectItem value="20">Within 20 km</SelectItem>
+                            <SelectContent position="popper" className="rounded-xl">
+                              <SelectItem value="all">{t("anyDistance")}</SelectItem>
+                              <SelectItem value="3">{t("within3km")}</SelectItem>
+                              <SelectItem value="5">{t("within5km")}</SelectItem>
+                              <SelectItem value="10">{t("within10km")}</SelectItem>
+                              <SelectItem value="20">{t("within20km")}</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
 
                         <div className="rounded-xl border border-border/40 bg-white/70 dark:bg-slate-900/40 p-2">
-                          <p className="text-[11px] font-semibold text-foreground mb-1.5">🧰 Profession</p>
+                          <p className="text-[11px] font-semibold text-foreground mb-1.5">🧰 {t("profession")}</p>
                           <Select value={tempProfession} onValueChange={setTempProfession}>
                             <SelectTrigger className="h-9 rounded-lg border-border/60 bg-background/70">
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent className="rounded-xl">
-                              <SelectItem value="all">All professions</SelectItem>
+                            <SelectContent position="popper" className="rounded-xl">
+                              <SelectItem value="all">{t("allProfessions")}</SelectItem>
                               {professions.map((p) => (
                                 <SelectItem key={p} value={p}>{p}</SelectItem>
                               ))}
@@ -395,35 +397,35 @@ export default function WorkersPage() {
                         </div>
 
                         <div className="rounded-xl border border-border/40 bg-white/70 dark:bg-slate-900/40 p-2">
-                          <p className="text-[11px] font-semibold text-foreground mb-1.5">⭐ Minimum Rating</p>
+                          <p className="text-[11px] font-semibold text-foreground mb-1.5">⭐ {t("minRating")}</p>
                           <Select value={tempRating} onValueChange={setTempRating}>
                             <SelectTrigger className="h-9 rounded-lg border-border/60 bg-background/70">
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent className="rounded-xl">
-                              <SelectItem value="0">Any rating</SelectItem>
-                              <SelectItem value="1">1.0 and above</SelectItem>
-                              <SelectItem value="2">2.0 and above</SelectItem>
-                              <SelectItem value="3">3.0 and above</SelectItem>
-                              <SelectItem value="3.5">3.5 and above</SelectItem>
-                              <SelectItem value="4">4.0 and above</SelectItem>
-                              <SelectItem value="4.5">4.5 and above</SelectItem>
-                              <SelectItem value="4.8">4.8 and above</SelectItem>
-                              <SelectItem value="5">5.0</SelectItem>
+                            <SelectContent position="popper" className="rounded-xl">
+                              <SelectItem value="0">{t("anyRating")}</SelectItem>
+                              <SelectItem value="1">{t("rating1")}</SelectItem>
+                              <SelectItem value="2">{t("rating2")}</SelectItem>
+                              <SelectItem value="3">{t("rating3")}</SelectItem>
+                              <SelectItem value="3.5">{t("rating35")}</SelectItem>
+                              <SelectItem value="4">{t("rating4")}</SelectItem>
+                              <SelectItem value="4.5">{t("rating45")}</SelectItem>
+                              <SelectItem value="4.8">{t("rating48")}</SelectItem>
+                              <SelectItem value="5">{t("rating5")}</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
 
                         <div className="rounded-xl border border-border/40 bg-white/70 dark:bg-slate-900/40 p-2">
-                          <p className="text-[11px] font-semibold text-foreground mb-1.5">🟢 Availability</p>
+                          <p className="text-[11px] font-semibold text-foreground mb-1.5">🟢 {t("availability")}</p>
                           <Select value={tempAvailability} onValueChange={setTempAvailability}>
                             <SelectTrigger className="h-9 rounded-lg border-border/60 bg-background/70">
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent className="rounded-xl">
-                              <SelectItem value="all">All workers</SelectItem>
-                              <SelectItem value="available">Available now</SelectItem>
-                              <SelectItem value="unavailable">Unavailable</SelectItem>
+                            <SelectContent position="popper" className="rounded-xl">
+                              <SelectItem value="all">{t("allWorkers")}</SelectItem>
+                              <SelectItem value="available">{t("availableNow")}</SelectItem>
+                              <SelectItem value="unavailable">{t("unavailable")}</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -433,14 +435,14 @@ export default function WorkersPage() {
                             onClick={applyFilters}
                             className="flex-1 h-11 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white font-semibold shadow-lg shadow-blue-500/30"
                           >
-                            Apply Filters
+                            {t("applyFilters")}
                           </Button>
                           <Button
                             variant="outline"
                             onClick={resetFilters}
                             className="flex-1 h-11 rounded-xl border-border/60 font-medium"
                           >
-                            Reset
+                            {t("reset")}
                           </Button>
                         </div>
                       </div>
@@ -455,7 +457,7 @@ export default function WorkersPage() {
               <div className="flex flex-wrap gap-2">
                 {distanceFilter !== "all" && (
                   <FilterChip
-                    label={`Within ${distanceFilter} km`}
+                    label={distanceFilter === "all" ? t("anyDistance") : distanceFilter === "3" ? t("within3km") : distanceFilter === "5" ? t("within5km") : distanceFilter === "10" ? t("within10km") : t("within20km")}
                     onRemove={() => setDistanceFilter("all")}
                   />
                 )}
@@ -467,7 +469,7 @@ export default function WorkersPage() {
                 )}
                 {availabilityFilter !== "all" && (
                   <FilterChip
-                    label={availabilityFilter === "available" ? "Available now" : "Unavailable"}
+                    label={availabilityFilter === "available" ? t("availableNow") : t("unavailable")}
                     onRemove={() => setAvailabilityFilter("all")}
                   />
                 )}
@@ -481,7 +483,7 @@ export default function WorkersPage() {
             <div className="flex items-center gap-2">
               <div className="h-px flex-1 bg-gradient-to-r from-border to-transparent" />
               <span className="text-xs font-medium text-muted-foreground px-2">
-                {filteredWorkers.length} worker{filteredWorkers.length !== 1 ? "s" : ""} found
+                {filteredWorkers.length} {filteredWorkers.length === 1 ? t("workerFound", { count: filteredWorkers.length }) : t("workersFound", { count: filteredWorkers.length })}
               </span>
               <div className="h-px flex-1 bg-gradient-to-l from-border to-transparent" />
             </div>
@@ -491,7 +493,7 @@ export default function WorkersPage() {
               {isLoading ? (
                 <div className="flex flex-col items-center justify-center py-12 space-y-4">
                   <Loader className="h-8 w-8 animate-spin text-blue-500" />
-                  <p className="text-muted-foreground animate-pulse">Finding local talent...</p>
+                  <p className="text-muted-foreground animate-pulse">{t("findingTalent")}</p>
                 </div>
               ) : error ? (
                 <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-rose-200 bg-rose-50/50 py-12 px-4 text-center">
@@ -500,7 +502,7 @@ export default function WorkersPage() {
                   </div>
                   <p className="font-semibold text-rose-900">{error}</p>
                   <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
-                    Try Again
+                    {t("tryAgain")}
                   </Button>
                 </div>
               ) : filteredWorkers.length > 0 ? (
@@ -512,9 +514,9 @@ export default function WorkersPage() {
                   <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/50">
                     <Users className="h-7 w-7 text-muted-foreground" />
                   </div>
-                  <p className="font-semibold text-foreground">No workers found</p>
+                  <p className="font-semibold text-foreground">{t("noWorkers")}</p>
                   <p className="text-sm text-muted-foreground">
-                    Try adjusting your filters or search terms.
+                    {t("adjustFilters")}
                   </p>
                 </div>
               )}
@@ -528,6 +530,7 @@ export default function WorkersPage() {
 
 /* ── Worker Card ── */
 function WorkerCard({ worker }: { worker: Worker }) {
+  const t = useTranslations("helpers");
   const locationLabel = typeof worker.distanceKm === 'number'
     ? `${formatDistance(worker.distanceKm)} · ${worker.location}`
     : worker.location || "";
@@ -571,13 +574,13 @@ function WorkerCard({ worker }: { worker: Worker }) {
             ) : (
               <XCircle className="h-3 w-3" />
             )}
-            {worker.isAvailable ? "Available" : "Unavailable"}
+            {worker.isAvailable ? t("available") : t("unavailable")}
           </span>
         </div>
 
         {/* Stats row */}
         <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-          <StatPill icon={<Star className="h-3.5 w-3.5 text-amber-500" />} label={`${worker.rating} (${worker.completedJobs} jobs)`} />
+          <StatPill icon={<Star className="h-3.5 w-3.5 text-amber-500" />} label={`${worker.rating} (${worker.completedJobs} ${t("jobsCount")})`} />
           {locationLabel ? (
             <StatPill icon={<MapPin className="h-3.5 w-3.5 text-blue-500" />} label={locationLabel} />
           ) : null}
@@ -596,7 +599,7 @@ function WorkerCard({ worker }: { worker: Worker }) {
           >
             <a href={`tel:${worker.phone}`}>
               <Phone className="mr-1.5 h-3.5 w-3.5" />
-              Call
+              {t("call")}
             </a>
           </Button>
           <Button
@@ -605,7 +608,7 @@ function WorkerCard({ worker }: { worker: Worker }) {
             className="flex-1 h-9 rounded-xl border-border/60 hover:bg-muted/60 font-medium"
           >
             <MessageCircle className="mr-1.5 h-3.5 w-3.5" />
-            Chat
+            {t("chat")}
           </Button>
         </div>
       </div>

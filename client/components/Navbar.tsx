@@ -92,13 +92,13 @@ const BlogHeader = () => {
       if (isContractor) {
         baseLinks.push({
           href: "/dashboard/contractor/projects",
-          text: "My Projects",
+          text: t("my-projects"),
           icon: Briefcase,
         });
       } else {
         baseLinks.push({
           href: "/dashboard/worker",
-          text: "My Work",
+          text: t("my-work"),
           icon: Briefcase,
         });
       }
@@ -285,7 +285,7 @@ const BlogHeader = () => {
                     <Globe className="mr-1 md:mr-2 h-3.5 md:h-4 w-3.5 md:w-4 text-gray-500" />
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="min-w-32 md:min-w-40">
+                  <SelectContent position="popper" align="end" side="bottom" className="min-w-32 md:min-w-40">
                     {languages.map((lang) => (
                       <SelectItem key={lang.code} value={lang.code}>
                         <div className="flex items-center gap-2">

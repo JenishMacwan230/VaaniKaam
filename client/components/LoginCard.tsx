@@ -6,6 +6,7 @@ import { usePathname, useRouter, useParams } from "next/navigation";
 import { getCurrentLocale, resolveAccountType } from "@/lib/authClient";
 import VoiceTextInput from "@/components/VoiceTextInput";
 import VoicePhoneInput from "@/components/VoicePhoneInput";
+import { useTranslations } from "next-intl";
 
 // Language code mapping for voice
 const getVoiceLanguage = (locale: string): string => {
@@ -23,6 +24,9 @@ export default function LoginCard() {
   const params = useParams();
   const locale = getCurrentLocale(pathname);
   const voiceLanguage = getVoiceLanguage((params?.locale as string) || locale);
+  const t = useTranslations("login");
+  const t2 = useTranslations("createAccount"); // For phone placeholder if needed
+  
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -52,7 +56,7 @@ export default function LoginCard() {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.message || "Login failed");
+        setError(data.message || t("loginFailed"));
         return;
       }
 
@@ -64,7 +68,7 @@ export default function LoginCard() {
       globalThis.window.dispatchEvent(new Event("auth-changed"));
       router.replace(homePath);
     } catch {
-      setError("Network error. Please try again.");
+      setError(t("networkError"));
     } finally {
       setLoading(false);
     }
@@ -75,10 +79,10 @@ export default function LoginCard() {
       <div className="absolute inset-x-12 top-6 h-1 rounded-full bg-linear-to-r from-primary via-secondary to-accent opacity-60" />
       <div className="relative space-y-8">
         <div>
-          <p className="text-sm font-medium text-primary">Mobile access</p>
-          <h2 className="text-3xl font-semibold">Welcome back</h2>
+          <p className="text-sm font-medium text-primary">{t("mobileAccess")}</p>
+          <h2 className="text-3xl font-semibold">{t("welcomeBack")}</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Use the mobile number linked to your account.
+            {t("subtitle")}
           </p>
         </div>
 
@@ -87,19 +91,19 @@ export default function LoginCard() {
             phoneNumber={phone}
             onPhoneNumberChange={setPhone}
             language={voiceLanguage}
-            placeholder="Enter 10 digit number"
+            placeholder={t2("phonePlaceholder")}
             disabled={loading}
             showHelper={true}
             autoSpeak={false}
           />
 
           <div className="space-y-2 text-sm font-medium">
-            <span>Password</span>
+            <span>{t("passwordLabel")}</span>
             <VoiceTextInput
               value={password}
               onChange={handlePasswordChange}
               label=""
-              placeholder="Enter your password"
+              placeholder={t("passwordPlaceholder")}
               language={voiceLanguage}
               disabled={loading}
               type="text"
@@ -116,9 +120,9 @@ export default function LoginCard() {
           )}
 
           <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <p className="font-medium text-muted-foreground">Remember this device</p>
+            <p className="font-medium text-muted-foreground">{t("rememberDevice")}</p>
             <Link href={`/${locale}/forgot-password`} className="font-medium text-primary hover:text-primary/80">
-              Forgot password?
+              {t("forgotPassword")}
             </Link>
           </div>
 
@@ -127,14 +131,14 @@ export default function LoginCard() {
             disabled={loading || phone.length !== 10 || !password}
             className="w-full rounded-2xl bg-linear-to-r from-primary via-secondary to-accent py-3 text-base font-semibold text-white shadow-lg transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? "Signing in..." : "Sign in"}
+            {loading ? t("signingIn") : t("signIn")}
           </button>
         </form>
 
         <p className="text-center text-sm text-muted-foreground">
-          New user?{" "}
+          {t("newUser")}{" "}
           <Link href={`/${locale}/create-account`} className="text-primary underline-offset-4 hover:underline">
-            Create account
+            {t("createAccount")}
           </Link>
         </p>
       </div>

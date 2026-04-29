@@ -11,6 +11,7 @@ import { getAuth, signInWithPhoneNumber, RecaptchaVerifier, ConfirmationResult }
 import { app } from "@/lib/firebase";
 import VoicePhoneInput from "@/components/VoicePhoneInput";
 import VoiceTextInput from "@/components/VoiceTextInput";
+import { useTranslations } from "next-intl";
 
 // Extend Window interface for RecaptchaVerifier
 declare global {
@@ -60,37 +61,38 @@ const getConfirmPasswordHint = (locale: string) => {
   }
 };
 
-const accountTypeOptions: Array<{
-  value: AccountType;
-  title: string;
-  description: string;
-  badge: string;
-  Icon: typeof Hammer;
-  accentClassName: string;
-}> = [
-  {
-    value: "worker",
-    title: "Worker",
-    description: "I want to find jobs and offer my skills.",
-    badge: "Find work",
-    Icon: Hammer,
-    accentClassName: "from-sky-500/20 via-sky-500/10 to-transparent text-sky-700",
-  },
-  {
-    value: "contractor",
-    title: "Contractor",
-    description: "I want to hire workers and manage projects.",
-    badge: "Hire talent",
-    Icon: Building2,
-    accentClassName: "from-emerald-500/20 via-emerald-500/10 to-transparent text-emerald-700",
-  },
-];
-
 export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
   const params = useParams();
   const locale = (params?.locale as string) || "en";
   const voiceLanguage = getVoiceLanguage(locale);
-  console.log("[PhoneAuthCard] Locale:", locale, "→ Voice Language:", voiceLanguage);
+  const t = useTranslations("createAccount");
+
+  const accountTypeOptions: Array<{
+    value: AccountType;
+    title: string;
+    description: string;
+    badge: string;
+    Icon: typeof Hammer;
+    accentClassName: string;
+  }> = [
+    {
+      value: "worker",
+      title: t("workerTitle"),
+      description: t("workerDesc"),
+      badge: t("workerBadge"),
+      Icon: Hammer,
+      accentClassName: "from-sky-500/20 via-sky-500/10 to-transparent text-sky-700",
+    },
+    {
+      value: "contractor",
+      title: t("contractorTitle"),
+      description: t("contractorDesc"),
+      badge: t("contractorBadge"),
+      Icon: Building2,
+      accentClassName: "from-emerald-500/20 via-emerald-500/10 to-transparent text-emerald-700",
+    },
+  ];
+
   const auth = getAuth(app);
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otp, setOtp] = useState("");
@@ -141,14 +143,7 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
   }, []);
 
   const sendOTP = async () => {
-    console.log("sendOTP: Starting Firebase phone sign in");
-    console.log("sendOTP: Phone number:", phoneNumber);
-
-    // Prevent double submission
-    if (loading) {
-      console.warn("sendOTP: Already in progress");
-      return;
-    }
+    if (loading) return;
 
     setLoading(true);
     setError(null);
@@ -156,18 +151,13 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
 
     try {
       if (!phoneNumber) {
-        console.warn("sendOTP: No phone number");
         setError("Please enter a valid phone number");
         setLoading(false);
         return;
       }
 
-      // Format phone number with +91 prefix for India
       const formattedPhone = phoneNumber.startsWith("+") ? phoneNumber : `+91${phoneNumber}`;
-      console.log("sendOTP: Formatted phone:", formattedPhone);
 
-      // Check if phone number already exists BEFORE sending OTP
-      console.log("sendOTP: Checking if phone number is already registered");
       const checkResponse = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/users/check-phone`,
         {
@@ -180,109 +170,57 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
       const checkData = await checkResponse.json();
 
       if (checkData.exists) {
-        console.log("sendOTP: Phone number already registered");
-        setError("Phone number already registered. Please login with password.");
+        setError(t("alreadyRegistered"));
         setLoading(false);
         return;
       }
 
-      console.log("sendOTP: Phone number available, proceeding with OTP");
-
-      // Check if RecaptchaVerifier is initialized, if not create it
       if (!window.recaptchaVerifier) {
-        console.log("sendOTP: RecaptchaVerifier not initialized, creating now");
         try {
           const verifier = new RecaptchaVerifier(
             auth,
             "recaptcha-container",
             { 
               size: "invisible",
-              callback: (response: string) => {
-                console.log("RecaptchaVerifier: Success");
-              }
+              callback: (response: string) => {}
             }
           );
-          
-          // For invisible reCAPTCHA, Firebase handles rendering automatically
-          // No need to call render() explicitly
-          console.log("sendOTP: RecaptchaVerifier created successfully");
-          
           window.recaptchaVerifier = verifier;
         } catch (e) {
-          console.error("sendOTP: Failed to create RecaptchaVerifier:", e);
           setError("reCAPTCHA initialization failed. Please reload the page.");
           setLoading(false);
           return;
         }
       }
 
-      console.log("sendOTP: Using RecaptchaVerifier for Firebase authentication");
-
-      // Sign in with phone number - Firebase will send SMS automatically with reCAPTCHA verification
-      console.log("sendOTP: Calling Firebase signInWithPhoneNumber");
       const result = await signInWithPhoneNumber(
         auth,
         formattedPhone,
         window.recaptchaVerifier
       );
 
-      console.log("sendOTP: Firebase sent SMS successfully");
       setConfirmationResult(result);
       confirmationResultRef.current = result;
       setSuccess("SMS sent! Enter the code sent to your phone.");
       setStep("otp");
       onStepChange?.("otp");
 
-      // Clear the verifier after successful use so a new one is created on retry
-      // This prevents reuse issues and expired token problems
       try {
         window.recaptchaVerifier?.clear();
         delete window.recaptchaVerifier;
-        console.log("sendOTP: Cleared verifier after successful send");
-      } catch (e) {
-        console.log("sendOTP: Couldn't clear verifier (already cleared)");
-      }
+      } catch (e) {}
     } catch (err: any) {
-      console.error("sendOTP: Firebase error:", err);
-      console.error("sendOTP: Error code:", err.code);
-      console.error("sendOTP: Error message:", err.message);
-
-      // Handle specific Firebase errors
       if (err.code === "auth/invalid-phone-number") {
         setError("Invalid phone number. Please check the number and try again.");
       } else if (err.code === "auth/too-many-requests") {
-        setError("Too many requests. You've exceeded the SMS limit (10 per day). Please try again tomorrow or use test numbers for development.");
-      } else if (err.code === "auth/invalid-app-credential") {
-        setError("reCAPTCHA verification failed. This might be a domain authorization issue. Please check: 1) Firebase Console > Authentication > Sign-in method > Phone is enabled, 2) Your domain is authorized in Firebase Console.");
-        // Clear invalid verifier so it can be recreated
-        try {
-          window.recaptchaVerifier?.clear();
-          delete window.recaptchaVerifier;
-        } catch (e) {
-          console.log("Could not clear verifier");
-        }
-      } else if (err.code === "auth/missing-app-credential") {
-        setError("Missing reCAPTCHA credential. Ensure reCAPTCHA script is loaded.");
-        try {
-          window.recaptchaVerifier?.clear();
-          delete window.recaptchaVerifier;
-        } catch (e) {
-          console.log("Could not clear verifier");
-        }
-      } else if (err.code === "auth/quota-exceeded") {
-        setError("Daily quota exceeded. Please try again tomorrow or contact support.");
+        setError("Too many requests. Please try again tomorrow.");
       } else {
         setError(err.message || "Failed to send SMS. Please try again.");
       }
-
-      // Clear the verifier on error too, so next attempt uses a fresh one
       try {
         window.recaptchaVerifier?.clear();
         delete window.recaptchaVerifier;
-        console.log("sendOTP: Cleared verifier after error");
-      } catch (e) {
-        console.log("sendOTP: Couldn't clear verifier on error");
-      }
+      } catch (e) {}
     } finally {
       setLoading(false);
     }
@@ -295,34 +233,27 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
 
     try {
       if (!otp || otp.length !== 6) {
-        setError("Please enter a valid 6-digit code");
+        setError(t("invalidCode"));
         setLoading(false);
         return;
       }
 
       const result = confirmationResultRef.current;
       if (!result) {
-        setError("Please request a new SMS code");
+        setError(t("pleaseRequestNewSms"));
         setLoading(false);
         return;
       }
 
-      console.log("verifyOTP: Verifying code with Firebase");
-
-      // Confirm the code with Firebase
       const userCredential = await result.confirm(otp);
       const idToken = await userCredential.user.getIdToken();
 
-      console.log("verifyOTP: Firebase verification successful");
       setSuccess("Code verified! Please enter your details.");
       setStep("details");
       onStepChange?.("details");
 
-      // Store Firebase token for later use
       localStorage.setItem("firebaseToken", idToken);
     } catch (err: any) {
-      console.error("verifyOTP: Firebase error:", err);
-
       if (err.code === "auth/invalid-verification-code") {
         setError("Invalid code. Please check and try again.");
       } else if (err.code === "auth/code-expired") {
@@ -342,19 +273,19 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
 
     try {
       if (!name || !location || !password) {
-        setError("Please fill in all required fields");
+        setError(t("fillAllFields"));
         setLoading(false);
         return;
       }
 
       if (password !== confirmPassword) {
-        setError("Passwords do not match");
+        setError(t("passwordsNoMatch"));
         setLoading(false);
         return;
       }
 
       if (password.length < 6) {
-        setError("Password must be at least 6 characters");
+        setError(t("passwordTooShort"));
         setLoading(false);
         return;
       }
@@ -369,7 +300,7 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
           credentials: "include",
           body: JSON.stringify({
             phoneNumber: phoneNumber.startsWith("+") ? phoneNumber : `+91${phoneNumber}`,
-            firebaseToken, // Firebase verification token
+            firebaseToken,
             name,
             location,
             accountType,
@@ -383,23 +314,21 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
 
       if (!response.ok) {
         if (data.shouldLogin) {
-          throw new Error("Phone already registered. Please login instead.");
+          throw new Error(t("alreadyRegistered"));
         }
         throw new Error(data.message || "Registration failed");
       }
 
-      // Store user info (JWT session is in httpOnly cookie)
       localStorage.setItem("user", JSON.stringify(data.user));
       globalThis.window.dispatchEvent(new Event("auth-changed"));
-      localStorage.removeItem("firebaseToken"); // Clean up
-      sessionStorage.removeItem("reg_phone"); // Clear session storage
+      localStorage.removeItem("firebaseToken");
+      sessionStorage.removeItem("reg_phone");
 
-      setSuccess("Registration successful! Redirecting...");
+      setSuccess(t("registrationSuccess"));
       setTimeout(() => {
-        window.location.href = "/";
+        window.location.href = `/${locale}`;
       }, 2000);
     } catch (err: any) {
-      console.error("Registration error:", err);
       setError(err.message || "Registration failed");
     } finally {
       setLoading(false);
@@ -407,21 +336,16 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
   };
 
   const resetVerification = () => {
-    console.log("resetVerification: Resetting to phone step");
     setConfirmationResult(null);
     confirmationResultRef.current = null;
     setOtp("");
     setError(null);
     
-    // Clear verifier so a fresh one is created on next send attempt
     if (window.recaptchaVerifier) {
       try {
         window.recaptchaVerifier.clear();
         delete window.recaptchaVerifier;
-        console.log("resetVerification: Cleared verifier for next attempt");
-      } catch (e) {
-        console.log("resetVerification: Could not clear verifier");
-      }
+      } catch (e) {}
     }
   };
 
@@ -430,14 +354,13 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
       <div className="absolute inset-x-12 top-6 h-1 rounded-full bg-linear-to-r from-primary via-secondary to-accent opacity-60" />
       <div className="relative space-y-8">
         <div>
-          <p className="text-sm font-medium text-primary">First time registration</p>
-          <h2 className="text-3xl font-semibold">Create account</h2>
+          <p className="text-sm font-medium text-primary">{t("firstTimeReg")}</p>
+          <h2 className="text-3xl font-semibold">{t("title")}</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Verify your phone number to get started.
+            {t("subtitle")}
           </p>
         </div>
 
-        {/* Error Alert */}
         {error && (
           <div className="rounded-lg bg-red-50 border border-red-200 p-4 flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
@@ -445,7 +368,6 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
           </div>
         )}
 
-        {/* Success Alert */}
         {success && (
           <div className="rounded-lg bg-green-50 border border-green-200 p-4 flex items-start gap-3">
             <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
@@ -453,7 +375,6 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
           </div>
         )}
 
-        {/* Firebase RecaptchaVerifier Container - Empty for invisible mode */}
         <div id="recaptcha-container"></div>
 
         <div className="space-y-5" style={{ display: step === "phone" ? "block" : "none" }}>
@@ -464,7 +385,7 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
               phoneNumber={phoneNumber}
               onPhoneNumberChange={setPhoneNumber}
               language={voiceLanguage}
-              placeholder="Enter 10 digit number"
+              placeholder={t("phonePlaceholder")}
               disabled={loading}
               showHelper={true}
               autoSpeak={step === "phone"}
@@ -475,24 +396,24 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
               disabled={loading || phoneNumber.length !== 10}
               className="w-full rounded-2xl bg-linear-to-r from-primary via-secondary to-accent py-3 text-base font-semibold text-white shadow-lg transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? "Sending SMS..." : "Send SMS"}
+              {loading ? t("sendingSms") : t("sendSms")}
             </Button>
           </div>
 
         <div className="space-y-5" style={{ display: step === "otp" ? "block" : "none" }}>
             <div className="rounded-lg bg-green-50 border border-green-200 p-3">
-              <p className="text-sm text-green-700">SMS code sent to +91 {phoneNumber}</p>
+              <p className="text-sm text-green-700">{t("smsSent")}{phoneNumber}</p>
             </div>
 
             <div className="flex items-center gap-2">
               <Shield className="w-4 h-4 text-primary" />
-              <Label className="text-sm font-medium">Enter verification code</Label>
+              <Label className="text-sm font-medium">{t("enterCode")}</Label>
             </div>
             <VoiceTextInput
               value={otp}
               onChange={(val) => setOtp(val.replace(/\D/g, "").slice(0, 6))}
               label=""
-              placeholder="Enter 6-digit code from SMS"
+              placeholder={t("codePlaceholder")}
               language={voiceLanguage}
               disabled={loading}
               type="tel"
@@ -507,7 +428,7 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
               disabled={loading || otp.length !== 6}
               className="w-full rounded-2xl bg-linear-to-r from-primary via-secondary to-accent py-3 text-base font-semibold text-white shadow-lg transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? "Verifying..." : "Verify Code"}
+              {loading ? t("verifying") : t("verifyCode")}
             </Button>
 
             <button
@@ -518,19 +439,19 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
               }}
               className="w-full text-primary hover:underline text-sm font-medium"
             >
-              Back to phone number
+              {t("backToPhone")}
             </button>
           </div>
 
         <div className="space-y-5" style={{ display: step === "details" ? "block" : "none" }}>
             <div className="rounded-lg bg-green-50 border border-green-200 p-3">
-              <p className="text-sm text-green-700">✓ Phone verified! Complete your profile.</p>
+              <p className="text-sm text-green-700">{t("phoneVerified")}</p>
             </div>
 
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-primary" />
-                <Label className="text-sm font-medium">Account type</Label>
+                <Label className="text-sm font-medium">{t("accountType")}</Label>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 {accountTypeOptions.map(({ value, title, description, badge, Icon, accentClassName }) => {
@@ -575,13 +496,13 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
 
             <div className="flex items-center gap-2">
               <User className="w-4 h-4 text-primary" />
-              <Label className="text-sm font-medium">Name</Label>
+              <Label className="text-sm font-medium">{t("nameLabel")}</Label>
             </div>
             <VoiceTextInput
               value={name}
               onChange={setName}
               label=""
-              placeholder="Your name"
+              placeholder={t("namePlaceholder")}
               language={voiceLanguage}
               disabled={loading}
               type="text"
@@ -593,13 +514,13 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
 
             <div className="flex items-center gap-2">
               <MapPin className="w-4 h-4 text-primary" />
-              <Label className="text-sm font-medium">Location</Label>
+              <Label className="text-sm font-medium">{t("locationLabel")}</Label>
             </div>
             <VoiceTextInput
               value={location}
               onChange={setLocation}
               label=""
-              placeholder="City or area"
+              placeholder={t("locationPlaceholder")}
               language={voiceLanguage}
               disabled={loading}
               type="text"
@@ -611,11 +532,11 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
 
             <div className="flex items-center gap-2">
               <Mail className="w-4 h-4 text-primary" />
-              <Label className="text-sm font-medium">Email (optional)</Label>
+              <Label className="text-sm font-medium">{t("emailLabel")}</Label>
             </div>
             <Input
               type="email"
-              placeholder="your@email.com"
+              placeholder={t("emailPlaceholder")}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={loading}
@@ -624,13 +545,13 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
 
             <div className="flex items-center gap-2">
               <Lock className="w-4 h-4 text-primary" />
-              <Label className="text-sm font-medium">Password</Label>
+              <Label className="text-sm font-medium">{t("passwordLabel")}</Label>
             </div>
             <VoiceTextInput
               value={password}
               onChange={setPassword}
               label=""
-              placeholder="Min. 6 characters"
+              placeholder={t("passwordPlaceholder")}
               language={voiceLanguage}
               disabled={loading}
               type="text"
@@ -641,13 +562,13 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
 
             <div className="flex items-center gap-2">
               <Lock className="w-4 h-4 text-primary" />
-              <Label className="text-sm font-medium">Confirm Password</Label>
+              <Label className="text-sm font-medium">{t("confirmPasswordLabel")}</Label>
             </div>
             <VoiceTextInput
               value={confirmPassword}
               onChange={setConfirmPassword}
               label=""
-              placeholder="Re-enter password"
+              placeholder={t("confirmPasswordPlaceholder")}
               language={voiceLanguage}
               disabled={loading}
               type="text"
@@ -661,14 +582,14 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
               disabled={loading || !password || !name || !location}
               className="w-full rounded-2xl bg-linear-to-r from-primary via-secondary to-accent py-3 text-base font-semibold text-white shadow-lg transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? "Creating account..." : "Create account"}
+              {loading ? t("creatingAccount") : t("createAccountBtn")}
             </Button>
           </div>
 
         <p className="text-center text-sm text-muted-foreground">
-          Already have an account?{" "}
-          <a href="/login" className="text-primary underline-offset-4 hover:underline">
-            Sign in
+          {t("alreadyHaveAccount")}{" "}
+          <a href={`/${locale}/login`} className="text-primary underline-offset-4 hover:underline">
+            {t("signIn")}
           </a>
         </p>
       </div>

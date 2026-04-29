@@ -27,6 +27,7 @@ import { reverseGeocodeNominatim } from "@/lib/geocoding";
 import { normalizeLocationWithCache } from "@/lib/locationNormalizer";
 import { fetchSessionUser } from "@/lib/authClient";
 import { recommendJobs } from "@/lib/recommendedJobs";
+import { useTranslations } from "next-intl";
 
 type JobTab = "live" | "recommended" | "applied";
 
@@ -57,31 +58,6 @@ type Job = {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
-function getUrgencyConfig(urgency?: string) {
-  if (urgency === "Immediate") return { label: "Immediate", class: "bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800" };
-  if (urgency === "Today") return { label: "Today", class: "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800" };
-  return { label: "Flexible", class: "bg-muted/60 text-muted-foreground border border-border/50" };
-}
-
-function getPayTypeDisplay(pricingType?: string) {
-  if (pricingType === "per_hour") return "hr";
-  if (pricingType === "per_day") return "day";
-  if (pricingType === "per_job") return "job";
-  return "day";
-}
-
-function getTimingLabel(jobDate?: string) {
-  if (jobDate === "today") return "Today";
-  if (jobDate === "tomorrow") return "Tomorrow";
-  if (jobDate === "pick") return "Pick date";
-  return "Flexible";
-}
-
-function getDurationLabel(durationValue?: number, durationUnit?: string) {
-  if (!durationValue) return "Any duration";
-  return `${durationValue} ${durationUnit || "day"}${durationValue === 1 ? "" : "s"}`;
-}
-
 function getCityFromAddress(address: Awaited<ReturnType<typeof reverseGeocodeNominatim>>) {
   return address.city || address.town || address.village || address.district || address.displayName || "Unknown location";
 }
@@ -92,6 +68,33 @@ const categoryEmoji: Record<string, string> = {
 };
 
 export default function FindWorkPage() {
+  const t = useTranslations("findWork");
+
+  function getUrgencyConfig(urgency?: string) {
+    if (urgency === "Immediate") return { label: t("immediate"), class: "bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800" };
+    if (urgency === "Today") return { label: t("today"), class: "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800" };
+    return { label: t("flexible"), class: "bg-muted/60 text-muted-foreground border border-border/50" };
+  }
+
+  function getPayTypeDisplay(pricingType?: string) {
+    if (pricingType === "per_hour") return t("perHour");
+    if (pricingType === "per_day") return t("perDay");
+    if (pricingType === "per_job") return t("perJob");
+    return t("perDay");
+  }
+
+  function getTimingLabel(jobDate?: string) {
+    if (jobDate === "today") return t("today");
+    if (jobDate === "tomorrow") return t("tomorrow");
+    if (jobDate === "pick") return t("pickDate");
+    return t("flexible");
+  }
+
+  function getDurationLabel(durationValue?: number, durationUnit?: string) {
+    if (!durationValue) return t("anyDuration");
+    return `${durationValue} ${durationUnit === "hour" ? t("hours") : durationUnit === "week" ? t("weeks") : t("days")}`;
+  }
+
   const [jobs, setJobs] = useState<Job[]>([]);
   const [userSkills, setUserSkills] = useState<string[]>([]);
   const [profileLocationCoords, setProfileLocationCoords] = useState<Coordinates | null>(null);
@@ -246,8 +249,8 @@ export default function FindWorkPage() {
 
   const getJobDistanceDisplay = (job: Job) => {
     if (typeof job.distanceKm === "number") return formatDistance(job.distanceKm);
-    if (hasDistanceReference) return "Not available";
-    return "Set location to see distance";
+    if (hasDistanceReference) return t("notAvailable");
+    return t("setLocationDistance");
   };
 
   const handleUseMyLocation = async () => {
@@ -276,9 +279,9 @@ export default function FindWorkPage() {
   };
 
   const tabs: { key: JobTab; label: string; icon: React.ReactNode }[] = [
-    { key: "live", label: "Live Jobs", icon: <Briefcase className="h-3.5 w-3.5" /> },
-    { key: "recommended", label: "For You", icon: <Star className="h-3.5 w-3.5" /> },
-    { key: "applied", label: "Applied", icon: <CheckCircle className="h-3.5 w-3.5" /> },
+    { key: "live", label: t("liveJobs"), icon: <Briefcase className="h-3.5 w-3.5" /> },
+    { key: "recommended", label: t("recommended"), icon: <Star className="h-3.5 w-3.5" /> },
+    { key: "applied", label: t("applied"), icon: <CheckCircle className="h-3.5 w-3.5" /> },
   ];
 
   return (
@@ -295,13 +298,13 @@ export default function FindWorkPage() {
               <Briefcase className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-white leading-tight">Find Work</h1>
-              <p className="mt-1 text-sm sm:text-base text-white/75">Browse and apply to jobs near you</p>
+              <h1 className="text-2xl sm:text-3xl font-bold text-white leading-tight">{t("heroTitle")}</h1>
+              <p className="mt-1 text-sm sm:text-base text-white/75">{t("heroSubtitle")}</p>
             </div>
           </div>
 
           <div className="mt-5 flex flex-wrap gap-2">
-            {[`${liveJobs.length} Live Jobs`, `${recommendedJobs.length} Recommended`, "Apply Instantly"].map((tag) => (
+            {[`${liveJobs.length} ${t("liveJobs")}`, `${recommendedJobs.length} ${t("recommended")}`, t("applyInstantly")].map((tag) => (
               <span key={tag} className="flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-medium text-white backdrop-blur-sm">
                 <Sparkles className="h-3 w-3" />{tag}
               </span>
@@ -323,7 +326,7 @@ export default function FindWorkPage() {
                 <Input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search job title or contractor…"
+                  placeholder={t("searchPlaceholder")}
                   className="h-11 pl-9 rounded-xl border-border/60 bg-muted/40 focus:bg-background focus:border-blue-500 focus:ring-blue-500/20 transition-all"
                 />
               </div>
@@ -337,7 +340,7 @@ export default function FindWorkPage() {
                     onChange={(e) => { setLocation(e.target.value); if (!e.target.value.trim()) setManualLocationCoords(null); }}
                     onBlur={() => void resolveManualLocationCoordinates()}
                     onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void resolveManualLocationCoordinates(); } }}
-                    placeholder="City (e.g., Bilimora, Surat)"
+                    placeholder={t("locationPlaceholder")}
                     className="h-11 pl-9 pr-10 rounded-xl border-border/60 bg-muted/40 focus:bg-background focus:border-blue-500 focus:ring-blue-500/20 transition-all"
                   />
                   <button
@@ -360,7 +363,7 @@ export default function FindWorkPage() {
                       className="relative h-11 px-4 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white shadow-md shadow-blue-500/25 font-medium shrink-0"
                     >
                       <SlidersHorizontal className="h-4 w-4 mr-2" />
-                      Filters
+                      {t("filters")}
                       {activeFilterCount > 0 && (
                         <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow">
                           {activeFilterCount}
@@ -372,18 +375,18 @@ export default function FindWorkPage() {
                   <SheetContent side="bottom" className="border-0 bg-transparent shadow-none px-3 pb-4">
                     <div className="mx-auto w-full max-w-2xl rounded-2xl border border-white/20 bg-white/85 dark:bg-slate-900/75 backdrop-blur-xl shadow-2xl">
                       <SheetHeader className="px-4 pb-2 pt-4">
-                        <SheetTitle className="text-lg font-bold">Filter Jobs</SheetTitle>
+                        <SheetTitle className="text-lg font-bold">{t("filterJobs")}</SheetTitle>
                       </SheetHeader>
 
                       <div className="grid grid-cols-1 gap-2 px-4 pb-4 sm:grid-cols-2">
                         {[
-                          { label: "Category", emoji: "🏷️", value: tempCategory, setter: setTempCategory, options: [{ v: "all", l: "All categories" }, ...categories.map((c) => ({ v: c, l: `${categoryEmoji[c] || "💼"} ${c}` }))] },
-                          { label: "Timing", emoji: "📅", value: tempTiming, setter: setTempTiming, options: [{ v: "all", l: "Any timing" }, { v: "today", l: "📅 Today" }, { v: "tomorrow", l: "🌅 Tomorrow" }, { v: "pick", l: "🗓 Pick date" }, { v: "flexible", l: "🔄 Flexible" }] },
-                          { label: "Duration", emoji: "⏳", value: tempDuration, setter: setTempDuration, options: [{ v: "all", l: "Any duration" }, { v: "hour", l: "Hours" }, { v: "day", l: "Days" }, { v: "week", l: "Weeks" }] },
-                          { label: "Pay Type", emoji: "💰", value: tempPayType, setter: setTempPayType, options: [{ v: "all", l: "Any pay type" }, { v: "per_hour", l: "⏱ Per hour" }, { v: "per_day", l: "📅 Per day" }, { v: "per_job", l: "💼 Per job" }] },
-                          { label: "Distance", emoji: "📍", value: tempDistance, setter: setTempDistance, options: [{ v: "3", l: "Within 3 km" }, { v: "5", l: "Within 5 km" }, { v: "10", l: "Within 10 km" }, { v: "20", l: "Within 20 km" }, { v: "all", l: "No limit" }], disabled: !hasDistanceReference },
-                          { label: "Min Pay (₹)", emoji: "💵", value: tempPay, setter: setTempPay, options: [{ v: "0", l: "Any pay" }, { v: "800", l: "₹800+" }, { v: "1200", l: "₹1200+" }, { v: "2000", l: "₹2000+" }] },
-                          { label: "Sort By", emoji: "↕️", value: tempSort, setter: setTempSort, options: [{ v: "nearest", l: "Nearest first" }, { v: "highest", l: "Highest pay" }, { v: "latest", l: "Latest" }] },
+                          { label: t("category"), emoji: "🏷️", value: tempCategory, setter: setTempCategory, options: [{ v: "all", l: t("allCategories") }, ...categories.map((c) => ({ v: c, l: `${categoryEmoji[c] || "💼"} ${c}` }))] },
+                          { label: t("timing"), emoji: "📅", value: tempTiming, setter: setTempTiming, options: [{ v: "all", l: t("anyTiming") }, { v: "today", l: `📅 ${t("today")}` }, { v: "tomorrow", l: `🌅 ${t("tomorrow")}` }, { v: "pick", l: `🗓 ${t("pickDate")}` }, { v: "flexible", l: `🔄 ${t("flexible")}` }] },
+                          { label: t("duration"), emoji: "⏳", value: tempDuration, setter: setTempDuration, options: [{ v: "all", l: t("anyDuration") }, { v: "hour", l: t("hours") }, { v: "day", l: t("days") }, { v: "week", l: t("weeks") }] },
+                          { label: t("payType"), emoji: "💰", value: tempPayType, setter: setTempPayType, options: [{ v: "all", l: t("anyPayType") }, { v: "per_hour", l: `⏱ ${t("perHour")}` }, { v: "per_day", l: `📅 ${t("perDay")}` }, { v: "per_job", l: `💼 ${t("perJob")}` }] },
+                          { label: t("distance"), emoji: "📍", value: tempDistance, setter: setTempDistance, options: [{ v: "3", l: t("within3km") }, { v: "5", l: t("within5km") }, { v: "10", l: t("within10km") }, { v: "20", l: t("within20km") }, { v: "all", l: t("noLimit") }], disabled: !hasDistanceReference },
+                          { label: t("minPay"), emoji: "💵", value: tempPay, setter: setTempPay, options: [{ v: "0", l: t("anyPay") }, { v: "800", l: "₹800+" }, { v: "1200", l: "₹1200+" }, { v: "2000", l: "₹2000+" }] },
+                          { label: t("sortBy"), emoji: "↕️", value: tempSort, setter: setTempSort, options: [{ v: "nearest", l: t("nearest") }, { v: "highest", l: t("highestPay") }, { v: "latest", l: t("latest") }] },
                         ].map(({ label, emoji, value, setter, options, disabled }) => (
                           <div key={label} className="rounded-xl border border-border/40 bg-white/70 dark:bg-slate-900/40 p-2">
                             <p className="text-[11px] font-semibold text-foreground mb-1.5">{emoji} {label}</p>
@@ -391,20 +394,20 @@ export default function FindWorkPage() {
                               <SelectTrigger className="h-9 rounded-lg border-border/60 bg-background/70">
                                 <SelectValue />
                               </SelectTrigger>
-                              <SelectContent className="rounded-xl">
+                              <SelectContent position="popper" className="rounded-xl">
                                 {options.map((o) => <SelectItem key={o.v} value={o.v}>{o.l}</SelectItem>)}
                               </SelectContent>
                             </Select>
-                            {disabled && <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">Enable location first</p>}
+                            {disabled && <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">{t("enableLocation")}</p>}
                           </div>
                         ))}
 
                         <div className="flex gap-2 sm:col-span-2">
                           <Button onClick={applyFilters} className="flex-1 h-11 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white font-semibold shadow-lg shadow-blue-500/30">
-                            Apply Filters
+                            {t("applyFilters")}
                           </Button>
                           <Button variant="outline" onClick={resetFilters} className="flex-1 h-11 rounded-xl border-border/60 font-medium">
-                            Reset
+                            {t("reset")}
                           </Button>
                         </div>
                       </div>
@@ -416,16 +419,16 @@ export default function FindWorkPage() {
               {/* Status chips */}
               <div className="flex flex-wrap gap-2">
                 {isResolvingManualLocation && (
-                  <StatusChip color="blue" label="Resolving location…" icon={<Loader className="h-3 w-3 animate-spin" />} />
+                  <StatusChip color="blue" label={t("resolvingLocation")} icon={<Loader className="h-3 w-3 animate-spin" />} />
                 )}
                 {currentLocation && (
-                  <StatusChip color="emerald" label="Using live location" icon={<CheckCircle className="h-3 w-3" />} />
+                  <StatusChip color="emerald" label={t("usingLiveLocation")} icon={<CheckCircle className="h-3 w-3" />} />
                 )}
                 {!currentLocation && profileLocationCoords && (
-                  <StatusChip color="teal" label="Using profile location" icon={<MapPin className="h-3 w-3" />} />
+                  <StatusChip color="teal" label={t("usingProfileLocation")} icon={<MapPin className="h-3 w-3" />} />
                 )}
                 {!hasDistanceReference && (
-                  <StatusChip color="amber" label="Set location for distance filter" />
+                  <StatusChip color="amber" label={t("setLocationForDistance")} />
                 )}
               </div>
             </div>
@@ -452,7 +455,7 @@ export default function FindWorkPage() {
             <div className="flex items-center gap-2">
               <div className="h-px flex-1 bg-gradient-to-r from-border to-transparent" />
               <span className="text-xs font-medium text-muted-foreground px-2">
-                {isLoading ? "Loading…" : `${filteredJobs.length} job${filteredJobs.length !== 1 ? "s" : ""}`}
+                {isLoading ? t("loading") : `${filteredJobs.length} job${filteredJobs.length !== 1 ? "s" : ""}`}
               </span>
               <div className="h-px flex-1 bg-gradient-to-l from-border to-transparent" />
             </div>
@@ -461,7 +464,7 @@ export default function FindWorkPage() {
             {isLoading && (
               <div className="flex flex-col items-center gap-3 py-12">
                 <div className="h-10 w-10 rounded-full border-4 border-[#1a7a5e]/20 border-t-[#1a7a5e] animate-spin" />
-                <p className="text-sm text-muted-foreground">Loading jobs…</p>
+                <p className="text-sm text-muted-foreground">{t("loading")}</p>
               </div>
             )}
 
@@ -508,14 +511,14 @@ export default function FindWorkPage() {
                               <p className="text-xs text-muted-foreground">/{getPayTypeDisplay(job.pricingType)}</p>
                             </div>
                           ) : (
-                            <span className="text-xs text-muted-foreground shrink-0">POA</span>
+                            <span className="text-xs text-muted-foreground shrink-0">{t("poa")}</span>
                           )}
                         </div>
 
                         {/* Badges */}
                         <div className="flex flex-wrap gap-1.5">
                           <span className="rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-300 border border-blue-500/20 px-2 py-0.5 text-[11px] font-medium">
-                            {job.category || "Uncategorized"}
+                            {job.category || t("uncategorized")}
                           </span>
                           <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${urgency.class}`}>
                             {urgency.label}
@@ -527,7 +530,7 @@ export default function FindWorkPage() {
                           )}
                           {isApplied && (
                             <span className="rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 text-[11px] font-medium flex items-center gap-1">
-                              <CheckCircle className="h-3 w-3" /> Applied
+                              <CheckCircle className="h-3 w-3" /> {t("applied_badge")}
                             </span>
                           )}
                         </div>
@@ -551,7 +554,7 @@ export default function FindWorkPage() {
                             onClick={() => openChat(job)}
                           >
                             <MessageCircle className="h-3.5 w-3.5 mr-1.5" />
-                            Chat
+                            {t("chat")}
                           </Button>
                           <Button
                             size="sm"
@@ -559,7 +562,7 @@ export default function FindWorkPage() {
                             className="h-9 rounded-xl px-3 text-muted-foreground hover:text-foreground"
                             onClick={() => setSelectedJob(job)}
                           >
-                            Details
+                            {t("details")}
                             <ChevronRight className="h-3.5 w-3.5 ml-0.5" />
                           </Button>
                         </div>
@@ -573,8 +576,8 @@ export default function FindWorkPage() {
                     <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/50 text-2xl">
                       💼
                     </div>
-                    <p className="font-semibold text-foreground">No jobs found</p>
-                    <p className="text-sm text-muted-foreground">Try adjusting your filters or search terms.</p>
+                    <p className="font-semibold text-foreground">{t("noJobsFound")}</p>
+                    <p className="text-sm text-muted-foreground">{t("noJobsDesc")}</p>
                   </div>
                 )}
               </div>
@@ -590,7 +593,7 @@ export default function FindWorkPage() {
             <DialogTitle className="text-lg">{selectedJob?.title}</DialogTitle>
             <DialogDescription className="flex items-center gap-1.5">
               <MapPin className="h-3.5 w-3.5" />
-              {selectedJob?.location || "Location not specified"}
+              {selectedJob?.location || t("locationNotSpecified")}
             </DialogDescription>
           </DialogHeader>
 
@@ -598,14 +601,14 @@ export default function FindWorkPage() {
             <div className="space-y-4 text-sm">
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  ["Category", selectedJob.category || "Not specified"],
-                  ["Pay", selectedJob.pricingAmount ? `₹${selectedJob.pricingAmount}/${getPayTypeDisplay(selectedJob.pricingType)}` : "POA"],
-                  ["Distance", typeof selectedJob.distanceKm === "number" ? formatDistance(selectedJob.distanceKm) : "N/A"],
-                  ["Urgency", selectedJob.urgency || "Flexible"],
-                  ["Timing", getTimingLabel(selectedJob.jobDate)],
-                  ["Duration", getDurationLabel(selectedJob.duration_value, selectedJob.duration_unit)],
+                  [t("category"), selectedJob.category || "Not specified"],
+                  ["Pay", selectedJob.pricingAmount ? `₹${selectedJob.pricingAmount}/${getPayTypeDisplay(selectedJob.pricingType)}` : t("poa")],
+                  [t("distance"), typeof selectedJob.distanceKm === "number" ? formatDistance(selectedJob.distanceKm) : t("notAvailable")],
+                  ["Urgency", getUrgencyConfig(selectedJob.urgency).label],
+                  [t("timing"), getTimingLabel(selectedJob.jobDate)],
+                  [t("duration"), getDurationLabel(selectedJob.duration_value, selectedJob.duration_unit)],
                   ["Posted by", selectedJob.postedBy?.name || "Unknown"],
-                  ["Email", selectedJob.postedBy?.email || "Not available"],
+                  ["Email", selectedJob.postedBy?.email || t("notAvailable")],
                 ].map(([k, v]) => (
                   <div key={k} className="rounded-xl bg-muted/40 px-3 py-2">
                     <p className="text-xs text-muted-foreground">{k}</p>
@@ -615,9 +618,9 @@ export default function FindWorkPage() {
               </div>
 
               <div className="rounded-xl bg-muted/40 p-3">
-                <p className="text-xs font-semibold text-foreground mb-1">About this job</p>
+                <p className="text-xs font-semibold text-foreground mb-1">{t("aboutThisJob")}</p>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  {selectedJob.description || "No description was provided for this job."}
+                  {selectedJob.description || t("noDescription")}
                 </p>
               </div>
 
@@ -627,10 +630,10 @@ export default function FindWorkPage() {
                   onClick={() => openChat(selectedJob)}
                 >
                   <MessageCircle className="h-4 w-4 mr-1.5" />
-                  Chat
+                  {t("chat")}
                 </Button>
                 <Button variant="outline" className="flex-1 h-10 rounded-xl border-border/60" onClick={() => setSelectedJob(null)}>
-                  Close
+                  {t("close")}
                 </Button>
               </div>
             </div>

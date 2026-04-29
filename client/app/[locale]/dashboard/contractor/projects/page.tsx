@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { fetchSessionUser, getCurrentLocale, resolveAccountType } from "@/lib/authClient";
+import { useTranslations } from "next-intl";
 import {
   Bell, TrendingUp, Briefcase, CheckCircle, AlertCircle,
   Eye, Phone, MessageSquare, ArrowLeft, Plus, ChevronRight,
@@ -49,6 +50,7 @@ export default function ContractorProjectsPage() {
   const router = useRouter();
   const pathname = usePathname();
   const locale = getCurrentLocale(pathname);
+  const t = useTranslations("contractorProjects");
 
   const [jobs, setJobs] = useState<JobWithApplications[]>([]);
   const [recentApplications, setRecentApplications] = useState<JobApplication[]>([]);
@@ -95,7 +97,7 @@ export default function ContractorProjectsPage() {
             setActiveTab("applications");
           }
         }
-      } catch { setError("Failed to load projects"); }
+      } catch { setError(t("loadingProjects")); }
       finally { setIsLoading(false); }
     };
     loadData();
@@ -104,7 +106,7 @@ export default function ContractorProjectsPage() {
   if (isLoading) return (
     <div className="flex min-h-[60vh] items-center justify-center flex-col gap-3">
       <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-emerald-600" />
-      <p className="text-sm text-muted-foreground">Loading projects…</p>
+      <p className="text-sm text-muted-foreground">{t("loadingProjects")}…</p>
     </div>
   );
 
@@ -200,21 +202,21 @@ export default function ContractorProjectsPage() {
           onClick={() => router.back()}
           className="mb-4 inline-flex items-center gap-1.5 rounded-full border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent/50 transition-colors"
         >
-          <ArrowLeft className="h-3.5 w-3.5" /> Dashboard
+          <ArrowLeft className="h-3.5 w-3.5" /> {t("dashboard")}
         </button>
 
         {/* Header */}
         <div className="mb-5 flex items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">My Projects</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Manage and track all your jobs</p>
+            <h1 className="text-2xl font-bold tracking-tight">{t("myProjects")}</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">{t("manageTrackJobs")}</p>
           </div>
           <button
             type="button"
             onClick={() => router.push(`/${locale}/add-works`)}
             className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors shrink-0"
           >
-            <Plus className="h-3.5 w-3.5" /> Post Job
+            <Plus className="h-3.5 w-3.5" /> {t("postJobButton")}
           </button>
         </div>
 
@@ -226,10 +228,10 @@ export default function ContractorProjectsPage() {
         {/* Summary row */}
         <div className="mb-5 grid grid-cols-4 gap-2">
           {[
-            { label: "Total",  value: jobs.length,          color: "text-foreground" },
-            { label: "Open",   value: openJobs.length,       color: "text-blue-600" },
-            { label: "Active", value: inProgressJobs.length, color: "text-amber-600" },
-            { label: "Done",   value: completedJobs.length,  color: "text-emerald-600" },
+            { label: t("total"),  value: jobs.length,          color: "text-foreground" },
+            { label: t("open"),   value: openJobs.length,       color: "text-blue-600" },
+            { label: t("active"), value: inProgressJobs.length, color: "text-amber-600" },
+            { label: t("done"),   value: completedJobs.length,  color: "text-emerald-600" },
           ].map(({ label, value, color }) => (
             <div key={label} className="rounded-xl border bg-background p-3 text-center shadow-sm">
               <p className={`text-lg font-bold leading-none ${color}`}>{value}</p>
@@ -243,15 +245,15 @@ export default function ContractorProjectsPage() {
           <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed bg-background p-12 text-center">
             <Briefcase className="h-12 w-12 text-muted-foreground/30" />
             <div>
-              <p className="font-semibold text-muted-foreground">No projects yet</p>
-              <p className="text-xs text-muted-foreground mt-1">Post your first project to find skilled workers</p>
+              <p className="font-semibold text-muted-foreground">{t("noProjectsYet")}</p>
+              <p className="text-xs text-muted-foreground mt-1">{t("postFirstProject")}</p>
             </div>
             <button
               type="button"
               onClick={() => router.push(`/${locale}/add-works`)}
               className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors"
             >
-              <Plus className="h-4 w-4" /> Post First Project
+              <Plus className="h-4 w-4" /> {t("postFirstProjectButton")}
             </button>
           </div>
         ) : (
@@ -291,7 +293,7 @@ export default function ContractorProjectsPage() {
               recentApplications.length === 0 ? (
                 <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed bg-background p-10 text-center">
                   <Bell className="h-10 w-10 text-muted-foreground/30" />
-                  <p className="font-semibold text-muted-foreground">No pending applications</p>
+                  <p className="font-semibold text-muted-foreground">{t("noPendingApplications")}</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -332,7 +334,7 @@ export default function ContractorProjectsPage() {
                 <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed bg-background p-10 text-center">
                   <Briefcase className="h-10 w-10 text-muted-foreground/30" />
                   <p className="font-semibold text-muted-foreground">
-                    {activeTab === "open" ? "No open projects" : activeTab === "active" ? "No active projects" : "No completed projects"}
+                    {activeTab === "open" ? t("noOpenProjects") : activeTab === "active" ? t("noActiveProjects") : t("noCompletedProjects")}
                   </p>
                 </div>
               ) : (

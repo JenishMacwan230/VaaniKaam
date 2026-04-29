@@ -15,7 +15,7 @@ interface Applicant {
   email?: string;
   proficiency?: string;
   location?: string;
-  status?: 'applied' | 'accepted' | 'rejected';
+  status?: 'applied' | 'accepted' | 'rejected' | 'completion_pending' | 'completed';
   createdAt?: string;
 }
 
@@ -261,7 +261,13 @@ export default function ApplicantsList({
                     >
                       {applicant.status === 'accepted'
                         ? 'Accepted'
-                        : 'Rejected'}
+                        : applicant.status === 'rejected'
+                        ? 'Rejected'
+                        : applicant.status === 'completion_pending'
+                        ? 'Completion Pending'
+                        : applicant.status === 'completed'
+                        ? 'Completed'
+                        : applicant.status}
                     </Button>
                   )}
                 </div>

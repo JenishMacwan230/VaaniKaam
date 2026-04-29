@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { getCurrentLocale, fetchSessionUser, resolveAccountType } from "@/lib/authClient";
 import {
   getWorkerApplications, getWorkerAcceptedJobs,
@@ -33,14 +34,15 @@ interface Job {
 
 type TabId = "active" | "applied" | "pending" | "completed";
 
-const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
-  { id: "active",    label: "Active",    icon: Clock },
-  { id: "applied",   label: "Applied",   icon: Briefcase },
-  { id: "pending",   label: "Confirm",   icon: AlertCircle },
-  { id: "completed", label: "Done",      icon: CheckCircle },
+const TABS: { id: TabId; icon: React.ElementType }[] = [
+  { id: "active", icon: Clock },
+  { id: "applied", icon: Briefcase },
+  { id: "pending", icon: AlertCircle },
+  { id: "completed", icon: CheckCircle },
 ];
 
 export default function WorkerDashboardPage() {
+  const t = useTranslations("workerDashboard");
   const router = useRouter();
   const pathname = usePathname();
   const locale = getCurrentLocale(pathname);
@@ -246,10 +248,10 @@ export default function WorkerDashboardPage() {
     completed: "bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/40 dark:text-teal-400",
   };
   const statusLabels: Record<string, string> = {
-    applied: "Applied",
-    accepted: "In Progress",
-    completion_pending: "Confirm?",
-    completed: "Done",
+    applied: t("applied"),
+    accepted: t("statusInProgress"),
+    completion_pending: t("statusConfirm"),
+    completed: t("done"),
   };
 
   return (
@@ -266,8 +268,8 @@ export default function WorkerDashboardPage() {
                 <Briefcase className="h-6 w-6 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-white leading-tight">My Work</h1>
-                <p className="mt-1 text-sm sm:text-base text-white/75">Jobs, applications & earnings</p>
+                <h1 className="text-2xl sm:text-3xl font-bold text-white leading-tight">{t("myWork")}</h1>
+                <p className="mt-1 text-sm sm:text-base text-white/75">{t("subtitle")}</p>
               </div>
             </div>
             <button
@@ -292,16 +294,16 @@ export default function WorkerDashboardPage() {
             className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent/40"
           >
             <ArrowLeft className="h-4 w-4" />
-            <span>Back</span>
+            <span>{t("back")}</span>
           </button>
         </div>
 
         {/* Badges */}
         <div className="flex flex-wrap gap-2 px-1">
           {[
-            `${appliedJobs.length} Applied`,
-            `${activeJobs.length + pendingJobs.length} Active`,
-            `${completedJobs.length} Done`,
+            `${appliedJobs.length} ${t("applied")}`,
+            `${activeJobs.length + pendingJobs.length} ${t("active")}`,
+            `${completedJobs.length} ${t("done")}`,
           ].map((tag) => (
             <span key={tag} className="flex items-center gap-1.5 rounded-full bg-blue-100 dark:bg-blue-900/30 px-3 py-1.5 text-xs font-medium text-blue-700 dark:text-blue-300">
               <Sparkles className="h-3 w-3" />{tag}
@@ -313,11 +315,11 @@ export default function WorkerDashboardPage() {
         <div className="rounded-2xl border-0 shadow-2xl shadow-black/10 dark:shadow-black/30 bg-white dark:bg-card p-5 sm:p-8">
           <div className="grid grid-cols-4 gap-2">
             {[
-              { label: "Applied",  value: appliedJobs.length,   color: "text-blue-600" },
-              { label: "Active",   value: activeJobs.length + pendingJobs.length, color: "text-cyan-600" },
-              { label: "Done",     value: completedJobs.length, color: "text-teal-600" },
+              { label: t("applied"),  value: appliedJobs.length,   color: "text-blue-600" },
+              { label: t("active"),   value: activeJobs.length + pendingJobs.length, color: "text-cyan-600" },
+              { label: t("done"),     value: completedJobs.length, color: "text-teal-600" },
               {
-                label: "Earned",
+                label: t("earned"),
                 value: totalEarned > 0
                   ? totalEarned >= 1000 ? `₹${(totalEarned / 1000).toFixed(1)}K` : `₹${totalEarned}`
                   : "₹0",
@@ -335,7 +337,8 @@ export default function WorkerDashboardPage() {
         {/* ── Tabs & Jobs ── */}
         <div className="rounded-2xl border-0 shadow-2xl shadow-black/10 dark:shadow-black/30 bg-white dark:bg-card p-5 sm:p-8 space-y-3">
           <div className="flex gap-1 rounded-xl border border-border/50 bg-muted/60 p-1">
-          {TABS.map(({ id, label, icon: Icon }) => {
+          {TABS.map(({ id, icon: Icon }) => {
+            const label = id === "active" ? t("active") : id === "applied" ? t("applied") : id === "pending" ? t("confirm") : t("done");
             const count = tabData[id].length;
             return (
               <button
@@ -371,13 +374,13 @@ export default function WorkerDashboardPage() {
             {activeTab === "completed" && <CheckCircle className="h-10 w-10 text-muted-foreground/30" />}
             <div>
               <p className="font-semibold text-muted-foreground">
-                {activeTab === "active" && "No active jobs"}
-                {activeTab === "applied" && "No applications yet"}
-                {activeTab === "pending" && "Nothing to confirm"}
-                {activeTab === "completed" && "No completed jobs yet"}
+                {activeTab === "active" && t("noActiveJobs")}
+                {activeTab === "applied" && t("noApplications")}
+                {activeTab === "pending" && t("nothingToConfirm")}
+                {activeTab === "completed" && t("noCompletedJobs")}
               </p>
               {(activeTab === "active" || activeTab === "applied") && (
-                <p className="text-xs text-muted-foreground mt-1">Browse available jobs to get started</p>
+                <p className="text-xs text-muted-foreground mt-1">{t("browseJobs")}</p>
               )}
             </div>
             {(activeTab === "active" || activeTab === "applied") && (
@@ -410,7 +413,7 @@ export default function WorkerDashboardPage() {
                     <div className="min-w-0">
                       <h3 className="font-semibold text-sm leading-snug">{job.title}</h3>
                       {job.postedBy && (
-                        <p className="text-xs text-muted-foreground mt-0.5">by {job.postedBy.name}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{t("by", { name: job.postedBy.name })}</p>
                       )}
                       {job.location && (
                         <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
@@ -437,28 +440,28 @@ export default function WorkerDashboardPage() {
                     {job.status === "completion_pending" ? (
                       <div className="flex gap-2">
                         <Button size="sm" className="h-8 gap-1.5 bg-blue-600 hover:bg-blue-700 text-xs" onClick={() => handleConfirm(job)}>
-                          <CheckCircle className="h-3.5 w-3.5" /> Confirm
+                          <CheckCircle className="h-3.5 w-3.5" /> {t("confirm")}
                         </Button>
                         <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => handleReject(job)}>
-                          Reject
+                          {t("reject")}
                         </Button>
                       </div>
                     ) : job.status === "completed" && job.paymentStatus === "pending" ? (
                       <div className="flex gap-2">
                         <Button size="sm" className="h-8 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-xs" onClick={() => handleConfirmPayment(job, "cash")} disabled={paymentLoading === job._id}>
-                          <DollarSign className="h-3.5 w-3.5" /> {paymentLoading === job._id ? "..." : "Got paid"}
+                          <DollarSign className="h-3.5 w-3.5" /> {paymentLoading === job._id ? "..." : t("gotPaid")}
                         </Button>
                         <Button size="sm" variant="destructive" className="h-8 gap-1 text-xs" onClick={() => handleDisputePayment(job)} disabled={paymentLoading === job._id}>
-                          <AlertTriangle className="h-3.5 w-3.5" /> Issue
+                          <AlertTriangle className="h-3.5 w-3.5" /> {t("issue")}
                         </Button>
                       </div>
                     ) : job.status === "completed" && job.paymentStatus === "confirmed_paid" ? (
-                      <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">✓ Confirmed</Badge>
+                      <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">{t("confirmed")}</Badge>
                     ) : job.status === "completed" && job.paymentStatus === "disputed" ? (
-                      <Badge variant="destructive">⚠ Disputed</Badge>
+                      <Badge variant="destructive">{t("disputed")}</Badge>
                     ) : (
                       <Button size="sm" variant="outline" className="h-8 gap-1 text-xs">
-                        Details <ChevronRight className="h-3.5 w-3.5" />
+                        {t("details")} <ChevronRight className="h-3.5 w-3.5" />
                       </Button>
                     )}
                   </div>
@@ -466,7 +469,7 @@ export default function WorkerDashboardPage() {
                   {/* Rating UI for completed jobs with confirmed payment */}
                   {job.status === "completed" && job.paymentStatus === "confirmed_paid" && !job.contractorRating?.givenAt && (
                     <div className="mt-4 pt-4 border-t">
-                      <p className="text-xs font-semibold mb-2">Rate your contractor</p>
+                      <p className="text-xs font-semibold mb-2">{t("rateContractor")}</p>
                       <div className="flex gap-1 mb-2">
                         {[1, 2, 3, 4, 5].map((star) => (
                           <button
@@ -481,7 +484,7 @@ export default function WorkerDashboardPage() {
                         ))}
                       </div>
                       <textarea
-                        placeholder="Add a review (optional, max 200 chars)"
+                        placeholder={t("addReview")}
                         value={ratingState[job._id]?.review || ""}
                         onChange={(e) => setRatingState((prev) => ({ ...prev, [job._id]: { ...prev[job._id], review: e.target.value.slice(0, 200), score: prev[job._id]?.score || 0, submitting: false } }))}
                         className="w-full text-xs p-2 border rounded mb-2 resize-none"
@@ -493,7 +496,7 @@ export default function WorkerDashboardPage() {
                         onClick={() => handleSubmitRating(job)}
                         disabled={ratingState[job._id]?.submitting || !ratingState[job._id]?.score}
                       >
-                        {ratingState[job._id]?.submitting ? "Submitting..." : "Submit Rating"}
+                        {ratingState[job._id]?.submitting ? t("submitting") : t("submitRating")}
                       </Button>
                     </div>
                   )}
@@ -507,8 +510,8 @@ export default function WorkerDashboardPage() {
         {/* Find more jobs CTA (bottom) */}
         <div className="rounded-2xl border-0 shadow-2xl shadow-black/10 dark:shadow-black/30 bg-white dark:bg-card p-5 sm:p-8 flex items-center justify-between">
           <div>
-            <p className="text-sm font-semibold">Looking for more work?</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Browse jobs that match your skills</p>
+            <p className="text-sm font-semibold">{t("lookingForWork")}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{t("browseMatch")}</p>
           </div>
           <button
             type="button"

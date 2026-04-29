@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getCurrentLocale } from "@/lib/authClient";
+import { useTranslations } from "next-intl";
 import {
   AlertCircle,
   CheckCircle,
@@ -71,6 +72,7 @@ export default function AddWorksPage() {
   const pathname = usePathname();
   const locale = getCurrentLocale(pathname);
   const router = useRouter();
+  const t = useTranslations("addWorks");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -214,7 +216,7 @@ export default function AddWorksPage() {
     setIsLoading(true);
     try {
       if (!formData.title || !formData.category || !formData.payAmount || !formData.location) {
-        setError("Please fill in all required fields");
+        setError(t("fillAllFields"));
         setIsLoading(false);
         return;
       }
@@ -245,7 +247,7 @@ export default function AddWorksPage() {
       });
       if (!response.ok) {
         const data = await response.json();
-        setError(data.message || "Failed to create work");
+        setError(data.message || t("createFailed"));
         setIsLoading(false);
         return;
       }
@@ -258,7 +260,7 @@ export default function AddWorksPage() {
       });
       setTimeout(() => router.push(`/${locale}/dashboard/contractor/projects`), 2000);
     } catch {
-      setError("An error occurred. Please try again.");
+      setError(t("error"));
       setIsLoading(false);
     }
   };
@@ -279,7 +281,7 @@ export default function AddWorksPage() {
             className="mb-6 flex items-center gap-1.5 text-sm text-white/80 hover:text-white transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back
+            {t("back")}
           </button>
 
           <div className="flex items-start gap-4">
@@ -288,17 +290,17 @@ export default function AddWorksPage() {
             </div>
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-white leading-tight">
-                Post a Work Opportunity
+                {t("pageTitle")}
               </h1>
               <p className="mt-1 text-sm sm:text-base text-white/75">
-                Connect with skilled workers in your area instantly
+                {t("pageSubtitle")}
               </p>
             </div>
           </div>
 
           {/* Quick stat chips */}
           <div className="mt-6 flex flex-wrap gap-2">
-            {["Fast Hiring", "Verified Workers", "Local Talent"].map((tag) => (
+            {[t("fastHiring"), t("verifiedWorkers"), t("localTalent")].map((tag) => (
               <span
                 key={tag}
                 className="flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-medium text-white backdrop-blur-sm"
@@ -327,7 +329,7 @@ export default function AddWorksPage() {
               <div className="mb-6 flex items-start gap-3 rounded-xl border border-emerald-300 bg-emerald-50 dark:bg-emerald-900/20 dark:border-emerald-800 p-4">
                 <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
                 <p className="text-sm text-emerald-700 dark:text-emerald-400 font-medium">
-                  Work posted successfully! Redirecting…
+                  {t("success")}
                 </p>
               </div>
             )}
@@ -336,19 +338,19 @@ export default function AddWorksPage() {
 
               {/* ── SECTION 1: Basic Info ── */}
               <section>
-                <SectionHeader icon={<FileText className="h-4 w-4" />} title="Basic Info" />
+                <SectionHeader icon={<FileText className="h-4 w-4" />} title={t("basicInfo")} />
 
                 <div className="mt-4 space-y-4">
                   {/* Title */}
                   <div>
                     <Label htmlFor="title" className="text-sm font-semibold text-foreground">
-                      Work Title <Required />
+                      {t("workTitle")} <Required />
                     </Label>
                     <Input
                       id="title"
                       name="title"
                       type="text"
-                      placeholder="e.g., Plumber needed for apartment repair"
+                      placeholder={t("workTitlePlaceholder")}
                       value={formData.title}
                       onChange={handleChange}
                       className="mt-1.5 h-11 rounded-xl border-border/60 bg-muted/40 focus:bg-background focus:border-emerald-500 focus:ring-emerald-500/20 transition-all"
@@ -358,13 +360,13 @@ export default function AddWorksPage() {
                   {/* Description */}
                   <div>
                     <Label htmlFor="description" className="text-sm font-semibold text-foreground">
-                      Description
-                      <span className="ml-2 text-xs font-normal text-muted-foreground">(optional)</span>
+                      {t("description")}
+                      <span className="ml-2 text-xs font-normal text-muted-foreground">{t("descriptionOptional")}</span>
                     </Label>
                     <Textarea
                       id="description"
                       name="description"
-                      placeholder="Add any extra details, requirements, tools needed…"
+                      placeholder={t("descriptionPlaceholder")}
                       value={formData.description}
                       onChange={handleChange}
                       rows={3}
@@ -376,22 +378,22 @@ export default function AddWorksPage() {
 
               {/* ── SECTION 2: Category & Location ── */}
               <section>
-                <SectionHeader icon={<Tag className="h-4 w-4" />} title="Category & Location" />
+                <SectionHeader icon={<Tag className="h-4 w-4" />} title={t("categoryLocation")} />
 
                 <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Category */}
                   <div>
                     <Label className="text-sm font-semibold text-foreground">
-                      Category <Required />
+                      {t("categoryLocation").split(" & ")[0]} <Required />
                     </Label>
                     <Select
                       value={formData.category}
                       onValueChange={(v) => handleSelectChange("category", v)}
                     >
                       <SelectTrigger className="mt-1.5 h-11 rounded-xl border-border/60 bg-muted/40 focus:border-emerald-500">
-                        <SelectValue placeholder="Select a category" />
+                        <SelectValue placeholder={t("selectCategory")} />
                       </SelectTrigger>
-                      <SelectContent className="rounded-xl">
+                      <SelectContent position="popper" className="rounded-xl">
                         {categories.map((cat) => (
                           <SelectItem key={cat} value={cat} className="rounded-lg">
                             <span className="flex items-center gap-2">
@@ -407,10 +409,10 @@ export default function AddWorksPage() {
                   {/* Location */}
                   <div>
                     <Label className="text-sm font-semibold text-foreground">
-                      Location <Required />
+                      {t("location")} <Required />
                       {isNormalizingLocation && (
                         <span className="ml-2 inline-flex items-center gap-1 text-xs font-normal text-blue-500">
-                          <Loader className="h-3 w-3 animate-spin" /> Verifying…
+                          <Loader className="h-3 w-3 animate-spin" /> {t("verifying")}
                         </span>
                       )}
                     </Label>
@@ -419,7 +421,7 @@ export default function AddWorksPage() {
                         id="location"
                         name="location"
                         type="text"
-                        placeholder="City name (e.g., Surat, Indore)"
+                        placeholder={t("cityPlaceholder")}
                         value={formData.location}
                         onChange={handleChange}
                         onBlur={handleLocationBlur}
@@ -429,7 +431,7 @@ export default function AddWorksPage() {
                         type="button"
                         onClick={handleAutoFillLocation}
                         disabled={isGPSLoading}
-                        title="Use my current location"
+                        title={t("useMyLocation")}
                         className="h-11 w-11 shrink-0 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 shadow-md shadow-blue-500/25 p-0"
                       >
                         {isGPSLoading
@@ -476,12 +478,12 @@ export default function AddWorksPage() {
 
               {/* ── SECTION 3: Pay ── */}
               <section>
-                <SectionHeader icon={<IndianRupee className="h-4 w-4" />} title="Pay Details" />
+                <SectionHeader icon={<IndianRupee className="h-4 w-4" />} title={t("payDetails")} />
 
                 <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-4">
                   {/* Pay Type */}
                   <div className="col-span-1">
-                    <Label className="text-sm font-semibold text-foreground">Pay Type</Label>
+                    <Label className="text-sm font-semibold text-foreground">{t("payType")}</Label>
                     <Select
                       value={formData.payType}
                       onValueChange={(v) => handlePayTypeChange(v as WorkForm["payType"])}
@@ -489,10 +491,10 @@ export default function AddWorksPage() {
                       <SelectTrigger className="mt-1.5 h-11 rounded-xl border-border/60 bg-muted/40">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="rounded-xl">
-                        <SelectItem value="per_hour">⏱ Per Hour</SelectItem>
-                        <SelectItem value="per_day">📅 Per Day</SelectItem>
-                        <SelectItem value="per_job">💼 Per Job</SelectItem>
+                      <SelectContent position="popper" className="rounded-xl">
+                        <SelectItem value="per_hour">⏱ {t("perHour")}</SelectItem>
+                        <SelectItem value="per_day">📅 {t("perDay")}</SelectItem>
+                        <SelectItem value="per_job">💼 {t("perJob")}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -500,7 +502,7 @@ export default function AddWorksPage() {
                   {/* Pay Amount */}
                   <div className="col-span-1 sm:col-span-2">
                     <Label className="text-sm font-semibold text-foreground">
-                      Amount (₹) <Required />
+                      {t("amount")} <Required />
                     </Label>
                     <div className="mt-1.5 relative">
                       <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -516,18 +518,18 @@ export default function AddWorksPage() {
                     </div>
                     {formData.payType === "per_day" && (
                       <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                        <Info className="h-3 w-3" /> Typical: ₹400–₹700/day
+                        <Info className="h-3 w-3" /> {t("typicalPerDay")}
                       </p>
                     )}
                     {formData.payType === "per_hour" && (
                       <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                        <Info className="h-3 w-3" /> Typical: ₹50–₹150/hour
+                        <Info className="h-3 w-3" /> {t("typicalPerHour")}
                       </p>
                     )}
                     {lowPaymentWarning && (
                       <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 px-3 py-2">
                         <p className="text-xs text-amber-700 dark:text-amber-300 font-medium">
-                          ⚠️ Very low pay — workers may not respond.
+                          {t("lowPaymentWarning")}
                         </p>
                       </div>
                     )}
@@ -538,7 +540,7 @@ export default function AddWorksPage() {
                 {estimatedTotal !== null && (
                   <div className="mt-4 flex items-center justify-between rounded-xl bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-cyan-500/10 border border-emerald-200 dark:border-emerald-800 px-4 py-3">
                     <span className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">
-                      Estimated Total
+                      {t("estimatedTotal")}
                     </span>
                     <span className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
                       ₹{estimatedTotal.toLocaleString()}
@@ -549,13 +551,13 @@ export default function AddWorksPage() {
 
               {/* ── SECTION 4: Duration ── */}
               <section>
-                <SectionHeader icon={<Clock className="h-4 w-4" />} title="Duration" />
+                <SectionHeader icon={<Clock className="h-4 w-4" />} title={t("duration")} />
 
                 <div className="mt-4 grid grid-cols-2 gap-4">
                   {/* Duration Value */}
                   <div>
                     <Label className="text-sm font-semibold text-foreground">
-                      How many? <Required />
+                      {t("howMany")} <Required />
                     </Label>
                     <Input
                       id="duration_value"
@@ -576,7 +578,7 @@ export default function AddWorksPage() {
                   {/* Duration Unit */}
                   <div>
                     <Label className="text-sm font-semibold text-foreground">
-                      Unit <Required />
+                      {t("unit")} <Required />
                     </Label>
                     <Select
                       value={formData.duration_unit}
@@ -587,7 +589,7 @@ export default function AddWorksPage() {
                       <SelectTrigger className="mt-1.5 h-11 rounded-xl border-border/60 bg-muted/40">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="rounded-xl">
+                      <SelectContent position="popper" className="rounded-xl">
                         {getValidDurationUnits(formData.payType).map((unit) => (
                           <SelectItem key={unit} value={unit}>
                             {unit.charAt(0).toUpperCase() + unit.slice(1)}s
@@ -597,7 +599,7 @@ export default function AddWorksPage() {
                     </Select>
                     {formData.payType !== "per_job" && (
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Locked to {formData.duration_unit}s for this pay type
+                        {t("lockedDuration", { unit: formData.duration_unit })}
                       </p>
                     )}
                   </div>
@@ -606,13 +608,13 @@ export default function AddWorksPage() {
 
               {/* ── SECTION 5: Schedule & Team ── */}
               <section>
-                <SectionHeader icon={<CalendarDays className="h-4 w-4" />} title="Schedule & Team" />
+                <SectionHeader icon={<CalendarDays className="h-4 w-4" />} title={t("scheduleAndTeam")} />
 
                 <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* When */}
                   <div>
                     <Label className="text-sm font-semibold text-foreground">
-                      Start Date <Required />
+                      {t("startDate")} <Required />
                     </Label>
                     <Select
                       value={formData.jobDate}
@@ -621,11 +623,11 @@ export default function AddWorksPage() {
                       <SelectTrigger className="mt-1.5 h-11 rounded-xl border-border/60 bg-muted/40">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="rounded-xl">
-                        <SelectItem value="today">📅 Today</SelectItem>
-                        <SelectItem value="tomorrow">🌅 Tomorrow</SelectItem>
-                        <SelectItem value="pick">🗓 Pick a date</SelectItem>
-                        <SelectItem value="flexible">🔄 Flexible</SelectItem>
+                      <SelectContent position="popper" className="rounded-xl">
+                        <SelectItem value="today">{t("todayEmoji")}</SelectItem>
+                        <SelectItem value="tomorrow">{t("tomorrowEmoji")}</SelectItem>
+                        <SelectItem value="pick">{t("pickDateEmoji")}</SelectItem>
+                        <SelectItem value="flexible">{t("flexibleEmoji")}</SelectItem>
                       </SelectContent>
                     </Select>
                     {formData.jobDate === "pick" && (
@@ -670,11 +672,11 @@ export default function AddWorksPage() {
                 >
                   {isLoading ? (
                     <span className="flex items-center gap-2">
-                      <Loader className="h-4 w-4 animate-spin" /> Posting…
+                      <Loader className="h-4 w-4 animate-spin" /> {t("posting")}
                     </span>
                   ) : (
                     <span className="flex items-center gap-2">
-                      Post Work
+                      {t("postWork")}
                       <ChevronRight className="h-4 w-4" />
                     </span>
                   )}
@@ -686,7 +688,7 @@ export default function AddWorksPage() {
                   disabled={isLoading}
                   className="flex-1 h-12 rounded-xl border-border/60 font-medium text-base hover:bg-muted transition-all"
                 >
-                  Cancel
+                  {t("cancel")}
                 </Button>
               </div>
             </form>

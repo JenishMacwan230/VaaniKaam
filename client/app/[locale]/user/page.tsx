@@ -25,8 +25,10 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ProfilePictureManager } from "@/components/ProfilePictureManager";
+import { useTranslations } from "next-intl";
 
 export default function UserHubPage() {
+  const t = useTranslations("userPage");
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -56,7 +58,7 @@ export default function UserHubPage() {
       <main className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
           <div className="h-10 w-10 rounded-full border-4 border-teal-500/30 border-t-teal-500 animate-spin" />
-          <p className="text-sm text-muted-foreground">Loading your account…</p>
+          <p className="text-sm text-muted-foreground">{t("loading")}</p>
         </div>
       </main>
     );
@@ -72,32 +74,32 @@ export default function UserHubPage() {
   const sections = [
     {
       key: "profile",
-      title: "Profile",
-      description: "View and edit your personal details, skills and languages.",
+      title: t("profileTitle"),
+      description: t("profileDesc"),
       href: `/${locale}/dashboard?editProfile=1`,
       icon: UserIcon,
       color: "violet",
     },
     {
       key: "dashboard",
-      title: "Dashboard",
-      description: "Track your work, availability and profile completion.",
+      title: t("dashboardTitle"),
+      description: t("dashboardDesc"),
       href: dashboardHref,
       icon: LayoutDashboard,
       color: "blue",
     },
     {
       key: "help",
-      title: "Help & Support",
-      description: "Get help with using VaaniKaam or report an issue.",
+      title: t("helpTitle"),
+      description: t("helpDesc"),
       href: `/${locale}/help-support`,
       icon: HelpCircle,
       color: "amber",
     },
     {
       key: "about",
-      title: "About Us",
-      description: "Learn more about the VaaniKaam mission and vision.",
+      title: t("aboutTitle"),
+      description: t("aboutDesc"),
       href: `/${locale}/about`,
       icon: Info,
       color: "cyan",
@@ -149,19 +151,19 @@ export default function UserHubPage() {
 
             {/* Info */}
             <div className="min-w-0 flex-1">
-              <p className="text-xs text-white/65 leading-none mb-1">Signed in as</p>
+              <p className="text-xs text-white/65 leading-none mb-1">{t("signedInAs")}</p>
               <h1 className="text-xl sm:text-2xl font-bold text-black leading-tight truncate">
-                {user.name || "User"}
+                {user.name || t("defaultName")}
               </h1>
               <p className="mt-1 text-sm text-black/80 truncate">
-                {user.phone || user.email || "No contact details added yet"}
+                {user.phone || user.email || t("noContact")}
               </p>
 
               {/* Account type + verified chip row */}
               <div className="mt-2.5 flex flex-wrap gap-2">
                 <span className="flex items-center gap-1 rounded-full bg-white/20 backdrop-blur-sm px-2.5 py-0.5 text-[11px] font-semibold text-black">
                   <ShieldCheck className="h-3 w-3" />
-                  {isContractor ? "Contractor" : "Worker"}
+                  {isContractor ? t("contractor") : t("worker")}
                 </span>
                 <span className="flex items-center gap-1 rounded-full bg-white/15 backdrop-blur-sm px-2.5 py-0.5 text-[11px] font-medium text-black/80">
                   <Sparkles className="h-3 w-3" />
@@ -183,7 +185,7 @@ export default function UserHubPage() {
               <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-teal-500/20 to-emerald-500/20 text-teal-600 dark:text-teal-400">
                 <LayoutDashboard className="h-4 w-4" />
               </div>
-              <h2 className="text-base font-semibold text-foreground">Account Centre</h2>
+              <h2 className="text-base font-semibold text-foreground">{t("accountCentre")}</h2>
               <div className="flex-1 h-px bg-gradient-to-r from-border to-transparent" />
             </div>
 
@@ -227,7 +229,7 @@ export default function UserHubPage() {
                 className="w-full h-12 rounded-xl bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 text-white font-semibold shadow-lg shadow-rose-500/25 transition-all flex items-center justify-center gap-2"
               >
                 <LogOut className="h-4 w-4" />
-                Log Out
+                {t("logOut")}
               </Button>
               <p className="text-center text-xs text-muted-foreground">
                 Manage all your VaaniKaam settings and pages from here.
