@@ -6,7 +6,7 @@ import { fetchSessionUser, getCurrentLocale } from "@/lib/authClient";
 import ApplicantsList from "@/components/ApplicantsList";
 import {
   ArrowLeft, MapPin, DollarSign, Clock, Users, CheckCircle,
-  Briefcase, Edit, Trash2, Copy, AlertCircle,
+  Briefcase, Edit, Trash2, Copy, AlertCircle, Star,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,7 +38,9 @@ interface JobDetails {
 
 interface JobApplication {
   _id: string;
-  status: "applied" | "accepted" | "rejected";
+  status: "applied" | "accepted" | "rejected" | "completion_pending" | "completed";
+  paymentStatus?: "pending" | "confirmed_paid" | "disputed";
+  workerRating?: { score: number; review?: string; givenAt: Date };
   createdAt: string;
   workerId: {
     _id: string; name: string; email: string;
@@ -60,6 +62,7 @@ export default function JobDetailsPage({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [ratingState, setRatingState] = useState<Record<string, { score: number; review: string; submitting: boolean }>>({});
 
   const refreshJob = async () => {
     const res = await fetch(`${API_BASE_URL}/api/jobs/${resolvedParams.jobId}`, { credentials: "include" });
@@ -88,14 +91,12 @@ export default function JobDetailsPage({
     if (!confirm(`Mark complete? This will notify ${acceptedApps.length} worker(s).`)) return;
     setActionLoading("complete");
     try {
-      for (const app of acceptedApps) {
-        const res = await fetch(`${API_BASE_URL}/api/jobs/mark-complete`, {
-          method: "POST", credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ applicationId: app._id }),
-        });
-        if (!res.ok) { alert("Failed to mark complete"); setActionLoading(null); return; }
-      }
+      const res = await fetch(`${API_BASE_URL}/api/jobs/mark-all-complete`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId: resolvedParams.jobId }),
+      });
+      if (!res.ok) { alert("Failed to mark complete"); setActionLoading(null); return; }
       await refreshJob();
     } catch { alert("Error"); }
     finally { setActionLoading(null); }
@@ -112,6 +113,38 @@ export default function JobDetailsPage({
       else alert("Failed to delete job");
     } catch { alert("Error deleting job"); }
     finally { setActionLoading(null); }
+  };
+
+  const handleSubmitRating = async (applicationId: string) => {
+    if (!API_BASE_URL) return;
+    const ratingData = ratingState[applicationId];
+    if (!ratingData || !ratingData.score) {
+      alert("Please select a rating");
+      return;
+    }
+    setRatingState((prev) => ({ ...prev, [applicationId]: { ...prev[applicationId], submitting: true } }));
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/jobs/rate`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ applicationId, score: ratingData.score, review: ratingData.review || "" }),
+      });
+      if (res.ok) {
+        await refreshJob();
+        setRatingState((prev) => {
+          const newState = { ...prev };
+          delete newState[applicationId];
+          return newState;
+        });
+      } else {
+        alert("Failed to submit rating");
+      }
+    } catch (e) {
+      alert("Error submitting rating");
+    } finally {
+      setRatingState((prev) => ({ ...prev, [applicationId]: { ...prev[applicationId], submitting: false } }));
+    }
   };
 
   const statusStyles: Record<string, string> = {
@@ -250,6 +283,84 @@ export default function JobDetailsPage({
             </div>
           </div>
           <div className="p-4">
+            {/* Show payment status for completed applications */}
+            {job.applications.some((a) => a.status === "completed" || a.status === "completion_pending") && (
+              <div className="mb-4 space-y-3">
+                {job.applications.filter((a) => a.status === "completed" || a.status === "completion_pending").map((app) => (
+                  <div key={app._id} className="border rounded-lg p-3 bg-muted/30">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium text-sm">{app.workerId.name}</span>
+                      <div className="flex items-center gap-2">
+                        {app.status === "completed" && app.paymentStatus === "pending" && (
+                          <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200 text-xs">Waiting for payment confirmation</Badge>
+                        )}
+                        {app.status === "completed" && app.paymentStatus === "confirmed_paid" && (
+                          <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-xs">✓ Payment confirmed</Badge>
+                        )}
+                        {app.status === "completed" && app.paymentStatus === "disputed" && (
+                          <Badge variant="destructive" className="text-xs">⚠ Payment disputed</Badge>
+                        )}
+                        {app.status === "completion_pending" && (
+                          <Badge className="bg-orange-100 text-orange-700 border-orange-200 text-xs">Awaiting worker confirmation</Badge>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Rating UI for completed applications with confirmed payment */}
+                    {app.status === "completed" && app.paymentStatus === "confirmed_paid" && !app.workerRating?.givenAt && (
+                      <div className="mt-3 pt-3 border-t">
+                        <p className="text-xs font-semibold mb-2">Rate this worker</p>
+                        <div className="flex gap-1 mb-2">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              onClick={() => setRatingState((prev) => ({ ...prev, [app._id]: { ...prev[app._id], score: star, review: prev[app._id]?.review || "", submitting: false } }))}
+                              className={`text-lg transition-colors ${
+                                (ratingState[app._id]?.score || 0) >= star ? "text-yellow-400" : "text-gray-300"
+                              }`}
+                            >
+                              ★
+                            </button>
+                          ))}
+                        </div>
+                        <textarea
+                          placeholder="Add a review (optional, max 200 chars)"
+                          value={ratingState[app._id]?.review || ""}
+                          onChange={(e) => setRatingState((prev) => ({ ...prev, [app._id]: { ...prev[app._id], review: e.target.value.slice(0, 200), score: prev[app._id]?.score || 0, submitting: false } }))}
+                          className="w-full text-xs p-2 border rounded mb-2 resize-none"
+                          rows={2}
+                        />
+                        <Button
+                          size="sm"
+                          className="w-full h-7 text-xs"
+                          onClick={() => handleSubmitRating(app._id)}
+                          disabled={ratingState[app._id]?.submitting || !ratingState[app._id]?.score}
+                        >
+                          {ratingState[app._id]?.submitting ? "Submitting..." : "Submit Rating"}
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Display rating if already given */}
+                    {app.status === "completed" && app.workerRating?.givenAt && (
+                      <div className="mt-2 pt-2 border-t text-xs">
+                        <div className="flex items-center gap-1">
+                          <span className="font-semibold">Your rating:</span>
+                          <span className="text-yellow-500">
+                            {"★".repeat(app.workerRating.score)}
+                            {"☆".repeat(5 - app.workerRating.score)}
+                          </span>
+                          <span className="text-muted-foreground">({app.workerRating.score}/5)</span>
+                        </div>
+                        {app.workerRating.review && (
+                          <p className="text-muted-foreground mt-1">"{app.workerRating.review}"</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
             <ApplicantsList
               applicants={job.applications.map((app) => ({
                 _id: app.workerId._id,

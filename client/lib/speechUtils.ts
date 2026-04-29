@@ -526,7 +526,7 @@ const mapSpeechErrorToMessage = (error: string): string | null => {
     "no-speech": null,
     "audio-capture": "No microphone found. Please check your device.",
     "network": "Network error. Please try again.",
-    "not-allowed": null,
+    "not-allowed": "Microphone blocked. Please allow microphone access in your browser settings.",
     "service-not-allowed": "Speech recognition service not allowed.",
   };
 

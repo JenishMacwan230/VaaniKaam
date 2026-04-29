@@ -14,6 +14,7 @@ import {
   Briefcase, CheckCircle, Clock, AlertCircle,
   MapPin, IndianRupee, ArrowRight, ArrowLeft,
   ChevronRight, Search, TrendingUp, Sparkles, LayoutDashboard,
+  AlertTriangle, DollarSign,
 } from "lucide-react";
 
 interface Job {
@@ -23,9 +24,11 @@ interface Job {
   pricingAmount?: number | string;
   pricingType?: string;
   status: "applied" | "accepted" | "completion_pending" | "completed";
-  postedBy?: { name: string };
+  postedBy?: { name: string; averageRating?: number; totalRatings?: number };
   createdAt?: string;
   applicationId?: string;
+  paymentStatus?: "pending" | "confirmed_paid" | "disputed";
+  contractorRating?: { score: number; review?: string; givenAt: Date };
 }
 
 type TabId = "active" | "applied" | "pending" | "completed";
@@ -49,6 +52,8 @@ export default function WorkerDashboardPage() {
   const [pendingJobs, setPendingJobs] = useState<Job[]>([]);
   const [completedJobs, setCompletedJobs] = useState<Job[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [paymentLoading, setPaymentLoading] = useState<string | null>(null);
+  const [ratingState, setRatingState] = useState<Record<string, { score: number; review: string; submitting: boolean }>>({});
 
   const toNum = (v: number | string | undefined): number => {
     if (typeof v === "number") return v;
@@ -60,6 +65,8 @@ export default function WorkerDashboardPage() {
     const n = toNum(amount);
     return n > 0 ? `₹${n.toLocaleString()}/${type || "job"}` : `POA`;
   };
+
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
   useEffect(() => {
     const init = async () => {
@@ -102,6 +109,7 @@ export default function WorkerDashboardPage() {
             _id: a.jobId._id, title: a.jobId.title, location: a.jobId.location,
             pricingAmount: a.jobId.pricingAmount, pricingType: a.jobId.pricingType,
             status: "completed" as const, postedBy: a.jobId.postedBy, createdAt: a.jobId.createdAt,
+            applicationId: a._id, paymentStatus: a.paymentStatus, contractorRating: a.contractorRating,
           })));
 
         // Auto-switch to pending if there are items needing action
@@ -118,7 +126,7 @@ export default function WorkerDashboardPage() {
     await confirmJobCompletion(job.applicationId);
     setPendingJobs((p) => p.filter((j) => j._id !== job._id));
     const d = await getWorkerCompletedJobs();
-    setCompletedJobs(d.map((a: any) => ({ _id: a.jobId._id, title: a.jobId.title, location: a.jobId.location, pricingAmount: a.jobId.pricingAmount, pricingType: a.jobId.pricingType, status: "completed" as const, postedBy: a.jobId.postedBy, createdAt: a.jobId.createdAt })));
+    setCompletedJobs(d.map((a: any) => ({ _id: a.jobId._id, title: a.jobId.title, location: a.jobId.location, pricingAmount: a.jobId.pricingAmount, pricingType: a.jobId.pricingType, status: "completed" as const, postedBy: a.jobId.postedBy, createdAt: a.jobId.createdAt, applicationId: a._id, paymentStatus: a.paymentStatus, contractorRating: a.contractorRating })));
   };
 
   const handleReject = async (job: Job) => {
@@ -127,6 +135,85 @@ export default function WorkerDashboardPage() {
     setPendingJobs((p) => p.filter((j) => j._id !== job._id));
     const d = await getWorkerAcceptedJobs();
     setActiveJobs(d.map((a: any) => ({ _id: a.jobId._id, title: a.jobId.title, location: a.jobId.location, pricingAmount: a.jobId.pricingAmount, pricingType: a.jobId.pricingType, status: "accepted" as const, postedBy: a.jobId.postedBy, createdAt: a.jobId.createdAt })));
+  };
+
+  const handleConfirmPayment = async (job: Job, method: "cash" | "upi" | "other") => {
+    if (!job.applicationId || !API_BASE_URL) return;
+    setPaymentLoading(job._id);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/jobs/confirm-payment`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ applicationId: job.applicationId, paymentMethod: method }),
+      });
+      if (res.ok) {
+        const d = await getWorkerCompletedJobs();
+        setCompletedJobs(d.map((a: any) => ({ _id: a.jobId._id, title: a.jobId.title, location: a.jobId.location, pricingAmount: a.jobId.pricingAmount, pricingType: a.jobId.pricingType, status: "completed" as const, postedBy: a.jobId.postedBy, createdAt: a.jobId.createdAt, applicationId: a._id, paymentStatus: a.paymentStatus, contractorRating: a.contractorRating })));
+      } else {
+        alert("Failed to confirm payment");
+      }
+    } catch (e) {
+      alert("Error confirming payment");
+    } finally {
+      setPaymentLoading(null);
+    }
+  };
+
+  const handleDisputePayment = async (job: Job) => {
+    if (!job.applicationId || !API_BASE_URL) return;
+    setPaymentLoading(job._id);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/jobs/dispute-payment`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ applicationId: job.applicationId }),
+      });
+      if (res.ok) {
+        const d = await getWorkerCompletedJobs();
+        setCompletedJobs(d.map((a: any) => ({ _id: a.jobId._id, title: a.jobId.title, location: a.jobId.location, pricingAmount: a.jobId.pricingAmount, pricingType: a.jobId.pricingType, status: "completed" as const, postedBy: a.jobId.postedBy, createdAt: a.jobId.createdAt, applicationId: a._id, paymentStatus: a.paymentStatus, contractorRating: a.contractorRating })));
+      } else {
+        alert("Failed to dispute payment");
+      }
+    } catch (e) {
+      alert("Error disputing payment");
+    } finally {
+      setPaymentLoading(null);
+    }
+  };
+
+  const handleSubmitRating = async (job: Job) => {
+    if (!job.applicationId || !API_BASE_URL) return;
+    const ratingData = ratingState[job._id];
+    if (!ratingData || !ratingData.score) {
+      alert("Please select a rating");
+      return;
+    }
+    setRatingState((prev) => ({ ...prev, [job._id]: { ...prev[job._id], submitting: true } }));
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/jobs/rate`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ applicationId: job.applicationId, score: ratingData.score, review: ratingData.review || "" }),
+      });
+      if (res.ok) {
+        const d = await getWorkerCompletedJobs();
+        setCompletedJobs(d.map((a: any) => ({ _id: a.jobId._id, title: a.jobId.title, location: a.jobId.location, pricingAmount: a.jobId.pricingAmount, pricingType: a.jobId.pricingType, status: "completed" as const, postedBy: a.jobId.postedBy, createdAt: a.jobId.createdAt, applicationId: a._id, paymentStatus: a.paymentStatus, contractorRating: a.contractorRating })));
+        setRatingState((prev) => {
+          const newState = { ...prev };
+          delete newState[job._id];
+          return newState;
+        });
+      } else {
+        alert("Failed to submit rating");
+      }
+    } catch (e) {
+      alert("Error submitting rating");
+    } finally {
+      setRatingState((prev) => ({ ...prev, [job._id]: { ...prev[job._id], submitting: false } }));
+    }
   };
 
   if (loading) return (
@@ -150,7 +237,7 @@ export default function WorkerDashboardPage() {
   };
 
   const currentJobs = tabData[activeTab];
-  const totalEarned = completedJobs.reduce((s, j) => s + toNum(j.pricingAmount), 0);
+  const totalEarned = completedJobs.reduce((s, j) => s + (j.paymentStatus === "confirmed_paid" ? toNum(j.pricingAmount) : 0), 0);
 
   const statusColors: Record<string, string> = {
     applied: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400",
@@ -338,9 +425,14 @@ export default function WorkerDashboardPage() {
                   </div>
 
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-base font-bold text-blue-600">
-                      {fmt(job.pricingAmount, job.pricingType)}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-base font-bold text-blue-600">
+                        {fmt(job.pricingAmount, job.pricingType)}
+                      </p>
+                      {job.postedBy?.averageRating && (
+                        <span className="text-xs text-muted-foreground">⭐ {job.postedBy.averageRating.toFixed(1)} ({job.postedBy.totalRatings})</span>
+                      )}
+                    </div>
 
                     {job.status === "completion_pending" ? (
                       <div className="flex gap-2">
@@ -351,12 +443,60 @@ export default function WorkerDashboardPage() {
                           Reject
                         </Button>
                       </div>
+                    ) : job.status === "completed" && job.paymentStatus === "pending" ? (
+                      <div className="flex gap-2">
+                        <Button size="sm" className="h-8 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-xs" onClick={() => handleConfirmPayment(job, "cash")} disabled={paymentLoading === job._id}>
+                          <DollarSign className="h-3.5 w-3.5" /> {paymentLoading === job._id ? "..." : "Got paid"}
+                        </Button>
+                        <Button size="sm" variant="destructive" className="h-8 gap-1 text-xs" onClick={() => handleDisputePayment(job)} disabled={paymentLoading === job._id}>
+                          <AlertTriangle className="h-3.5 w-3.5" /> Issue
+                        </Button>
+                      </div>
+                    ) : job.status === "completed" && job.paymentStatus === "confirmed_paid" ? (
+                      <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">✓ Confirmed</Badge>
+                    ) : job.status === "completed" && job.paymentStatus === "disputed" ? (
+                      <Badge variant="destructive">⚠ Disputed</Badge>
                     ) : (
                       <Button size="sm" variant="outline" className="h-8 gap-1 text-xs">
                         Details <ChevronRight className="h-3.5 w-3.5" />
                       </Button>
                     )}
                   </div>
+
+                  {/* Rating UI for completed jobs with confirmed payment */}
+                  {job.status === "completed" && job.paymentStatus === "confirmed_paid" && !job.contractorRating?.givenAt && (
+                    <div className="mt-4 pt-4 border-t">
+                      <p className="text-xs font-semibold mb-2">Rate your contractor</p>
+                      <div className="flex gap-1 mb-2">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            onClick={() => setRatingState((prev) => ({ ...prev, [job._id]: { ...prev[job._id], score: star, review: prev[job._id]?.review || "" } }))}
+                            className={`text-lg transition-colors ${
+                              (ratingState[job._id]?.score || 0) >= star ? "text-yellow-400" : "text-gray-300"
+                            }`}
+                          >
+                            ★
+                          </button>
+                        ))}
+                      </div>
+                      <textarea
+                        placeholder="Add a review (optional, max 200 chars)"
+                        value={ratingState[job._id]?.review || ""}
+                        onChange={(e) => setRatingState((prev) => ({ ...prev, [job._id]: { ...prev[job._id], review: e.target.value.slice(0, 200), score: prev[job._id]?.score || 0, submitting: false } }))}
+                        className="w-full text-xs p-2 border rounded mb-2 resize-none"
+                        rows={2}
+                      />
+                      <Button
+                        size="sm"
+                        className="w-full h-7 text-xs"
+                        onClick={() => handleSubmitRating(job)}
+                        disabled={ratingState[job._id]?.submitting || !ratingState[job._id]?.score}
+                      >
+                        {ratingState[job._id]?.submitting ? "Submitting..." : "Submit Rating"}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

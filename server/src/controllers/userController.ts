@@ -55,6 +55,10 @@ export const firebaseAuth = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Password is required and must be at least 6 characters" });
     }
 
+    if (/\s/.test(password)) {
+      return res.status(400).json({ message: "Password must not contain spaces" });
+    }
+
     if (!location || typeof location !== "string" || !location.trim()) {
       return res.status(400).json({ message: "Location is required" });
     }
@@ -125,6 +129,10 @@ export const loginWithPassword = async (req: Request, res: Response) => {
     
     if (!phone || !password) {
       return res.status(400).json({ message: "Phone and password are required" });
+    }
+
+    if (/\s/.test(password)) {
+      return res.status(400).json({ message: "Password must not contain spaces" });
     }
 
     const user = await User.findOne({ phone });
@@ -219,6 +227,10 @@ export const resetPasswordWithOtp = async (req: Request, res: Response) => {
 
     if (newPassword.length < 6) {
       return res.status(400).json({ message: "Password must be at least 6 characters" });
+    }
+
+    if (/\s/.test(newPassword)) {
+      return res.status(400).json({ message: "Password must not contain spaces" });
     }
 
     const otpRecord = await OtpCode.findOne({ phone, purpose: "password-reset" });

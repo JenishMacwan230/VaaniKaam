@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import VoicePhoneInput from "@/components/VoicePhoneInput";
+import VoiceTextInput from "@/components/VoiceTextInput";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -130,12 +132,11 @@ export default function VerifyPhonePage() {
     }
   };
 
-  const handleVerifyOTP = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleVerifyOTP = async () => {
     setError(null);
     setSuccess(null);
 
-    if (!otp || otp.length !== 6) {
+    if (otp?.length !== 6) {
       setError("Please enter a valid 6-digit OTP");
       return;
     }
@@ -255,7 +256,7 @@ export default function VerifyPhonePage() {
           {/* Error Alert */}
           {error && (
             <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
               <p className="text-red-800 text-sm">{error}</p>
             </div>
           )}
@@ -263,7 +264,7 @@ export default function VerifyPhonePage() {
           {/* Success Alert */}
           {success && (
             <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
-              <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+              <CheckCircle className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
               <p className="text-green-800 text-sm">{success}</p>
             </div>
           )}
@@ -272,22 +273,18 @@ export default function VerifyPhonePage() {
           {step === "phone" && (
             <form onSubmit={handleSendOTP} className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <Phone className="inline w-4 h-4 mr-2" />
-                  Phone Number
-                </label>
-                <div className="flex items-center">
-                  <span className="text-gray-500 mr-2">+91</span>
-                  <Input
-                    type="tel"
-                    placeholder="9876543210"
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
-                    maxLength={10}
-                    disabled={loading}
-                    className="flex-1"
-                  />
+                <div className="flex items-center gap-2 mb-2">
+                  <Phone className="w-4 h-4 text-primary" />
                 </div>
+                <VoicePhoneInput
+                  phoneNumber={phoneNumber}
+                  onPhoneNumberChange={setPhoneNumber}
+                  language="en"
+                  placeholder="Enter 10 digit number"
+                  disabled={loading}
+                  showHelper={true}
+                  autoSpeak={true}
+                />
               </div>
 
               {/* reCAPTCHA Container */}
@@ -297,8 +294,8 @@ export default function VerifyPhonePage() {
 
               <Button
                 type="submit"
-                disabled={loading || !phoneNumber || !recaptchaToken}
-                className="w-full"
+                disabled={loading || phoneNumber.length !== 10 || !recaptchaToken}
+                className="w-full rounded-2xl bg-linear-to-r from-primary via-secondary to-accent py-3 text-base font-semibold text-white shadow-lg transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? "Sending OTP..." : "Send OTP"}
               </Button>
@@ -314,24 +311,36 @@ export default function VerifyPhonePage() {
 
           {/* OTP Step */}
           {step === "otp" && (
-            <form onSubmit={handleVerifyOTP} className="space-y-6">
+            <div className="space-y-6">
+              <div className="rounded-lg bg-green-50 border border-green-200 p-3">
+                <p className="text-sm text-green-700">SMS code sent to +91 {phoneNumber}</p>
+              </div>
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <Lock className="inline w-4 h-4 mr-2" />
-                  Enter OTP
-                </label>
-                <Input
-                  type="text"
-                  placeholder="000000"
+                <div className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
+                  <Lock className="w-4 h-4" />
+                  <span>Enter OTP</span>
+                </div>
+                <VoiceTextInput
                   value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                  maxLength={6}
+                  onChange={setOtp}
+                  label=""
+                  placeholder="Enter 6-digit code from SMS"
+                  language="en"
                   disabled={loading}
-                  className="text-center text-2xl tracking-widest font-bold"
+                  type="number"
+                  maxLength={6}
+                  showHelper={true}
+                  autoSpeak={false}
+                  hint="Please say the 6-digit verification code from your SMS"
                 />
               </div>
 
-              <Button type="submit" disabled={loading || !otp} className="w-full">
+              <Button
+                onClick={handleVerifyOTP}
+                disabled={loading || otp.length !== 6}
+                className="w-full rounded-2xl bg-linear-to-r from-primary via-secondary to-accent py-3 text-base font-semibold text-white shadow-lg transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 {loading ? "Verifying OTP..." : "Verify OTP"}
               </Button>
 
@@ -347,18 +356,19 @@ export default function VerifyPhonePage() {
               >
                 Back to phone number
               </button>
-            </form>
+            </div>
           )}
 
           {/* Details Step */}
           {step === "details" && (
             <form onSubmit={handleCompleteRegistration} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="full-name" className="block text-sm font-medium text-gray-700 mb-2">
                   <User className="inline w-4 h-4 mr-2" />
                   Full Name
                 </label>
                 <Input
+                  id="full-name"
                   type="text"
                   placeholder="John Doe"
                   value={name}
@@ -368,11 +378,12 @@ export default function VerifyPhonePage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
                   <Mail className="inline w-4 h-4 mr-2" />
                   Email Address
                 </label>
                 <Input
+                  id="email"
                   type="email"
                   placeholder="john@example.com"
                   value={email}
@@ -382,11 +393,12 @@ export default function VerifyPhonePage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
                   <Lock className="inline w-4 h-4 mr-2" />
                   Password
                 </label>
                 <Input
+                  id="password"
                   type="password"
                   placeholder="••••••••"
                   value={password}
@@ -396,10 +408,11 @@ export default function VerifyPhonePage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-700 mb-2">
                   Confirm Password
                 </label>
                 <Input
+                  id="confirm-password"
                   type="password"
                   placeholder="••••••••"
                   value={confirmPassword}
@@ -426,18 +439,6 @@ export default function VerifyPhonePage() {
 // Declare grecaptcha global
 declare global {
   interface Window {
-    grecaptcha?: {
-      render: (
-        container: HTMLElement,
-        options: {
-          sitekey: string;
-          theme?: string;
-          callback?: (token: string) => void;
-          "expired-callback"?: () => void;
-        }
-      ) => void;
-      reset: (widgetId?: number) => void;
-      getResponse: (widgetId?: number) => string;
-    };
+    grecaptcha?: any;
   }
 }

@@ -2,9 +2,67 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import VoiceTextInput from "@/components/VoiceTextInput";
+import VoicePhoneInput from "@/components/VoicePhoneInput";
+
+// Language code mapping for voice
+const getVoiceLanguage = (locale: string): string => {
+  const mapping: Record<string, string> = {
+    en: "en",
+    hi: "hi",
+    gu: "gu",
+  };
+  return mapping[locale] || "en";
+};
+
+const getOtpHint = (locale: string) => {
+  switch(locale) {
+    case 'hi': return 'कृपया अपने फोन पर भेजा गया छह अंकों का ओटीपी बोलें';
+    case 'gu': return 'કૃપયા તમારા ફોન પર મોકલેલો છ આંકડાનો ઓટીપી બોલો';
+    default: return 'Please say the 6-digit OTP sent to your phone';
+  }
+};
+
+const getPasswordHint = (locale: string) => {
+  switch(locale) {
+    case 'hi': return 'कृपया अपना नया पासवर्ड बोलें या टाइप करें';
+    case 'gu': return 'કૃપયા તમારો નવો પાસવર્ડ બોલો અથવા ટાઇપ કરો';
+    default: return 'Please speak or type your new password';
+  }
+};
+
+const getConfirmPasswordHint = (locale: string) => {
+  switch(locale) {
+    case 'hi': return 'पुष्टि करने के लिए कृपया अपना पासवर्ड फिर से बोलें या टाइप करें';
+    case 'gu': return 'કન્ફર્મ કરવા માટે કૃપયા તમારો પાસવર્ડ ફરીથી બોલો અથવા ટાઇપ કરો';
+    default: return 'Please speak or type your password again to confirm';
+  }
+};
 
 export default function ForgotPasswordPage() {
-  const [step, setStep] = useState<"phone" | "otp" | "newPassword">("phone");
+  const params = useParams();
+  const voiceLanguage = getVoiceLanguage((params?.locale as string) || "en");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialStep = (searchParams?.get("step") as "phone" | "otp" | "newPassword") || "phone";
+  const [step, setStepState] = useState<"phone" | "otp" | "newPassword">(initialStep);
+
+  const setStep = (newStep: "phone" | "otp" | "newPassword") => {
+    if (newStep === "otp" || newStep === "newPassword") {
+      sessionStorage.setItem("forgot_phone", phone);
+    }
+    setStepState(newStep);
+    router.replace(`?step=${newStep}`, { scroll: false });
+  };
+
+  React.useEffect(() => {
+    const stepParam = searchParams?.get("step");
+    if (stepParam === "otp" || stepParam === "newPassword") {
+      const saved = sessionStorage.getItem("forgot_phone");
+      if (saved) setPhone(saved);
+    }
+  }, [searchParams]);
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -13,10 +71,8 @@ export default function ForgotPasswordPage() {
   const [error, setError] = useState("");
   const [otpFromServer, setOtpFromServer] = useState("");
 
-  const handlePhoneChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const digitsOnly = event.target.value.replace(/\D/g, "").slice(0, 10);
-    setPhone(digitsOnly);
-  };
+  const handlePasswordChange = (val: string) => setNewPassword(val.replace(/\s/g, ""));
+  const handleConfirmPasswordChange = (val: string) => setConfirmPassword(val.replace(/\s/g, ""));
 
   const requestOTP = async () => {
     setError("");
@@ -84,6 +140,7 @@ export default function ForgotPasswordPage() {
       // Store token
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
+      sessionStorage.removeItem("forgot_phone"); // Clear session storage
 
       // Redirect to home
       window.location.href = "/";
@@ -111,20 +168,15 @@ export default function ForgotPasswordPage() {
 
           {step === "phone" && (
             <div className="space-y-5">
-              <label className="space-y-2 text-sm font-medium">
-                <span>Mobile number</span>
-                <input
-                  type="tel"
-                  inputMode="numeric"
-                  pattern="^\\d{10}$"
-                  maxLength={10}
-                  placeholder="Enter 10 digit number"
-                  value={phone}
-                  onChange={handlePhoneChange}
-                  disabled={loading}
-                  className="w-full rounded-2xl border border-input bg-background/40 px-4 py-3 text-base shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
-                />
-              </label>
+              <VoicePhoneInput
+                phoneNumber={phone}
+                onPhoneNumberChange={setPhone}
+                language={voiceLanguage}
+                placeholder="Enter 10 digit number"
+                disabled={loading}
+                showHelper={true}
+                autoSpeak={false}
+              />
 
               {error && (
                 <div className="rounded-lg bg-red-50 border border-red-200 p-3">
@@ -151,43 +203,51 @@ export default function ForgotPasswordPage() {
                 )}
               </div>
 
-              <label className="space-y-2 text-sm font-medium">
-                <span>Enter OTP</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  placeholder="Enter 6-digit OTP"
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                  disabled={loading}
-                  className="w-full rounded-2xl border border-input bg-background/40 px-4 py-3 text-base shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
-                />
-              </label>
+              <VoiceTextInput
+                value={otp}
+                onChange={(val) => setOtp(val.replace(/\D/g, "").slice(0, 6))}
+                label=""
+                placeholder="Enter 6-digit OTP"
+                language={voiceLanguage}
+                disabled={loading}
+                type="tel"
+                maxLength={6}
+                showHelper={true}
+                autoSpeak={true}
+                hint={getOtpHint(voiceLanguage)}
+              />
 
-              <label className="space-y-2 text-sm font-medium">
+              <div className="space-y-2 text-sm font-medium">
                 <span>New password</span>
-                <input
-                  type="password"
-                  placeholder="Min. 6 characters"
+                <VoiceTextInput
                   value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
+                  onChange={handlePasswordChange}
+                  label=""
+                  placeholder="Min. 6 characters"
+                  language={voiceLanguage}
                   disabled={loading}
-                  className="w-full rounded-2xl border border-input bg-background/40 px-4 py-3 text-base shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                  type="text"
+                  showHelper={true}
+                  autoSpeak={false}
+                  hint={getPasswordHint(voiceLanguage)}
                 />
-              </label>
+              </div>
 
-              <label className="space-y-2 text-sm font-medium">
+              <div className="space-y-2 text-sm font-medium">
                 <span>Confirm password</span>
-                <input
-                  type="password"
-                  placeholder="Re-enter password"
+                <VoiceTextInput
                   value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onChange={handleConfirmPasswordChange}
+                  label=""
+                  placeholder="Re-enter password"
+                  language={voiceLanguage}
                   disabled={loading}
-                  className="w-full rounded-2xl border border-input bg-background/40 px-4 py-3 text-base shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                  type="text"
+                  showHelper={true}
+                  autoSpeak={false}
+                  hint={getConfirmPasswordHint(voiceLanguage)}
                 />
-              </label>
+              </div>
 
               {error && (
                 <div className="rounded-lg bg-red-50 border border-red-200 p-3">

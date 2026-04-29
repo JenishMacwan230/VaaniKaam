@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useEffect, useState, useRef } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,30 @@ const getVoiceLanguage = (locale: string): string => {
     gu: "gu",
   };
   return mapping[locale] || "en";
+};
+
+const getOtpHint = (locale: string) => {
+  switch(locale) {
+    case 'hi': return 'कृपया अपने फोन पर भेजा गया छह अंकों का सत्यापन कोड बोलें';
+    case 'gu': return 'કૃપયા તમારા ફોન પર મોકલેલો છ આંકડાનો વેરિફિકેશન કોડ બોલો';
+    default: return 'Please say the 6-digit verification code from your SMS';
+  }
+};
+
+const getPasswordHint = (locale: string) => {
+  switch(locale) {
+    case 'hi': return 'कृपया अपना पासवर्ड बोलें या टाइप करें';
+    case 'gu': return 'કૃપયા તમારો પાસવર્ડ બોલો અથવા ટાઇપ કરો';
+    default: return 'Please speak or type your password';
+  }
+};
+
+const getConfirmPasswordHint = (locale: string) => {
+  switch(locale) {
+    case 'hi': return 'पुष्टि करने के लिए कृपया अपना पासवर्ड फिर से बोलें या टाइप करें';
+    case 'gu': return 'કન્ફર્મ કરવા માટે કૃપયા તમારો પાસવર્ડ ફરીથી બોલો અથવા ટાઇપ કરો';
+    default: return 'Please speak or type your password again to confirm';
+  }
 };
 
 const accountTypeOptions: Array<{
@@ -79,8 +103,28 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [step, setStep] = useState<"phone" | "otp" | "details">("phone");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialStep = (searchParams?.get("step") as "phone" | "otp" | "details") || "phone";
+  const [step, setStepState] = useState<"phone" | "otp" | "details">(initialStep);
+
+  const setStep = (newStep: "phone" | "otp" | "details") => {
+    if (newStep === "otp" || newStep === "details") {
+      sessionStorage.setItem("reg_phone", phoneNumber);
+    }
+    setStepState(newStep);
+    router.replace(`?step=${newStep}`, { scroll: false });
+  };
+
+  useEffect(() => {
+    const stepParam = searchParams?.get("step");
+    if (stepParam === "otp" || stepParam === "details") {
+      const saved = sessionStorage.getItem("reg_phone");
+      if (saved) setPhoneNumber(saved);
+    }
+  }, [searchParams]);
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const confirmationResultRef = useRef<ConfirmationResult | null>(null);
 
   // Cleanup RecaptchaVerifier on unmount
   useEffect(() => {
@@ -184,6 +228,7 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
 
       console.log("sendOTP: Firebase sent SMS successfully");
       setConfirmationResult(result);
+      confirmationResultRef.current = result;
       setSuccess("SMS sent! Enter the code sent to your phone.");
       setStep("otp");
       onStepChange?.("otp");
@@ -255,7 +300,8 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
         return;
       }
 
-      if (!confirmationResult) {
+      const result = confirmationResultRef.current;
+      if (!result) {
         setError("Please request a new SMS code");
         setLoading(false);
         return;
@@ -264,7 +310,7 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
       console.log("verifyOTP: Verifying code with Firebase");
 
       // Confirm the code with Firebase
-      const userCredential = await confirmationResult.confirm(otp);
+      const userCredential = await result.confirm(otp);
       const idToken = await userCredential.user.getIdToken();
 
       console.log("verifyOTP: Firebase verification successful");
@@ -346,6 +392,7 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
       localStorage.setItem("user", JSON.stringify(data.user));
       globalThis.window.dispatchEvent(new Event("auth-changed"));
       localStorage.removeItem("firebaseToken"); // Clean up
+      sessionStorage.removeItem("reg_phone"); // Clear session storage
 
       setSuccess("Registration successful! Redirecting...");
       setTimeout(() => {
@@ -362,6 +409,7 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
   const resetVerification = () => {
     console.log("resetVerification: Resetting to phone step");
     setConfirmationResult(null);
+    confirmationResultRef.current = null;
     setOtp("");
     setError(null);
     
@@ -405,8 +453,10 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
           </div>
         )}
 
-        {step === "phone" && (
-          <div className="space-y-5">
+        {/* Firebase RecaptchaVerifier Container - Empty for invisible mode */}
+        <div id="recaptcha-container"></div>
+
+        <div className="space-y-5" style={{ display: step === "phone" ? "block" : "none" }}>
             <div className="flex items-center gap-2">
               <Phone className="w-4 h-4 text-primary" />
             </div>
@@ -417,11 +467,8 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
               placeholder="Enter 10 digit number"
               disabled={loading}
               showHelper={true}
-              autoSpeak={true}
+              autoSpeak={step === "phone"}
             />
-
-            {/* Firebase RecaptchaVerifier Container - Empty for invisible mode */}
-            <div id="recaptcha-container"></div>
 
             <Button
               onClick={sendOTP}
@@ -431,10 +478,8 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
               {loading ? "Sending SMS..." : "Send SMS"}
             </Button>
           </div>
-        )}
 
-        {step === "otp" && (
-          <div className="space-y-5">
+        <div className="space-y-5" style={{ display: step === "otp" ? "block" : "none" }}>
             <div className="rounded-lg bg-green-50 border border-green-200 p-3">
               <p className="text-sm text-green-700">SMS code sent to +91 {phoneNumber}</p>
             </div>
@@ -445,16 +490,16 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
             </div>
             <VoiceTextInput
               value={otp}
-              onChange={setOtp}
+              onChange={(val) => setOtp(val.replace(/\D/g, "").slice(0, 6))}
               label=""
               placeholder="Enter 6-digit code from SMS"
               language={voiceLanguage}
               disabled={loading}
-              type="number"
+              type="tel"
               maxLength={6}
               showHelper={true}
-              autoSpeak={false}
-              hint="Please say the 6-digit verification code from your SMS"
+              autoSpeak={step === "otp"}
+              hint={getOtpHint(voiceLanguage)}
             />
 
             <Button
@@ -476,10 +521,8 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
               Back to phone number
             </button>
           </div>
-        )}
 
-        {step === "details" && (
-          <div className="space-y-5">
+        <div className="space-y-5" style={{ display: step === "details" ? "block" : "none" }}>
             <div className="rounded-lg bg-green-50 border border-green-200 p-3">
               <p className="text-sm text-green-700">✓ Phone verified! Complete your profile.</p>
             </div>
@@ -583,26 +626,34 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
               <Lock className="w-4 h-4 text-primary" />
               <Label className="text-sm font-medium">Password</Label>
             </div>
-            <Input
-              type="password"
-              placeholder="Min. 6 characters"
+            <VoiceTextInput
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={setPassword}
+              label=""
+              placeholder="Min. 6 characters"
+              language={voiceLanguage}
               disabled={loading}
-              className="rounded-2xl border border-input bg-background/40 px-4 py-3 text-base font-semibold shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+              type="text"
+              showHelper={true}
+              autoSpeak={false}
+              hint={getPasswordHint(voiceLanguage)}
             />
 
             <div className="flex items-center gap-2">
               <Lock className="w-4 h-4 text-primary" />
               <Label className="text-sm font-medium">Confirm Password</Label>
             </div>
-            <Input
-              type="password"
-              placeholder="Re-enter password"
+            <VoiceTextInput
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
+              onChange={setConfirmPassword}
+              label=""
+              placeholder="Re-enter password"
+              language={voiceLanguage}
               disabled={loading}
-              className="rounded-2xl border border-input bg-background/40 px-4 py-3 text-base font-semibold shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+              type="text"
+              showHelper={true}
+              autoSpeak={false}
+              hint={getConfirmPasswordHint(voiceLanguage)}
             />
 
             <Button
@@ -613,7 +664,6 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
               {loading ? "Creating account..." : "Create account"}
             </Button>
           </div>
-        )}
 
         <p className="text-center text-sm text-muted-foreground">
           Already have an account?{" "}

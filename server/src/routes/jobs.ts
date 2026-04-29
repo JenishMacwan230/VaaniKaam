@@ -14,10 +14,14 @@ import {
   getWorkerApplications,
   getWorkerAcceptedJobs,
   markJobComplete,
+  markAllJobsComplete,
   getWorkerPendingCompletion,
   confirmJobCompletion,
   rejectJobCompletion,
-  getWorkerCompletedJobs
+  getWorkerCompletedJobs,
+  confirmPayment,
+  disputePayment,
+  rateUser,
 } from "../controllers/jobController";
 
 const router = express.Router();
@@ -41,11 +45,24 @@ router.get("/worker/completed-jobs", verifyAuthToken, requireRole("worker") as a
 // Contractor marks job as complete
 router.post("/mark-complete", verifyAuthToken, requireAnyRole(["individual", "company"]) as any, markJobComplete as any);
 
+// Contractor marks all accepted applications as complete (atomic operation)
+router.post("/mark-all-complete", verifyAuthToken, requireAnyRole(["individual", "company"]) as any, markAllJobsComplete as any);
+
 // Worker confirms job completion
 router.post("/confirm-completion", verifyAuthToken, requireRole("worker") as any, confirmJobCompletion as any);
 
 // Worker rejects job completion
 router.post("/reject-completion", verifyAuthToken, requireRole("worker") as any, rejectJobCompletion as any);
+
+// Worker confirms payment receipt
+router.post("/confirm-payment", verifyAuthToken, requireRole("worker") as any, confirmPayment as any);
+
+// Worker disputes payment
+router.post("/dispute-payment", verifyAuthToken, requireRole("worker") as any, disputePayment as any);
+
+// Rate user (worker rates contractor or contractor rates worker)
+// No role restriction needed - authorization happens in the endpoint based on job assignment
+router.post("/rate", verifyAuthToken, rateUser as any);
 
 // Get specific job by ID
 router.get("/:jobId", getJobById as any);

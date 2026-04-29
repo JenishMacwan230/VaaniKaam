@@ -24,7 +24,7 @@ interface VoiceTextInputProps {
   readonly placeholder?: string;
   readonly language?: string;
   readonly disabled?: boolean;
-  readonly type?: "text" | "number";
+  readonly type?: "text" | "number" | "tel";
   readonly showHelper?: boolean;
   readonly autoSpeak?: boolean;
   readonly icon?: React.ReactNode;
@@ -74,7 +74,7 @@ export default function VoiceTextInput({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let newValue = e.target.value;
     
-    if (type === "number") {
+    if (type === "number" || type === "tel") {
       newValue = newValue.replaceAll(/\D/g, "");
     }
     

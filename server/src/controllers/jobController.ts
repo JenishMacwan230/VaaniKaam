@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import Job from "../models/Job";
 import JobApplication from "../models/JobApplication";
 import User from "../models/User";
+import { Notification } from "../models/Notification";
 import { createNotification } from "../utils/notificationHelper";
 
 const syncJobStatusFromApplications = async (jobId: any) => {
@@ -541,6 +542,81 @@ export const rejectJobCompletion = async (req: Request & any, res: Response) => 
   }
 };
 
+export const markAllJobsComplete = async (req: Request & any, res: Response) => {
+  try {
+    const { jobId } = req.body;
+    const user = req.user;
+    if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+    // Verify the job exists and belongs to the contractor
+    const job = await Job.findById(jobId);
+    if (!job) return res.status(404).json({ message: "Job not found" });
+    
+    const jobPostedById = job.postedBy?.toString();
+    const userId = user._id?.toString();
+    if (jobPostedById !== userId) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    // Find all accepted applications for this job
+    const acceptedApplications = await JobApplication.find({ 
+      jobId, 
+      status: "accepted" 
+    }).populate("workerId", "name");
+
+    if (acceptedApplications.length === 0) {
+      return res.status(400).json({ message: "No accepted applications to mark complete" });
+    }
+
+    // Atomic updateMany: update all accepted applications to completion_pending
+    const updateResult = await JobApplication.updateMany(
+      { jobId, status: "accepted" },
+      { $set: { status: "completion_pending" } }
+    );
+
+    if (updateResult.modifiedCount === 0) {
+      return res.status(500).json({ message: "Failed to update applications" });
+    }
+
+    // Sync job status after bulk update
+    await syncJobStatusFromApplications(jobId);
+
+    // Create notifications for all affected workers (bulk insert)
+    const notifications = acceptedApplications.map((app) => ({
+      userId: app.workerId._id.toString(),
+      type: "job_update",
+      title: "Job Completion Review",
+      message: `${user.name || "Contractor"} marked "${job.title}" as complete. Please confirm the work is done.`,
+      data: {
+        jobId: job._id.toString(),
+        applicationId: app._id.toString(),
+      },
+      read: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }));
+
+    try {
+      await Notification.insertMany(notifications);
+    } catch (notifError) {
+      console.error("Failed to create notifications:", notifError);
+      // Don't fail the request if notification creation fails
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        updatedCount: updateResult.modifiedCount,
+        message: `Marked ${updateResult.modifiedCount} application(s) as complete`,
+      },
+    });
+  } catch (error) {
+    console.error("Mark all jobs complete error:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return res.status(500).json({ message: `Failed to mark jobs complete: ${errorMessage}` });
+  }
+};
+
 export const getWorkerCompletedJobs = async (req: Request & any, res: Response) => {
   try {
     const user = req.user;
@@ -558,5 +634,230 @@ export const getWorkerCompletedJobs = async (req: Request & any, res: Response) 
   } catch (error) {
     console.error("Get worker completed jobs error:", error);
     return res.status(500).json({ message: "Failed to fetch completed jobs" });
+  }
+};
+
+export const confirmPayment = async (req: Request & any, res: Response) => {
+  try {
+    const { applicationId, paymentMethod } = req.body;
+    const user = req.user;
+    if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+    // Get the application
+    const application = await JobApplication.findById(applicationId);
+    if (!application) {
+      return res.status(404).json({ success: false, error: "Application not found" });
+    }
+
+    // Verify the worker owns this application
+    const workerId = application.workerId?.toString();
+    const userId = user._id?.toString();
+    if (workerId !== userId) {
+      return res.status(403).json({ success: false, error: "Unauthorized" });
+    }
+
+    // Guard: status must be completed
+    if (application.status !== "completed") {
+      return res.status(400).json({ success: false, error: "Job must be completed before confirming payment" });
+    }
+
+    // Guard: paymentStatus must be pending (prevent double confirm)
+    if (application.paymentStatus !== "pending") {
+      return res.status(400).json({ success: false, error: "Payment already processed" });
+    }
+
+    // Update payment info
+    application.paymentStatus = "confirmed_paid";
+    application.paymentMethod = paymentMethod;
+    application.paidAt = new Date();
+    await application.save();
+
+    // Send notification to contractor
+    try {
+      const job = await Job.findById(application.jobId);
+      await createNotification({
+        userId: job?.postedBy.toString() as string,
+        type: "payment",
+        title: "Payment Confirmed",
+        message: `${user.name || "Worker"} confirmed payment receipt for "${job?.title}"`,
+        data: {
+          jobId: job?._id.toString(),
+          applicationId: application._id.toString(),
+          workerId: user._id.toString(),
+        },
+      });
+    } catch (notifError) {
+      console.error("Failed to create notification:", notifError);
+    }
+
+    return res.json({ success: true, data: application });
+  } catch (error) {
+    console.error("Confirm payment error:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return res.status(500).json({ success: false, error: `Failed to confirm payment: ${errorMessage}` });
+  }
+};
+
+export const disputePayment = async (req: Request & any, res: Response) => {
+  try {
+    const { applicationId } = req.body;
+    const user = req.user;
+    if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+    // Get the application
+    const application = await JobApplication.findById(applicationId);
+    if (!application) {
+      return res.status(404).json({ success: false, error: "Application not found" });
+    }
+
+    // Verify the worker owns this application
+    const workerId = application.workerId?.toString();
+    const userId = user._id?.toString();
+    if (workerId !== userId) {
+      return res.status(403).json({ success: false, error: "Unauthorized" });
+    }
+
+    // Guard: status must be completed
+    if (application.status !== "completed") {
+      return res.status(400).json({ success: false, error: "Job must be completed before disputing payment" });
+    }
+
+    // Guard: paymentStatus must be pending (prevent double dispute)
+    if (application.paymentStatus !== "pending") {
+      return res.status(400).json({ success: false, error: "Payment already processed" });
+    }
+
+    // Update payment status to disputed
+    application.paymentStatus = "disputed";
+    await application.save();
+
+    // Send notification to contractor
+    try {
+      const job = await Job.findById(application.jobId);
+      await createNotification({
+        userId: job?.postedBy.toString() as string,
+        type: "payment",
+        title: "Payment Dispute Reported",
+        message: `${user.name || "Worker"} reported a payment issue for "${job?.title}"`,
+        data: {
+          jobId: job?._id.toString(),
+          applicationId: application._id.toString(),
+          workerId: user._id.toString(),
+        },
+      });
+    } catch (notifError) {
+      console.error("Failed to create notification:", notifError);
+    }
+
+    return res.json({ success: true, data: application });
+  } catch (error) {
+    console.error("Dispute payment error:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return res.status(500).json({ success: false, error: `Failed to dispute payment: ${errorMessage}` });
+  }
+};
+
+export const rateUser = async (req: Request & any, res: Response) => {
+  try {
+    const { applicationId, score, review } = req.body;
+    const user = req.user;
+    if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+    // Validate score
+    if (typeof score !== "number" || score < 1 || score > 5) {
+      return res.status(400).json({ success: false, error: "Score must be between 1 and 5" });
+    }
+
+    // Validate review length
+    if (review && typeof review === "string" && review.length > 200) {
+      return res.status(400).json({ success: false, error: "Review must be 200 characters or less" });
+    }
+
+    // Get the application
+    const application = await JobApplication.findById(applicationId);
+    if (!application) {
+      return res.status(404).json({ success: false, error: "Application not found" });
+    }
+
+    // Guard: paymentStatus must be "confirmed_paid"
+    if (application.paymentStatus !== "confirmed_paid") {
+      return res.status(400).json({ success: false, error: "Can only rate after payment is confirmed" });
+    }
+
+    // Guard: status must be completed
+    if (application.status !== "completed") {
+      return res.status(400).json({ success: false, error: "Can only rate completed jobs" });
+    }
+
+    // Determine if caller is worker or contractor
+    const userIdStr = user._id?.toString();
+    const workerIdStr = application.workerId?.toString();
+    const isWorker = userIdStr === workerIdStr;
+
+    // Get job to find contractor
+    const job = await Job.findById(application.jobId);
+    if (!job) {
+      return res.status(404).json({ success: false, error: "Job not found" });
+    }
+
+    const contractorIdStr = job.postedBy?.toString();
+    const isContractor = userIdStr === contractorIdStr;
+
+    if (!isWorker && !isContractor) {
+      return res.status(403).json({ success: false, error: "You are not part of this job" });
+    }
+
+    // Determine which rating to update
+    if (isWorker) {
+      // Worker is rating the contractor
+      if (application.contractorRating?.givenAt) {
+        return res.status(400).json({ success: false, error: "You have already rated this contractor" });
+      }
+      application.contractorRating = {
+        score,
+        review: review || "",
+        givenAt: new Date(),
+      };
+
+      // Update contractor's average rating
+      const contractor = await User.findById(contractorIdStr);
+      if (contractor) {
+        const newAvg =
+          ((contractor.averageRating || 0) * (contractor.totalRatings || 0) + score) /
+          ((contractor.totalRatings || 0) + 1);
+        contractor.averageRating = Math.round(newAvg * 10) / 10;
+        contractor.totalRatings = (contractor.totalRatings || 0) + 1;
+        await contractor.save();
+      }
+    } else {
+      // Contractor is rating the worker
+      if (application.workerRating?.givenAt) {
+        return res.status(400).json({ success: false, error: "You have already rated this worker" });
+      }
+      application.workerRating = {
+        score,
+        review: review || "",
+        givenAt: new Date(),
+      };
+
+      // Update worker's average rating
+      const worker = await User.findById(workerIdStr);
+      if (worker) {
+        const newAvg =
+          ((worker.averageRating || 0) * (worker.totalRatings || 0) + score) /
+          ((worker.totalRatings || 0) + 1);
+        worker.averageRating = Math.round(newAvg * 10) / 10;
+        worker.totalRatings = (worker.totalRatings || 0) + 1;
+        await worker.save();
+      }
+    }
+
+    await application.save();
+
+    return res.json({ success: true, data: application });
+  } catch (error) {
+    console.error("Rate user error:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return res.status(500).json({ success: false, error: `Failed to rate: ${errorMessage}` });
   }
 };

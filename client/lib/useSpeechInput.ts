@@ -19,7 +19,7 @@ export interface UseSpeechInputOptions {
   onPhoneNumberChange?: (phone: string) => void;
   autoSpeakOnMount?: boolean;
   initialGreeting?: string;
-  mode?: "phone" | "text"; // "phone" = extract digits, "text" = raw transcription
+  mode?: "phone" | "text" | "digits"; // "phone" = validate 10 digits, "digits" = extract digits without length validation
 }
 
 export interface UseSpeechInputResult {
@@ -108,8 +108,12 @@ export const useSpeechInput = (
         });
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Failed to speak text";
-        if (!errorMessage.includes("not-allowed") && mountedRef.current) {
-          setError(errorMessage);
+        if (mountedRef.current) {
+          if (errorMessage.includes("not-allowed")) {
+            setError("Speaker blocked by browser. Please allow audio in site settings.");
+          } else {
+            setError(errorMessage);
+          }
         }
       } finally {
         if (mountedRef.current) {
@@ -150,6 +154,17 @@ export const useSpeechInput = (
           onPhoneNumberChange?.(digits);
         } else {
           console.log(`[useSpeechInput] No digits extracted from: "${text}"`);
+        }
+        return;
+      }
+
+      if (mode === "digits") {
+        const digits = extractDigitsFromSpeech(text);
+        console.log(`[useSpeechInput] digits mode: "${text}" → "${digits}"`);
+        if (digits.length > 0) {
+          onPhoneNumberChange?.(digits);
+        } else {
+          onPhoneNumberChange?.(text.trim());
         }
         return;
       }

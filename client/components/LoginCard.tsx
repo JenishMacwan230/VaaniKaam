@@ -2,22 +2,35 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useParams } from "next/navigation";
 import { getCurrentLocale, resolveAccountType } from "@/lib/authClient";
+import VoiceTextInput from "@/components/VoiceTextInput";
+import VoicePhoneInput from "@/components/VoicePhoneInput";
+
+// Language code mapping for voice
+const getVoiceLanguage = (locale: string): string => {
+  const mapping: Record<string, string> = {
+    en: "en",
+    hi: "hi",
+    gu: "gu",
+  };
+  return mapping[locale] || "en";
+};
 
 export default function LoginCard() {
   const router = useRouter();
   const pathname = usePathname();
+  const params = useParams();
   const locale = getCurrentLocale(pathname);
-  const [showPassword, setShowPassword] = useState(false);
+  const voiceLanguage = getVoiceLanguage((params?.locale as string) || locale);
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handlePhoneChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const digitsOnly = event.target.value.replaceAll(/\D/g, "").slice(0, 10);
-    setPhone(digitsOnly);
+  const handlePasswordChange = (val: string) => {
+    // Strip spaces from password (backend rejects spaces)
+    setPassword(val.replace(/\s/g, ""));
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -70,40 +83,31 @@ export default function LoginCard() {
         </div>
 
         <form className="space-y-5" onSubmit={handleSubmit} noValidate>
-          <label className="space-y-2 text-sm font-medium">
-            <span>Mobile number</span>
-            <input
-              type="tel"
-              inputMode="numeric"
-              maxLength={10}
-              placeholder="Enter 10 digit number"
-              value={phone}
-              onChange={handlePhoneChange}
-              disabled={loading}
-              className="w-full rounded-2xl border border-input bg-background/40 px-4 py-3 text-base shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
-            />
-          </label>
+          <VoicePhoneInput
+            phoneNumber={phone}
+            onPhoneNumberChange={setPhone}
+            language={voiceLanguage}
+            placeholder="Enter 10 digit number"
+            disabled={loading}
+            showHelper={true}
+            autoSpeak={false}
+          />
 
-          <label className="space-y-2 text-sm font-medium">
+          <div className="space-y-2 text-sm font-medium">
             <span>Password</span>
-            <div className="relative">
-              <input
-                type={showPassword ? "text" : "password"}
-                placeholder="Enter your password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                disabled={loading}
-                className="w-full rounded-2xl border border-input bg-background/40 px-4 py-3 text-base shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((prev) => !prev)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-primary"
-              >
-                {showPassword ? "Hide" : "Show"}
-              </button>
-            </div>
-          </label>
+            <VoiceTextInput
+              value={password}
+              onChange={handlePasswordChange}
+              label=""
+              placeholder="Enter your password"
+              language={voiceLanguage}
+              disabled={loading}
+              type="text"
+              showHelper={true}
+              autoSpeak={false}
+              hint="Please speak or type your password"
+            />
+          </div>
 
           {error && (
             <div className="rounded-lg bg-red-50 border border-red-200 p-3">

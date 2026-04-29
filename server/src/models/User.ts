@@ -26,6 +26,8 @@ export interface IUser extends Document {
   availability?: boolean;
   languages?: string[];
   about?: string;
+  averageRating?: number;
+  totalRatings?: number;
 }
 
 const userSchema = new Schema<IUser>(
@@ -53,6 +55,8 @@ const userSchema = new Schema<IUser>(
     availability: { type: Boolean, default: true },
     languages: { type: [String], default: [] },
     about: { type: String, trim: true, maxlength: 500 },
+    averageRating: { type: Number, default: 0 },
+    totalRatings: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
