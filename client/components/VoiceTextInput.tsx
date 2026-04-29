@@ -68,7 +68,8 @@ export default function VoiceTextInput({
   };
 
   const handleSpeakClick = async () => {
-    await speak(hint || `Please enter ${label.toLowerCase()}`);
+    const labelText = typeof label === 'string' ? label.toLowerCase() : 'text';
+    await speak(hint || `Please enter ${labelText}`);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
