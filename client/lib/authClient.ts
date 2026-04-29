@@ -118,3 +118,26 @@ export async function updateSessionProfile(payload: ProfileUpdatePayload): Promi
     return null;
   }
 }
+
+export interface PublicStats {
+  totalUsers: number;
+  totalJobs: number;
+  avgRating: number;
+}
+
+export async function fetchPublicStats(): Promise<PublicStats | null> {
+  if (!API_BASE_URL) return null;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/users/public-stats`, {
+      method: "GET",
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    return data.stats ?? null;
+  } catch {
+    return null;
+  }
+}

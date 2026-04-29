@@ -32,6 +32,7 @@ export interface UseSpeechInputResult {
   stopListening: () => void;
   speak: (text: string) => Promise<void>;
   clearError: () => void;
+  isGlobalMicListening: boolean;
 }
 
 export const useSpeechInput = (
@@ -50,6 +51,7 @@ export const useSpeechInput = (
   const [transcribedText, setTranscribedText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSupported, setIsSupported] = useState(false);
+  const [globalListening, setGlobalListening] = useState(false);
   const mountedRef = useRef(true);
   const finalProcessedRef = useRef(false);
   const greetingSpokenRef = useRef(false);
@@ -79,6 +81,17 @@ export const useSpeechInput = (
   useEffect(() => {
     const apiAvailability = isSpeechAPIAvailable();
     setIsSupported(apiAvailability.speechRecognition && apiAvailability.speechSynthesis);
+
+    const handleStart = () => setGlobalListening(true);
+    const handleStop = () => setGlobalListening(false);
+    
+    globalThis.addEventListener("speech-listening-started", handleStart);
+    globalThis.addEventListener("speech-listening-stopped", handleStop);
+    
+    return () => {
+      globalThis.removeEventListener("speech-listening-started", handleStart);
+      globalThis.removeEventListener("speech-listening-stopped", handleStop);
+    };
   }, []);
 
   const speak = useCallback(
@@ -203,8 +216,14 @@ export const useSpeechInput = (
         },
         onError: (errorMsg) => {
           if (mountedRef.current) {
-            console.error(`[useSpeechInput] Speech error: ${errorMsg}`);
-            setError(errorMsg);
+            if (errorMsg.toLowerCase().includes("aborted")) {
+              console.log("[useSpeechInput] Speech aborted (likely by another mic)");
+              setIsListening(false);
+            } else {
+              console.error(`[useSpeechInput] Speech error: ${errorMsg}`);
+              setError(errorMsg);
+              setIsListening(false);
+            }
           }
         },
         onEnd: () => {
@@ -255,5 +274,6 @@ export const useSpeechInput = (
     stopListening,
     speak,
     clearError,
+    isGlobalMicListening: globalListening && !isListening,
   };
 };

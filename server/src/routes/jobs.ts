@@ -12,6 +12,7 @@ import {
   updateApplicationStatus,
   deleteJob,
   getWorkerApplications,
+  withdrawApplication,
   getWorkerAcceptedJobs,
   markJobComplete,
   markAllJobsComplete,
@@ -30,6 +31,7 @@ const router = express.Router();
 router.post("/", verifyAuthToken, requireAnyRole(["individual", "company"]) as any, createJob as any);
 router.get("/", listJobs as any);
 router.post("/apply", verifyAuthToken, requireRole("worker") as any, applyToJob as any);
+router.post("/withdraw", verifyAuthToken, requireRole("worker") as any, withdrawApplication as any);
 
 // Get worker's own applications
 router.get("/worker/applications", verifyAuthToken, requireRole("worker") as any, getWorkerApplications as any);

@@ -19,20 +19,37 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 const POLL_INTERVAL = 15000; // 15 seconds
 
 /**
- * Hook to fetch and manage notifications with polling
- * Shows toast only for new unread notifications
+/**
+ * Helper to persist seen notifications across page reloads
  */
+const getSeenIds = (): Set<string> => {
+  if (typeof window === "undefined") return new Set();
+  try {
+    return new Set(JSON.parse(sessionStorage.getItem("seenNotifications") || "[]"));
+  } catch {
+    return new Set();
+  }
+};
+
+const addSeenId = (id: string) => {
+  if (typeof window === "undefined") return;
+  try {
+    const seen = getSeenIds();
+    seen.add(id);
+    sessionStorage.setItem("seenNotifications", JSON.stringify(Array.from(seen)));
+  } catch {}
+};
+
 export function useNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const previousNotificationIdsRef = useRef<Set<string>>(new Set());
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const getAuthToken = useCallback(() => {
     if (globalThis.window === undefined) return null;
     // Prefer explicit token in localStorage, but fall back to auth cookie if present
-    const token = localStorage.getItem("token") || localStorage.getItem("firebaseToken");
+    const token = localStorage.getItem("authToken");
     if (token) return token;
     // Check for auth cookie named 'authToken'
     const match = document.cookie.match(new RegExp('(?:^|; )' + 'authToken' + '=([^;]*)'));
@@ -96,24 +113,19 @@ export function useNotifications() {
       }
 
       const data = await response.json();
-      const fetchedNotifications = data.notifications || [];
+      
+      // Only keep unread notifications
+      const fetchedNotifications = (data.notifications || []).filter((n: Notification) => !n.read);
 
-      // Check for new unread notifications (show toast)
-      const currentUnreadIds = new Set<string>(
-        fetchedNotifications.filter((n: Notification) => !n.read).map((n: Notification) => n._id)
-      );
+      const seen = getSeenIds();
 
-      currentUnreadIds.forEach((id) => {
-        if (!previousNotificationIdsRef.current.has(id)) {
-          // This is a new notification, show toast
-          const notif = fetchedNotifications.find((n: Notification) => n._id === id);
-          if (notif) {
-            showNotificationToast(notif);
-          }
+      fetchedNotifications.forEach((n: Notification) => {
+        if (!seen.has(n._id)) {
+          showNotificationToast(n);
+          addSeenId(n._id);
         }
       });
 
-      previousNotificationIdsRef.current = currentUnreadIds;
       setNotifications(fetchedNotifications);
       setError(null);
     } catch (err) {
@@ -155,10 +167,8 @@ export function useNotifications() {
         });
 
         if (response.ok) {
-          // Update local state
-          setNotifications((prev) =>
-            prev.map((n) => (n._id === notificationId ? { ...n, read: true } : n))
-          );
+          // Update local state by removing the read notification
+          setNotifications((prev) => prev.filter((n) => n._id !== notificationId));
           setUnreadCount((prev) => Math.max(0, prev - 1));
         }
       } catch (err) {
@@ -177,8 +187,8 @@ export function useNotifications() {
       });
 
       if (response.ok) {
-        // Update local state
-        setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+        // Update local state by removing all read notifications
+        setNotifications([]);
         setUnreadCount(0);
       }
     } catch (err) {
@@ -238,6 +248,78 @@ export function useNotifications() {
 }
 
 /**
+ * Translate common notification titles and messages based on locale
+ */
+function translateNotification(title: string, message: string, locale: string) {
+  if (locale === "en") return { title, message };
+
+  let tTitle = title;
+  let tMessage = message;
+
+  // Title translations
+  const titles: Record<string, Record<string, string>> = {
+    "New Application Received": { hi: "नया आवेदन प्राप्त हुआ", gu: "નવી અરજી મળી" },
+    "Application Accepted!": { hi: "आवेदन स्वीकृत!", gu: "અરજી સ્વીકારવામાં આવી!" },
+    "Job Completion Review": { hi: "कार्य पूर्णता समीक्षा", gu: "કામ પૂર્ણતા સમીક્ષા" },
+    "Job Completed ✓": { hi: "कार्य पूर्ण ✓", gu: "કામ પૂર્ણ ✓" },
+    "Payment Confirmed": { hi: "भुगतान की पुष्टि हुई", gu: "ચૂકવણીની પુષ્ટિ થઈ" },
+    "Job Marked Paid": { hi: "कार्य का भुगतान चिह्नित किया गया", gu: "કામ ચૂકવેલ ચિહ્નિત" },
+    "Payment Dispute Reported": { hi: "भुगतान विवाद दर्ज", gu: "ચૂકવણી વિવાદ નોંધાયો" },
+  };
+
+  if (titles[title] && titles[title][locale]) {
+    tTitle = titles[title][locale];
+  }
+
+  // Message translations using regex patterns
+  if (message.includes('applied for')) {
+    const match = message.match(/(.+) applied for "(.+)"/);
+    if (match) {
+      if (locale === "hi") tMessage = `${match[1]} ने "${match[2]}" के लिए आवेदन किया`;
+      if (locale === "gu") tMessage = `${match[1]} એ "${match[2]}" માટે અરજી કરી`;
+    }
+  } else if (message.includes('Your application for') && message.includes('has been accepted')) {
+    const match = message.match(/Your application for "(.+)" has been accepted/);
+    if (match) {
+      if (locale === "hi") tMessage = `"${match[1]}" के लिए आपका आवेदन स्वीकृत कर लिया गया है। अब आप काम शुरू कर सकते हैं।`;
+      if (locale === "gu") tMessage = `"${match[1]}" માટેની તમારી અરજી સ્વીકારવામાં આવી છે. હવે તમે કામ શરૂ કરી શકો છો.`;
+    }
+  } else if (message.includes('marked') && message.includes('as complete. Please confirm')) {
+    const match = message.match(/(.+) marked "(.+)" as complete\. Please confirm/);
+    if (match) {
+      if (locale === "hi") tMessage = `${match[1]} ने "${match[2]}" को पूर्ण चिह्नित किया है। कृपया पुष्टि करें।`;
+      if (locale === "gu") tMessage = `${match[1]} એ "${match[2]}" ને પૂર્ણ ચિહ્નિત કર્યું છે. કૃપા કરીને પુષ્ટિ કરો.`;
+    }
+  } else if (message.includes('confirmed completion of')) {
+    const match = message.match(/(.+) confirmed completion of "(.+)"/);
+    if (match) {
+      if (locale === "hi") tMessage = `${match[1]} ने "${match[2]}" के पूरा होने की पुष्टि की है।`;
+      if (locale === "gu") tMessage = `${match[1]} એ "${match[2]}" ની પૂર્ણતાની પુષ્ટિ કરી છે.`;
+    }
+  } else if (message.includes('confirmed payment receipt for')) {
+    const match = message.match(/(.+) confirmed payment receipt for "(.+)"/);
+    if (match) {
+      if (locale === "hi") tMessage = `${match[1]} ने "${match[2]}" के भुगतान की रसीद की पुष्टि की है।`;
+      if (locale === "gu") tMessage = `${match[1]} એ "${match[2]}" માટે ચૂકવણીની રસીદની પુષ્ટિ કરી છે.`;
+    }
+  } else if (message.includes('marked') && message.includes('as paid and completed')) {
+    const match = message.match(/(.+) marked "(.+)" as paid and completed/);
+    if (match) {
+      if (locale === "hi") tMessage = `${match[1]} ने "${match[2]}" को भुगतान किया और पूरा कर दिया।`;
+      if (locale === "gu") tMessage = `${match[1]} એ "${match[2]}" ને ચૂકવેલ અને પૂર્ણ ચિહ્નિત કર્યું છે.`;
+    }
+  } else if (message.includes('reported a payment issue for')) {
+    const match = message.match(/(.+) reported a payment issue for "(.+)"/);
+    if (match) {
+      if (locale === "hi") tMessage = `${match[1]} ने "${match[2]}" के लिए भुगतान समस्या की सूचना दी।`;
+      if (locale === "gu") tMessage = `${match[1]} એ "${match[2]}" માટે ચૂકવણી સમસ્યાની જાણ કરી.`;
+    }
+  }
+
+  return { title: tTitle, message: tMessage };
+}
+
+/**
  * Show appropriate toast based on notification type
  */
 function showNotificationToast(notification: Notification) {
@@ -250,8 +332,39 @@ function showNotificationToast(notification: Notification) {
 
   const icon = icons[notification.type] || "🔔";
 
-  toast.info(`${icon} ${notification.title}`, {
-    description: notification.message,
-    duration: 5000,
+  let locale = "en";
+  if (typeof window !== "undefined") {
+    const segment = window.location.pathname.split("/")[1];
+    if (["en", "hi", "gu"].includes(segment)) {
+      locale = segment;
+    }
+  }
+
+  const { title, message } = translateNotification(
+    notification.title,
+    notification.message,
+    locale
+  );
+
+  const handleRedirect = () => {
+    let accountType = "worker";
+    try {
+      const userStr = localStorage.getItem("user");
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        accountType = user.accountType === "contractor" ? "contractor" : "worker";
+      }
+    } catch (e) {}
+
+    window.location.href = `/${locale}/dashboard/${accountType}`;
+  };
+
+  toast.info(`${icon} ${title}`, {
+    description: message,
+    duration: 3000,
+    action: {
+      label: locale === "hi" ? "देखें" : locale === "gu" ? "જુઓ" : "View",
+      onClick: handleRedirect,
+    },
   });
 }

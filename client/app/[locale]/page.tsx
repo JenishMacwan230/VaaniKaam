@@ -3,9 +3,10 @@ import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter, useParams, usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { fetchSessionUser, resolveAccountType, AuthUser } from "@/lib/authClient";
+import { fetchSessionUser, resolveAccountType, AuthUser, fetchPublicStats, PublicStats } from "@/lib/authClient";
 import Logo from "@/components/ui/logo";
 import { UserMenu } from "@/components/UserMenu";
+import { NotificationBell } from "@/components/NotificationBell";
 import { useTranslations } from "next-intl";
 import { locales } from "@/i18n";
 import {
@@ -198,6 +199,7 @@ const HomePage: React.FC = () => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [sessionChecked, setSessionChecked] = useState(false);
   const [notifIdx, setNotifIdx] = useState(0);
+  const [stats, setStats] = useState<PublicStats | null>(null);
 
   const notifications = [
     { id: 1, title: "New Opportunity!", message: "₹2,000 - Plumber needed in Bilimora", icon: "🔧" },
@@ -208,8 +210,12 @@ const HomePage: React.FC = () => {
 
   useEffect(() => {
     const run = async () => {
-      const s = await fetchSessionUser();
+      const [s, st] = await Promise.all([
+        fetchSessionUser(),
+        fetchPublicStats()
+      ]);
       setUser(s || null);
+      setStats(st || null);
       setSessionChecked(true);
     };
     void run();
@@ -288,14 +294,14 @@ const HomePage: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                aria-label="Voice search"
-                className="flex h-9 w-9 items-center justify-center rounded-full border"
-                style={{ background: PILL_BG, borderColor: PILL_BORDER }}
-              >
-                <Mic className="h-4 w-4 text-white" />
-              </button>
+              {user && (
+                <div 
+                  className="flex h-9 w-9 items-center justify-center rounded-full border [&_svg]:text-white hover:[&_button]:bg-white/10"
+                  style={{ background: PILL_BG, borderColor: PILL_BORDER }}
+                >
+                  <NotificationBell />
+                </div>
+              )}
               <Select value={currentLocale} onValueChange={handleLanguageChange}>
                 <SelectTrigger
                   className="h-[32px] w-auto gap-1 rounded-full border px-3 text-[12px] font-semibold text-white shadow-none"
@@ -376,11 +382,11 @@ const HomePage: React.FC = () => {
             {user ? (
               <>
                 <button
-                  onClick={() => router.push(`/${locale}/projects`)}
+                  onClick={() => router.push(`/${locale}/${isContractor ? 'add-works' : 'find-work'}`)}
                   className="flex items-center gap-2 rounded-xl px-7 py-3.5 text-[15px] font-bold text-white transition-opacity active:opacity-80 shadow-md"
                   style={{ background: HERO_GRADIENT }}
                 >
-                  Find Jobs <ArrowRight className="h-5 w-5" />
+                  {isContractor ? "Add Work" : "Find Jobs"} <ArrowRight className="h-5 w-5" />
                 </button>
                 <button
                   onClick={() => router.push(`/${locale}/dashboard`)}
@@ -412,9 +418,9 @@ const HomePage: React.FC = () => {
 
           {/* Quick stats */}
           <div className="mt-12 grid grid-cols-3 gap-3">
-            <StatCard value="10K+" label={t("activeUsers")} />
-            <StatCard value="5K+" label={t("jobsPosted")} />
-            <StatCard value="4.8★" label={t("avgRating")} />
+            <StatCard value={stats ? `${stats.totalUsers > 1000 ? (stats.totalUsers/1000).toFixed(1) + 'K+' : stats.totalUsers}` : "10K+"} label={t("activeUsers")} />
+            <StatCard value={stats ? `${stats.totalJobs > 1000 ? (stats.totalJobs/1000).toFixed(1) + 'K+' : stats.totalJobs}` : "5K+"} label={t("jobsPosted")} />
+            <StatCard value={stats ? `${stats.avgRating}★` : "4.8★"} label={t("avgRating")} />
           </div>
         </div>
       </section>
@@ -434,218 +440,7 @@ const HomePage: React.FC = () => {
         </div>
       </section>
 
-      {/* ══════════════════════════════════════════════════
-          POPULAR JOBS (logged-in only)
-      ══════════════════════════════════════════════════ */}
-      {user && (
-        <section className="px-4 py-14 md:py-20 bg-white">
-          <div className="mx-auto max-w-5xl">
-            <SectionHeading title={t("popularJobs")} subtitle={t("popularJobsDesc")} />
-            <div className="grid gap-4 md:grid-cols-3">
-              {[
-                { title: "Plumber Needed", location: "Bilimora", pay: "₹1,200/day", dist: "1.2 km", badge: "Urgent", badgeColor: "#dc2626" },
-                { title: "Painter for Interior", location: "Navsari", pay: "₹950/day", dist: "2.8 km", badge: "Today", badgeColor: TEAL },
-                { title: "Construction Helper", location: "Valsad", pay: "₹1,100/day", dist: "3.4 km", badge: "Flexible", badgeColor: BLUE },
-              ].map((job) => (
-                <div
-                  key={job.title}
-                  className="group overflow-hidden rounded-2xl border bg-white transition-all hover:-translate-y-1 hover:shadow-lg"
-                  style={{ borderColor: "rgba(0,0,0,0.08)" }}
-                >
-                  <div className="h-[3px]" style={{ background: job.badgeColor }} />
-                  <div className="p-5">
-                    <div className="mb-3 flex items-start justify-between gap-2">
-                      <h3 className="text-[15px] font-bold text-foreground leading-snug">{job.title}</h3>
-                      <span
-                        className="shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold text-white"
-                        style={{ background: job.badgeColor }}
-                      >
-                        {job.badge}
-                      </span>
-                    </div>
-                    <p className="mb-1 flex items-center gap-1.5 text-[13px] text-foreground/55">
-                      <MapPin className="h-3.5 w-3.5 shrink-0" style={{ color: TEAL }} />
-                      {job.location} · {job.dist}
-                    </p>
-                    <p className="mb-4 flex items-center gap-1.5 text-[14px] font-bold text-foreground">
-                      <DollarSign className="h-3.5 w-3.5 shrink-0" style={{ color: TEAL }} />
-                      {job.pay}
-                    </p>
-                    <button
-                      className="w-full rounded-xl py-2.5 text-[13px] font-bold text-white transition-opacity active:opacity-80"
-                      style={{ background: HERO_GRADIENT }}
-                    >
-                      View Job
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-10 text-center">
-              <button
-                onClick={() => router.push(`/${locale}/projects`)}
-                className="inline-flex items-center gap-2 rounded-xl px-7 py-3.5 text-[15px] font-bold text-white shadow-md transition-opacity active:opacity-80"
-                style={{ background: HERO_GRADIENT }}
-              >
-                View All Jobs <ArrowRight className="h-5 w-5" />
-              </button>
-            </div>
-          </div>
-        </section>
-      )}
 
-      {/* ══════════════════════════════════════════════════
-          HOW IT WORKS
-      ══════════════════════════════════════════════════ */}
-      <section className="px-4 py-14 md:py-20" style={{ background: "rgba(13,158,110,0.03)" }}>
-        <div className="mx-auto max-w-5xl">
-          <SectionHeading title={t("howItWorks")} />
-          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
-            {[
-              { step: "1", title: t("createProfile"), desc: t("createProfileDesc"), icon: Users },
-              { step: "2", title: t("browseJobs"), desc: t("browseJobsDesc"), icon: Target },
-              { step: "3", title: t("applyInstantly"), desc: t("applyInstantlyDesc"), icon: Smartphone },
-              { step: "4", title: t("getHired"), desc: t("getHiredDesc"), icon: CheckCircle },
-            ].map((item, idx) => {
-              const Icon = item.icon;
-              return (
-                <div key={idx} className="relative">
-                  <div
-                    className="rounded-2xl border bg-white p-5 text-center transition-all hover:-translate-y-1 hover:shadow-md"
-                    style={{ borderColor: "rgba(13,158,110,0.15)" }}
-                  >
-                    <div
-                      className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full text-[15px] font-extrabold text-white"
-                      style={{ background: HERO_GRADIENT }}
-                    >
-                      {item.step}
-                    </div>
-                    <Icon className="mx-auto mb-2 h-7 w-7" style={{ color: TEAL }} />
-                    <h3 className="mb-1 text-[14px] font-bold text-foreground">{item.title}</h3>
-                    <p className="text-[12px] text-foreground/50">{item.desc}</p>
-                  </div>
-                  {idx < 3 && (
-                    <ArrowRight
-                      className="absolute -right-2.5 top-1/3 hidden h-5 w-5 md:block"
-                      style={{ color: "rgba(13,158,110,0.3)" }}
-                    />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════════════════
-          CONTRACTOR DASHBOARD
-      ══════════════════════════════════════════════════ */}
-      {user && isContractor && (
-        <section className="px-4 py-14 md:py-20 bg-white">
-          <div className="mx-auto max-w-5xl">
-            <SectionHeading title={t("manageContracts")} subtitle={t("manageContractsDesc")} />
-            <div className="grid gap-4 md:grid-cols-3">
-              <DashCard
-                icon={Briefcase}
-                badge={t("active")}
-                badgeBg="rgba(13,158,110,0.12)"
-                badgeText={TEAL}
-                value="3"
-                label={t("activeContracts")}
-                btnLabel={t("viewAll")}
-                topColor={HERO_GRADIENT}
-                iconBg="rgba(13,158,110,0.1)"
-                iconColor={TEAL}
-              />
-              <DashCard
-                icon={DollarSign}
-                badge={t("thisMonth")}
-                badgeBg="rgba(26,122,158,0.12)"
-                badgeText={BLUE}
-                value="₹18,500"
-                label={t("totalEarnings")}
-                btnLabel={t("withdraw")}
-                topColor={`linear-gradient(135deg,${BLUE},${TEAL})`}
-                iconBg="rgba(26,122,158,0.1)"
-                iconColor={BLUE}
-              />
-              <DashCard
-                icon={AlertCircle}
-                badge={t("pending")}
-                badgeBg="#fee2e2"
-                badgeText="#dc2626"
-                value="2"
-                label={t("pendingProjects")}
-                btnLabel={t("review")}
-                topColor="linear-gradient(135deg,#dc2626,#f87171)"
-                iconBg="#fee2e2"
-                iconColor="#dc2626"
-              />
-            </div>
-            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <StatCard value="96%" label={t("completionRate")} />
-              <StatCard value="4.9★" label={t("averageRating")} />
-              <StatCard value="28" label={t("totalProjects")} />
-              <StatCard value="<2 hr" label={t("responseTime")} />
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* ══════════════════════════════════════════════════
-          WORKER DASHBOARD
-      ══════════════════════════════════════════════════ */}
-      {user && !isContractor && (
-        <section className="px-4 py-14 md:py-20 bg-white">
-          <div className="mx-auto max-w-5xl">
-            <SectionHeading title={t("yourWorkStats")} subtitle={t("yourWorkStatsDesc")} />
-            <div className="grid gap-4 md:grid-cols-3">
-              <DashCard
-                icon={Target}
-                badge={t("pending")}
-                badgeBg="rgba(26,122,158,0.12)"
-                badgeText={BLUE}
-                value="5"
-                label={t("jobApplications")}
-                btnLabel={t("viewAll")}
-                topColor={`linear-gradient(135deg,${BLUE},${TEAL_L})`}
-                iconBg="rgba(26,122,158,0.1)"
-                iconColor={BLUE}
-              />
-              <DashCard
-                icon={DollarSign}
-                badge={t("total")}
-                badgeBg="rgba(13,158,110,0.12)"
-                badgeText={TEAL}
-                value="₹12,350"
-                label={t("totalEarnings")}
-                btnLabel={t("history")}
-                topColor={HERO_GRADIENT}
-                iconBg="rgba(13,158,110,0.1)"
-                iconColor={TEAL}
-              />
-              <DashCard
-                icon={Star}
-                badge="4.8★"
-                badgeBg="rgba(251,191,36,0.15)"
-                badgeText="#b45309"
-                value="87"
-                label={t("profileViews")}
-                btnLabel={t("updateProfile")}
-                topColor="linear-gradient(135deg,#f59e0b,#fbbf24)"
-                iconBg="rgba(251,191,36,0.12)"
-                iconColor="#f59e0b"
-              />
-            </div>
-            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <StatCard value="42" label={t("jobsCompleted")} />
-              <StatCard value="98%" label={t("onTimeRate")} />
-              <StatCard value="15" label={t("repeatClients")} />
-              <StatCard value="30 min" label={t("avgResponse")} />
-            </div>
-          </div>
-        </section>
-      )}
 
       {/* ══════════════════════════════════════════════════
           TRENDING CATEGORIES

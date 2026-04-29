@@ -129,11 +129,6 @@ export default function DashboardPage() {
         const userData = await fetchSessionUser();
         if (!userData) { router.push("/en/login"); return; }
         const accountType = resolveAccountType(userData);
-        if (accountType === "contractor") {
-          const locale = getCurrentLocale(window.location.pathname);
-          router.replace(`/${locale}/dashboard/contractor`);
-          return;
-        }
         setUser(userData);
         if (typeof userData.availability === "boolean") setIsAvailable(userData.availability);
         const raw = userData as unknown as Record<string, unknown>;
@@ -250,6 +245,7 @@ export default function DashboardPage() {
   }
 
   if (!user) return null;
+  const isContractor = resolveAccountType(user) === "contractor";
 
   const workerData = user as AuthUser & {
     profession?: string; skills?: string[]; experienceYears?: number;
@@ -309,27 +305,29 @@ export default function DashboardPage() {
                 </span>
               </button>
               {/* Availability toggle */}
-              <button
-                type="button"
-                onClick={handleAvailabilityToggle}
-                className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold border transition-colors ${
-                  isAvailable
-                    ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400"
-                    : "bg-muted text-muted-foreground border-border"
-                }`}
-              >
-                <span className={`h-2 w-2 rounded-full ${isAvailable ? "bg-emerald-500" : "bg-gray-400"}`} />
-                {isAvailable ? "Available" : "Unavailable"}
-              </button>
+              {!isContractor && (
+                <button
+                  type="button"
+                  onClick={handleAvailabilityToggle}
+                  className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold border transition-colors ${
+                    isAvailable
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400"
+                      : "bg-muted text-muted-foreground border-border"
+                  }`}
+                >
+                  <span className={`h-2 w-2 rounded-full ${isAvailable ? "bg-emerald-500" : "bg-gray-400"}`} />
+                  {isAvailable ? "Available" : "Unavailable"}
+                </button>
+              )}
             </div>
 
             {/* Name + meta */}
             <h2 className="text-xl font-bold">{user.name || "User"}</h2>
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
               <Badge variant="secondary" className="text-xs font-semibold uppercase tracking-wide">
-                Worker
+                {resolveAccountType(user) === "contractor" ? "Contractor" : "Worker"}
               </Badge>
-              {workerData.profession && (
+              {!isContractor && workerData.profession && (
                 <Badge variant="outline" className="text-xs">{workerData.profession}</Badge>
               )}
               {user.location && (
@@ -340,7 +338,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Pricing */}
-            {workerPricingAmount ? (
+            {!isContractor && workerPricingAmount ? (
               <p className="mt-2 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
                 ₹{workerPricingAmount} {getPricingLabel(workerPricingType)}
               </p>
@@ -354,7 +352,7 @@ export default function DashboardPage() {
             )}
 
             {/* Skills */}
-            {workerData.skills && workerData.skills.length > 0 && (
+            {!isContractor && workerData.skills && workerData.skills.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {workerData.skills.slice(0, 5).map((s) => (
                   <span key={s} className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
@@ -370,23 +368,25 @@ export default function DashboardPage() {
             )}
 
             {/* Profile completion */}
-            <div className="mt-4 space-y-1.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground font-medium">Profile completion</span>
-                <span className="font-bold text-foreground">{profileCompletion}%</span>
+            {!isContractor && (
+              <div className="mt-4 space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground font-medium">Profile completion</span>
+                  <span className="font-bold text-foreground">{profileCompletion}%</span>
+                </div>
+                <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500"
+                    style={{ width: `${profileCompletion}%` }}
+                  />
+                </div>
+                {profileCompletion < 100 && (
+                  <p className="text-xs text-muted-foreground">
+                    Complete your profile to get more job matches
+                  </p>
+                )}
               </div>
-              <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500"
-                  style={{ width: `${profileCompletion}%` }}
-                />
-              </div>
-              {profileCompletion < 100 && (
-                <p className="text-xs text-muted-foreground">
-                  Complete your profile to get more job matches
-                </p>
-              )}
-            </div>
+            )}
 
             {/* Actions */}
             <div className="mt-4 flex flex-wrap gap-2">
@@ -400,11 +400,12 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* ── Analytics ── */}
-        <div className="mb-5">
-          <div className="mb-3 flex items-center gap-2">
-            <Activity className="h-4 w-4 text-emerald-600" />
-            <h2 className="text-base font-bold">Analytics</h2>
+        {/* ── Worker Analytics ── */}
+        {!isContractor && (
+          <div className="mb-5">
+            <div className="mb-3 flex items-center gap-2">
+              <Activity className="h-4 w-4 text-emerald-600" />
+              <h2 className="text-base font-bold">Analytics</h2>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[
@@ -477,8 +478,10 @@ export default function DashboardPage() {
             </Card>
           )}
         </div>
+        )}
 
         {/* ── Navigate to Work Section ── */}
+        {!isContractor && (
         <div className="mb-5">
           <div className="mb-3 flex items-center gap-2">
             <Briefcase className="h-4 w-4 text-emerald-600" />
@@ -508,6 +511,7 @@ export default function DashboardPage() {
             <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-emerald-600 transition-colors flex-shrink-0" />
           </button>
         </div>
+        )}
 
         {/* ── Quick Actions ── */}
         <div>
@@ -598,6 +602,7 @@ export default function DashboardPage() {
           <DialogHeader className="border-b px-5 py-4">
             <DialogTitle>Edit Profile</DialogTitle>
             <DialogDescription>Keep your details updated to get better job matches.</DialogDescription>
+            {!isContractor && (
             <div className="mt-2 space-y-1">
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span>Profile completion</span>
@@ -607,6 +612,7 @@ export default function DashboardPage() {
                 <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all" style={{ width: `${profileCompletion}%` }} />
               </div>
             </div>
+            )}
           </DialogHeader>
 
           <div className="overflow-y-auto max-h-[calc(92vh-175px)] px-5 py-4 space-y-5">
@@ -642,6 +648,7 @@ export default function DashboardPage() {
             </section>
 
             {/* Profession */}
+            {!isContractor && (
             <section className="rounded-xl border bg-muted/30 p-4 space-y-3">
               <p className="flex items-center gap-2 text-sm font-semibold"><BriefcaseBusiness className="h-4 w-4" /> Profession</p>
               <Select value={editFormData.profession} onValueChange={(v) => setEditFormData({ ...editFormData, profession: v })}>
@@ -649,8 +656,10 @@ export default function DashboardPage() {
                 <SelectContent>{professionOptions.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
               </Select>
             </section>
+            )}
 
             {/* Skills */}
+            {!isContractor && (
             <section className="rounded-xl border bg-muted/30 p-4 space-y-3">
               <p className="flex items-center gap-2 text-sm font-semibold"><Hammer className="h-4 w-4" /> Skills</p>
               <div className="flex flex-wrap gap-2">
@@ -663,8 +672,10 @@ export default function DashboardPage() {
                 ))}
               </div>
             </section>
+            )}
 
             {/* Experience */}
+            {!isContractor && (
             <section className="rounded-xl border bg-muted/30 p-4 space-y-3">
               <p className="flex items-center gap-2 text-sm font-semibold"><Clock className="h-4 w-4" /> Experience</p>
               <div className="grid grid-cols-2 gap-2">
@@ -679,8 +690,10 @@ export default function DashboardPage() {
                 ))}
               </div>
             </section>
+            )}
 
             {/* Pricing */}
+            {!isContractor && (
             <section className="rounded-xl border bg-muted/30 p-4 space-y-3">
               <p className="flex items-center gap-2 text-sm font-semibold"><Wallet className="h-4 w-4" /> Pricing</p>
               <div className="flex gap-2">
@@ -694,6 +707,7 @@ export default function DashboardPage() {
               </div>
               <Input value={editFormData.pricingAmount} onChange={(e) => setEditFormData({ ...editFormData, pricingAmount: e.target.value })} placeholder={getPricingPlaceholder(editFormData.pricingType)} />
             </section>
+            )}
 
             {/* Languages */}
             <section className="rounded-xl border bg-muted/30 p-4 space-y-3">

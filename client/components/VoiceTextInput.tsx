@@ -20,7 +20,7 @@ import { useSpeechInput } from "@/lib/useSpeechInput";
 interface VoiceTextInputProps {
   readonly value: string;
   readonly onChange: (value: string) => void;
-  readonly label?: string;
+  readonly label?: React.ReactNode;
   readonly placeholder?: string;
   readonly language?: string;
   readonly disabled?: boolean;
@@ -46,11 +46,11 @@ export default function VoiceTextInput({
   maxLength,
   hint,
 }: Readonly<VoiceTextInputProps>) {
-  const { isListening, isSpeaking, isSupported, transcribedText, error, startListening, stopListening, speak, clearError } = useSpeechInput({
+  const { isListening, isSpeaking, isSupported, transcribedText, error, startListening, stopListening, speak, clearError, isGlobalMicListening } = useSpeechInput({
     language,
     onPhoneNumberChange: onChange,
     autoSpeakOnMount: autoSpeak,
-    initialGreeting: hint || `Please enter ${label.toLowerCase()}`,
+    initialGreeting: hint || `Please enter ${typeof label === 'string' ? label.toLowerCase() : 'text'}`,
     mode: "text",
   });
 
@@ -89,10 +89,25 @@ export default function VoiceTextInput({
   return (
     <div className="space-y-2">
       {label && (
-        <Label className="text-sm font-medium flex items-center gap-2">
-          <span>{label}</span>
-          {isSpeaking && <Volume2 className="w-4 h-4 text-blue-500 animate-pulse" />}
-        </Label>
+        <div className="flex items-center gap-2 mb-1">
+          {isSupported && (
+            <button
+              type="button"
+              onClick={handleSpeakClick}
+              disabled={disabled || isListening}
+              aria-label="Play instruction"
+              className="focus:outline-none transition-colors"
+              title="Replay instructions"
+            >
+              {isSpeaking ? (
+                <Volume2 className="w-4 h-4 animate-pulse text-blue-500" />
+              ) : (
+                <Volume2 className="w-4 h-4 text-muted-foreground hover:text-blue-500" />
+              )}
+            </button>
+          )}
+          <Label className="text-sm font-medium">{label}</Label>
+        </div>
       )}
 
       <div className="relative flex items-center gap-2">
@@ -122,13 +137,13 @@ export default function VoiceTextInput({
             <Button
               type="button"
               onClick={handleMicClick}
-              disabled={disabled || isSpeaking}
+              disabled={disabled || isSpeaking || isGlobalMicListening}
               size="icon"
               variant="outline"
               className={cn(
                 "rounded-2xl border-2 h-10 w-10 transition-all",
                 isListening
-                  ? "border-red-500 bg-red-50 text-red-600 hover:bg-red-100"
+                  ? "border-green-500 bg-green-50 text-green-600 hover:bg-green-100"
                   : "border-input hover:border-primary hover:bg-primary/5"
               )}
               title={isListening ? "Stop listening" : "Start voice input"}
@@ -140,28 +155,6 @@ export default function VoiceTextInput({
               )}
             </Button>
 
-            {/* Speaker Button */}
-            <Button
-              type="button"
-              onClick={handleSpeakClick}
-              disabled={disabled || isListening}
-              size="icon"
-              variant="outline"
-              aria-label="Play instruction"
-              className={cn(
-                "rounded-2xl border-2 h-10 w-10 transition-all",
-                isSpeaking
-                  ? "border-blue-500 bg-blue-50 text-blue-600 hover:bg-blue-100"
-                  : "border-input hover:border-blue-500 hover:bg-blue-50"
-              )}
-              title="Replay instructions"
-            >
-              {isSpeaking ? (
-                <VolumeX className="w-4 h-4" />
-              ) : (
-                <Volume2 className="w-4 h-4" />
-              )}
-            </Button>
           </>
         )}
       </div>

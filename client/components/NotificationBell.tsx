@@ -47,7 +47,25 @@ export function NotificationBell() {
     if (!notification.read) {
       markAsRead(notification._id);
     }
-    setSelectedNotification(notification);
+    
+    // Redirect to dashboard
+    let locale = "en";
+    let accountType = "worker";
+    if (typeof window !== "undefined") {
+      const segment = window.location.pathname.split("/")[1];
+      if (["en", "hi", "gu"].includes(segment)) {
+        locale = segment;
+      }
+      try {
+        const userStr = localStorage.getItem("user");
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          accountType = user.accountType === "contractor" ? "contractor" : "worker";
+        }
+      } catch (e) {}
+      
+      window.location.href = `/${locale}/dashboard/${accountType}`;
+    }
   };
 
   return (

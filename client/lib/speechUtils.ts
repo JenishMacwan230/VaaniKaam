@@ -447,7 +447,7 @@ export const startSpeechRecognition = (
       let finalTranscript = "";
 
       recognition.onstart = () => {
-        // no-op; kept for lifecycle consistency
+        globalThis.dispatchEvent(new Event("speech-listening-started"));
       };
 
       recognition.onresult = (event: any) => {
@@ -493,6 +493,7 @@ export const startSpeechRecognition = (
 
       recognition.onend = () => {
         activeRecognition = null;
+        globalThis.dispatchEvent(new Event("speech-listening-stopped"));
         onEnd?.();
         resolve(finalTranscript);
       };

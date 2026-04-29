@@ -304,9 +304,7 @@ const BlogHeader = () => {
                   <span>{languages.find((l) => l.code === currentLocale)?.label || "English"}</span>
                 </div>
               )}
-              <button className="p-1.5 md:p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
-                <Search className="h-4 md:h-5 w-4 md:w-5" />
-              </button>
+
               {user && <NotificationBell />}
               {user ? (
                 <UserMenu user={user} />

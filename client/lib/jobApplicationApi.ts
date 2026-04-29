@@ -46,7 +46,7 @@ export async function applyToJob(jobId: string): Promise<JobApplicationData> {
 
   const token =
     typeof window !== "undefined"
-      ? localStorage.getItem("firebaseToken") || localStorage.getItem("token")
+      ? localStorage.getItem("authToken")
       : null;
 
   const headers: Record<string, string> = {
@@ -79,6 +79,40 @@ export async function applyToJob(jobId: string): Promise<JobApplicationData> {
 }
 
 /**
+ * Withdraw an application from a job
+ */
+export async function withdrawApplication(jobId: string): Promise<void> {
+  if (!API_BASE_URL) {
+    throw new Error("API configuration missing");
+  }
+
+  const token =
+    typeof window !== "undefined"
+      ? localStorage.getItem("authToken")
+      : null;
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (token) {
+    headers["Authorization"] = token.startsWith("Bearer ") ? token : `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/jobs/withdraw`, {
+    method: "POST",
+    headers,
+    credentials: "include",
+    body: JSON.stringify({ jobId }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || `Failed to withdraw application (${response.status})`);
+  }
+}
+
+/**
  * Get all applicants for jobs posted by contractor
  */
 export async function getContractorJobApplicants(): Promise<ApplicantData[]> {
@@ -88,7 +122,7 @@ export async function getContractorJobApplicants(): Promise<ApplicantData[]> {
 
   const token =
     typeof window !== "undefined"
-      ? localStorage.getItem("firebaseToken") || localStorage.getItem("token")
+      ? localStorage.getItem("authToken")
       : null;
 
   const headers: Record<string, string> = {
@@ -126,7 +160,7 @@ export async function getJobApplicants(
 
   const token =
     typeof window !== "undefined"
-      ? localStorage.getItem("firebaseToken") || localStorage.getItem("token")
+      ? localStorage.getItem("authToken")
       : null;
 
   const headers: Record<string, string> = {
@@ -173,7 +207,7 @@ export async function updateApplicationStatus(
 
   const token =
     typeof window !== "undefined"
-      ? localStorage.getItem("firebaseToken") || localStorage.getItem("token")
+      ? localStorage.getItem("authToken")
       : null;
 
   const headers: Record<string, string> = {
@@ -243,7 +277,7 @@ export async function getWorkerApplications(): Promise<
 
   const token =
     typeof window !== "undefined"
-      ? localStorage.getItem("firebaseToken") || localStorage.getItem("token")
+      ? localStorage.getItem("authToken")
       : null;
 
   const headers: Record<string, string> = {
@@ -309,7 +343,7 @@ export async function getWorkerAcceptedJobs(): Promise<
 
   const token =
     typeof window !== "undefined"
-      ? localStorage.getItem("firebaseToken") || localStorage.getItem("token")
+      ? localStorage.getItem("authToken")
       : null;
 
   const headers: Record<string, string> = {
@@ -345,7 +379,7 @@ export async function markJobComplete(applicationId: string): Promise<JobApplica
 
   const token =
     typeof window !== "undefined"
-      ? localStorage.getItem("firebaseToken") || localStorage.getItem("token")
+      ? localStorage.getItem("authToken")
       : null;
 
   const headers: Record<string, string> = {
@@ -419,7 +453,7 @@ export async function getWorkerPendingCompletion(): Promise<
 
   const token =
     typeof window !== "undefined"
-      ? localStorage.getItem("firebaseToken") || localStorage.getItem("token")
+      ? localStorage.getItem("authToken")
       : null;
 
   const headers: Record<string, string> = {
@@ -455,7 +489,7 @@ export async function confirmJobCompletion(applicationId: string): Promise<JobAp
 
   const token =
     typeof window !== "undefined"
-      ? localStorage.getItem("firebaseToken") || localStorage.getItem("token")
+      ? localStorage.getItem("authToken")
       : null;
 
   const headers: Record<string, string> = {
@@ -508,7 +542,7 @@ export async function rejectJobCompletion(applicationId: string): Promise<JobApp
 
   const token =
     typeof window !== "undefined"
-      ? localStorage.getItem("firebaseToken") || localStorage.getItem("token")
+      ? localStorage.getItem("authToken")
       : null;
 
   const headers: Record<string, string> = {
@@ -582,7 +616,7 @@ export async function getWorkerCompletedJobs(): Promise<
 
   const token =
     typeof window !== "undefined"
-      ? localStorage.getItem("firebaseToken") || localStorage.getItem("token")
+      ? localStorage.getItem("authToken")
       : null;
 
   const headers: Record<string, string> = {

@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "node:crypto";
 import User, { allowedRoles } from "../models/User";
+import Job from "../models/Job";
 import OtpCode from "../models/OtpCode";
 import { verifyFirebaseToken } from "../config/firebase";
 
@@ -563,5 +564,32 @@ export const getWorkerProfile = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Get worker profile error:", error);
     return res.status(500).json({ message: "Failed to fetch user profile" });
+  }
+};
+
+// GET PUBLIC STATS
+export const getPublicStats = async (_req: Request, res: Response) => {
+  try {
+    const totalUsers = await User.countDocuments({ isActive: true });
+    const totalJobs = await Job.countDocuments();
+    
+    const usersWithRatings = await User.aggregate([
+      { $match: { totalRatings: { $gt: 0 } } },
+      { $group: { _id: null, avgRating: { $avg: "$averageRating" } } }
+    ]);
+    
+    const avgRating = usersWithRatings.length > 0 ? Number(usersWithRatings[0].avgRating.toFixed(1)) : 4.8;
+    
+    return res.json({
+      success: true,
+      stats: {
+        totalUsers,
+        totalJobs,
+        avgRating
+      }
+    });
+  } catch (error) {
+    console.error("Get public stats error:", error);
+    return res.status(500).json({ message: "Failed to fetch stats" });
   }
 };

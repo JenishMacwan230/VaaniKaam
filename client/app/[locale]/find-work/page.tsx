@@ -21,7 +21,7 @@ import {
   User,
 } from "lucide-react";
 import ApplyJobButton from "@/components/ApplyJobButton";
-import { getWorkerApplications } from "@/lib/jobApplicationApi";
+import { getWorkerApplications, withdrawApplication } from "@/lib/jobApplicationApi";
 import type { Coordinates } from "@/lib/geolocation";
 import { getCurrentLocation } from "@/lib/geolocation";
 import { calculateDistance, formatDistance } from "@/lib/distance";
@@ -218,13 +218,14 @@ export default function FindWorkPage() {
       return { ...job, distanceKm: calculateDistance(distanceReferenceLocation, { latitude: job.latitude, longitude: job.longitude }) };
     }), [distanceReferenceLocation, jobs]);
 
-  const recommendedJobs = useMemo(() => {
-    const recommended = recommendJobs(jobsWithDistance, { skills: userSkills, location: distanceReferenceLocation });
-    return recommended.map((job) => ({ ...job, distanceKm: typeof job.recommendationDistanceKm === "number" ? job.recommendationDistanceKm : job.distanceKm, tab: "recommended" as JobTab }));
-  }, [distanceReferenceLocation, jobsWithDistance, userSkills]);
-
-  const appliedJobs = useMemo(() => jobsWithDistance.filter((j) => (j.tab || "live") === "applied"), [jobsWithDistance]);
   const liveJobs = useMemo(() => jobsWithDistance.filter((j) => (j.tab || "live") === "live"), [jobsWithDistance]);
+  const appliedJobs = useMemo(() => jobsWithDistance.filter((j) => (j.tab || "live") === "applied"), [jobsWithDistance]);
+
+  const recommendedJobs = useMemo(() => {
+    // Only recommend from live jobs, not already applied jobs
+    const recommended = recommendJobs(liveJobs, { skills: userSkills, location: distanceReferenceLocation });
+    return recommended.map((job) => ({ ...job, distanceKm: typeof job.recommendationDistanceKm === "number" ? job.recommendationDistanceKm : job.distanceKm, tab: "recommended" as JobTab }));
+  }, [distanceReferenceLocation, liveJobs, userSkills]);
 
   const filteredJobs = useMemo(() => {
     const nq = query.trim().toLowerCase();
@@ -582,7 +583,33 @@ export default function FindWorkPage() {
 
                         {/* Actions */}
                         <div className="flex gap-2">
-                          <ApplyJobButton jobId={job._id} isAlreadyApplied={isApplied} />
+                          {isApplied ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-9 rounded-xl border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 font-medium"
+                              onClick={async () => {
+                                try {
+                                  await withdrawApplication(job._id);
+                                  // Update local state to move it back to live
+                                  setJobs((prev) => prev.map((j) => j._id === job._id ? { ...j, tab: "live" } : j));
+                                } catch (e) {
+                                  alert(e instanceof Error ? e.message : "Failed to cancel application");
+                                }
+                              }}
+                            >
+                              Cancel Application
+                            </Button>
+                          ) : (
+                            <div onClick={() => {
+                              // We need a timeout so that the API call completes before state changes
+                              setTimeout(() => {
+                                setJobs((prev) => prev.map((j) => j._id === job._id ? { ...j, tab: "applied" } : j));
+                              }, 1500);
+                            }}>
+                              <ApplyJobButton jobId={job._id} isAlreadyApplied={false} />
+                            </div>
+                          )}
                           <Button
                             size="sm"
                             variant="outline"

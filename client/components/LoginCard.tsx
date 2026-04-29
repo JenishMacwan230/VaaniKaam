@@ -97,25 +97,22 @@ export default function LoginCard() {
             language={voiceLanguage}
             placeholder={t2("phonePlaceholder")}
             disabled={loading}
-            showHelper={true}
+            showHelper={false}
             autoSpeak={false}
           />
 
-          <div className="space-y-2 text-sm font-medium">
-            <span>{t("passwordLabel")}</span>
-            <VoiceTextInput
-              value={password}
-              onChange={handlePasswordChange}
-              label=""
-              placeholder={t("passwordPlaceholder")}
-              language={voiceLanguage}
-              disabled={loading}
-              type="text"
-              showHelper={true}
-              autoSpeak={false}
-              hint="Please speak or type your password"
-            />
-          </div>
+          <VoiceTextInput
+            value={password}
+            onChange={handlePasswordChange}
+            label={t("passwordLabel")}
+            placeholder={t("passwordPlaceholder")}
+            language={voiceLanguage}
+            disabled={loading}
+            type="text"
+            showHelper={false}
+            autoSpeak={false}
+            hint="Please speak or type your password"
+          />
 
           {error && (
             <div className="rounded-lg bg-red-50 border border-red-200 p-3">

@@ -144,6 +144,30 @@ export const applyToJob = async (req: Request & any, res: Response) => {
   }
 };
 
+export const withdrawApplication = async (req: Request & any, res: Response) => {
+  try {
+    const { jobId } = req.body || {};
+    const user = req.user;
+    if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+    // Only allow withdrawing if it's still 'applied' (not accepted or completed)
+    const application = await JobApplication.findOneAndDelete({ 
+      jobId, 
+      workerId: user._id,
+      status: "applied"
+    });
+
+    if (!application) {
+      return res.status(404).json({ message: "Application not found or cannot be withdrawn" });
+    }
+
+    return res.json({ message: "Application withdrawn successfully" });
+  } catch (error) {
+    console.error("Withdraw application error:", error);
+    return res.status(500).json({ message: "Failed to withdraw application" });
+  }
+};
+
 export const getContractorJobs = async (req: Request & any, res: Response) => {
   try {
     const user = req.user;

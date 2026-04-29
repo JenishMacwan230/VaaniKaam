@@ -111,7 +111,7 @@ export default function WorkersPage() {
           phone: w.phone || "",
           isAvailable: w.availability !== false,
           location: w.location || "Unknown",
-          avatarUrl: w.profilePictureUrl || `https://i.pravatar.cc/100?u=${w.id}`,
+          avatarUrl: w.profilePictureUrl || "",
           latitude: typeof w.latitude === "number" ? w.latitude : undefined,
           longitude: typeof w.longitude === "number" ? w.longitude : undefined,
         }));
@@ -554,15 +554,19 @@ function WorkerCard({ worker }: { worker: Worker }) {
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             {/* Avatar */}
-            <div className="h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-muted/60 shadow-sm">
-              <img
-                src={worker.avatarUrl}
-                alt={`${worker.name} profile`}
-                className="h-full w-full object-cover"
-                onError={(event) => {
-                  event.currentTarget.src = "/logo.png";
-                }}
-              />
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-blue-500/10 to-cyan-500/10 shadow-sm font-bold text-blue-600 dark:text-blue-400">
+              {worker.avatarUrl ? (
+                <img
+                  src={worker.avatarUrl}
+                  alt={`${worker.name} profile`}
+                  className="h-full w-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
+              ) : (
+                worker.name.charAt(0).toUpperCase()
+              )}
             </div>
             <div>
               <p className="font-semibold text-foreground leading-tight">{worker.name}</p>

@@ -37,7 +37,7 @@ export default function VoicePhoneInput({
   showHelper = true,
   autoSpeak = true,
 }: Readonly<VoicePhoneInputProps>) {
-  const { isListening, isSpeaking, isSupported, transcribedText, error, startListening, stopListening, speak, clearError } = useSpeechInput({
+  const { isListening, isSpeaking, isSupported, transcribedText, error, startListening, stopListening, speak, clearError, isGlobalMicListening } = useSpeechInput({
     language,
     onPhoneNumberChange,
     autoSpeakOnMount: autoSpeak,
@@ -89,11 +89,26 @@ export default function VoicePhoneInput({
 
   return (
     <div className="space-y-3">
-      {/* Label */}
-      <Label className="text-sm font-medium flex items-center gap-2">
-        <span>Mobile number</span>
-        {isSpeaking && <Volume2 className="w-4 h-4 text-blue-500 animate-pulse" />}
-      </Label>
+      {/* Label with inline Speaker Button */}
+      <div className="flex items-center gap-2 mb-1">
+        {isSupported && (
+          <button
+            type="button"
+            onClick={handleSpeakClick}
+            disabled={disabled || isListening}
+            aria-label="Play instruction"
+            className="focus:outline-none transition-colors"
+            title="Replay instructions"
+          >
+            {isSpeaking ? (
+              <Volume2 className="w-4 h-4 animate-pulse text-blue-500" />
+            ) : (
+              <Volume2 className="w-4 h-4 text-muted-foreground hover:text-blue-500" />
+            )}
+          </button>
+        )}
+        <Label className="text-sm font-medium">Mobile number</Label>
+      </div>
 
       {/* Input with Mic Button */}
       <div className="relative flex items-center gap-2">
@@ -137,13 +152,13 @@ export default function VoicePhoneInput({
             <Button
               type="button"
               onClick={handleMicClick}
-              disabled={disabled || isSpeaking}
+              disabled={disabled || isSpeaking || isGlobalMicListening}
               size="icon"
               variant="outline"
               className={cn(
                 "rounded-2xl border-2 h-12 w-12 transition-all",
                 isListening
-                  ? "border-red-500 bg-red-50 text-red-600 hover:bg-red-100"
+                  ? "border-green-500 bg-green-50 text-green-600 hover:bg-green-100"
                   : "border-input hover:border-primary hover:bg-primary/5"
               )}
               title={isListening ? "Stop listening" : "Start voice input"}
@@ -152,29 +167,6 @@ export default function VoicePhoneInput({
                 <MicOff className="w-5 h-5" />
               ) : (
                 <Mic className="w-5 h-5" />
-              )}
-            </Button>
-
-            {/* Speaker Button - Replay Instructions */}
-            <Button
-              type="button"
-              onClick={handleSpeakClick}
-              disabled={disabled || isListening}
-              size="icon"
-              variant="outline"
-              aria-label="Play instruction"
-              className={cn(
-                "rounded-2xl border-2 h-12 w-12 transition-all",
-                isSpeaking
-                  ? "border-blue-500 bg-blue-50 text-blue-600 hover:bg-blue-100"
-                  : "border-input hover:border-blue-500 hover:bg-blue-50"
-              )}
-              title="Replay instructions"
-            >
-              {isSpeaking ? (
-                <Volume2 className="w-5 h-5 animate-pulse" />
-              ) : (
-                <VolumeX className="w-5 h-5" />
               )}
             </Button>
           </>

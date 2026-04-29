@@ -387,7 +387,7 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
               language={voiceLanguage}
               placeholder={t("phonePlaceholder")}
               disabled={loading}
-              showHelper={true}
+              showHelper={false}
               autoSpeak={step === "phone"}
             />
 
@@ -405,20 +405,21 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
               <p className="text-sm text-green-700">{t("smsSent")}{phoneNumber}</p>
             </div>
 
-            <div className="flex items-center gap-2">
-              <Shield className="w-4 h-4 text-primary" />
-              <Label className="text-sm font-medium">{t("enterCode")}</Label>
-            </div>
             <VoiceTextInput
               value={otp}
               onChange={(val) => setOtp(val.replace(/\D/g, "").slice(0, 6))}
-              label=""
+              label={
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-primary" />
+                  <span>{t("enterCode")}</span>
+                </div>
+              }
               placeholder={t("codePlaceholder")}
               language={voiceLanguage}
               disabled={loading}
               type="tel"
               maxLength={6}
-              showHelper={true}
+              showHelper={false}
               autoSpeak={step === "otp"}
               hint={getOtpHint(voiceLanguage)}
             />
@@ -494,37 +495,39 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <User className="w-4 h-4 text-primary" />
-              <Label className="text-sm font-medium">{t("nameLabel")}</Label>
-            </div>
             <VoiceTextInput
               value={name}
               onChange={setName}
-              label=""
+              label={
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4 text-primary" />
+                  <span>{t("nameLabel")}</span>
+                </div>
+              }
               placeholder={t("namePlaceholder")}
               language={voiceLanguage}
               disabled={loading}
               type="text"
-              showHelper={true}
+              showHelper={false}
               autoSpeak={false}
               icon={null}
               hint="Please speak your full name"
             />
 
-            <div className="flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-primary" />
-              <Label className="text-sm font-medium">{t("locationLabel")}</Label>
-            </div>
             <VoiceTextInput
               value={location}
               onChange={setLocation}
-              label=""
+              label={
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-primary" />
+                  <span>{t("locationLabel")}</span>
+                </div>
+              }
               placeholder={t("locationPlaceholder")}
               language={voiceLanguage}
               disabled={loading}
               type="text"
-              showHelper={true}
+              showHelper={false}
               autoSpeak={false}
               icon={null}
               hint="Please speak your city or area name"
@@ -543,36 +546,38 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
               className="rounded-2xl border border-input bg-background/40 px-4 py-3 text-base font-semibold shadow-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
             />
 
-            <div className="flex items-center gap-2">
-              <Lock className="w-4 h-4 text-primary" />
-              <Label className="text-sm font-medium">{t("passwordLabel")}</Label>
-            </div>
             <VoiceTextInput
               value={password}
               onChange={setPassword}
-              label=""
+              label={
+                <div className="flex items-center gap-2">
+                  <Lock className="w-4 h-4 text-primary" />
+                  <span>{t("passwordLabel")}</span>
+                </div>
+              }
               placeholder={t("passwordPlaceholder")}
               language={voiceLanguage}
               disabled={loading}
               type="text"
-              showHelper={true}
+              showHelper={false}
               autoSpeak={false}
               hint={getPasswordHint(voiceLanguage)}
             />
 
-            <div className="flex items-center gap-2">
-              <Lock className="w-4 h-4 text-primary" />
-              <Label className="text-sm font-medium">{t("confirmPasswordLabel")}</Label>
-            </div>
             <VoiceTextInput
               value={confirmPassword}
               onChange={setConfirmPassword}
-              label=""
+              label={
+                <div className="flex items-center gap-2">
+                  <Lock className="w-4 h-4 text-primary" />
+                  <span>{t("confirmPasswordLabel")}</span>
+                </div>
+              }
               placeholder={t("confirmPasswordPlaceholder")}
               language={voiceLanguage}
               disabled={loading}
               type="text"
-              showHelper={true}
+              showHelper={false}
               autoSpeak={false}
               hint={getConfirmPasswordHint(voiceLanguage)}
             />
