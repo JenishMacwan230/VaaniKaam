@@ -12,7 +12,10 @@ interface JobDetailsModalProps {
   onClose: () => void;
   initialData?: {
     title: string;
+    description?: string;
     location?: string;
+    category?: string;
+    estimatedDuration?: string;
     pricingAmount?: number | string;
     pricingType?: string;
     status: string;
