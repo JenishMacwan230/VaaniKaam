@@ -65,6 +65,10 @@ export default function LoginCard() {
 
       // Keep account type normalization in local storage for home role sections.
       localStorage.setItem("user", JSON.stringify({ ...data.user, accountType }));
+      // Also store auth token so subsequent API calls can send Authorization header
+      if (data.token) {
+        localStorage.setItem("authToken", data.token);
+      }
       globalThis.window.dispatchEvent(new Event("auth-changed"));
       router.replace(homePath);
     } catch {

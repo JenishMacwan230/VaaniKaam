@@ -265,6 +265,7 @@
     "within5km": "Within 5 km",
     "within10km": "Within 10 km",
     "within20km": "Within 20 km"
+    ,"viewProfile": "View profile"
   },
   "helpSupport": {
     "back": "Back",
@@ -376,6 +377,7 @@
     "subtitle": "Search and connect with verified local workers",
     "pageTitle": "Find Workers",
     "pageSubtitle": "Search and connect with verified local workers",
+    "back": "Back",
     "workers": "Workers",
     "availableNow": "Available Now",
     "verifiedProfiles": "Verified Profiles",
@@ -438,7 +440,10 @@
     "statusConfirm": "Confirm?",
     "reject": "Reject",
     "gotPaid": "Got paid",
+    "paid": "Paid",
+    "markAsPaid": "Mark as paid",
     "issue": "Issue",
+    "raiseIssue": "Raise issue",
     "confirmed": "✓ Confirmed",
     "disputed": "⚠ Disputed",
     "details": "Details",
@@ -446,6 +451,8 @@
     "addReview": "Add a review (optional, max 200 chars)",
     "submitRating": "Submit Rating",
     "submitting": "Submitting...",
+    "jobDetails": "Job Details",
+    "close": "Close",
     "lookingForWork": "Looking for more work?",
     "browseMatch": "Browse jobs that match your skills"
   },

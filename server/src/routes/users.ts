@@ -14,6 +14,7 @@ import {
   saveProfilePicture,
   deleteProfilePicture,
   getPublicWorkers,
+  getWorkerProfile,
 } from "../controllers/userController";
 
 const router = express.Router();
@@ -23,6 +24,9 @@ router.post("/check-phone", checkPhoneExists);
 
 // GET PUBLIC WORKERS
 router.get("/public-workers", getPublicWorkers);
+
+// GET PUBLIC WORKER PROFILE
+router.get("/:id([0-9a-fA-F]{24})", getWorkerProfile);
 
 // FIRST TIME: Firebase Phone Authentication + Set password
 // Firebase handles SMS sending, client sends verified Firebase token

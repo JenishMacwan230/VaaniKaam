@@ -315,10 +315,29 @@ export default function ContractorProjectsPage() {
                             </p>
                           </div>
                           <div className="flex flex-col gap-1.5 shrink-0">
-                            <Button size="sm" variant="outline" className="h-7 gap-1 text-xs">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 gap-1 text-xs"
+                              onClick={() => {
+                                const jobId = (app.jobId as any)?._id || (app.jobId as any)?.id;
+                                if (!jobId) return;
+                                router.push(`/${locale}/dashboard/contractor/${jobId}?tab=applications&applicationId=${app._id}`);
+                              }}
+                            >
                               <Eye className="h-3 w-3" /> View
                             </Button>
-                            <Button size="sm" variant="outline" className="h-7 gap-1 text-xs">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 gap-1 text-xs"
+                              onClick={() => {
+                                const phone = (app.workerId as any)?.phone;
+                                if (!phone) { alert("Phone not available"); return; }
+                                const tel = `tel:${phone.replace(/\D/g, "")}`;
+                                window.open(tel, "_self");
+                              }}
+                            >
                               <Phone className="h-3 w-3" /> Call
                             </Button>
                           </div>

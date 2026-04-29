@@ -7,14 +7,15 @@ import { getCurrentLocale, fetchSessionUser, resolveAccountType } from "@/lib/au
 import {
   getWorkerApplications, getWorkerAcceptedJobs,
   getWorkerPendingCompletion, getWorkerCompletedJobs,
-  confirmJobCompletion, rejectJobCompletion,
+  confirmJobCompletion,
 } from "@/lib/jobApplicationApi";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import JobDetailsModal from "@/components/JobDetailsModal";
 import {
   Briefcase, CheckCircle, Clock, AlertCircle,
-  MapPin, IndianRupee, ArrowRight, ArrowLeft,
-  ChevronRight, Search, TrendingUp, Sparkles, LayoutDashboard,
+  MapPin, ArrowRight, ArrowLeft,
+  ChevronRight, Search, Sparkles,
   AlertTriangle, DollarSign,
 } from "lucide-react";
 
@@ -25,7 +26,7 @@ interface Job {
   pricingAmount?: number | string;
   pricingType?: string;
   status: "applied" | "accepted" | "completion_pending" | "completed";
-  postedBy?: { name: string; averageRating?: number; totalRatings?: number };
+  postedBy?: { name: string; phone?: string; averageRating?: number; totalRatings?: number };
   createdAt?: string;
   applicationId?: string;
   paymentStatus?: "pending" | "confirmed_paid" | "disputed";
@@ -56,10 +57,15 @@ export default function WorkerDashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [paymentLoading, setPaymentLoading] = useState<string | null>(null);
   const [ratingState, setRatingState] = useState<Record<string, { score: number; review: string; submitting: boolean }>>({});
+  const [detailsJobId, setDetailsJobId] = useState<string | null>(null);
+  const [detailsJobData, setDetailsJobData] = useState<Job | null>(null);
 
   const toNum = (v: number | string | undefined): number => {
     if (typeof v === "number") return v;
-    if (typeof v === "string") { const p = parseFloat(v); return isFinite(p) ? p : 0; }
+    if (typeof v === "string") {
+      const p = Number.parseFloat(v);
+      return Number.isFinite(p) ? p : 0;
+    }
     return 0;
   };
 
@@ -96,6 +102,7 @@ export default function WorkerDashboardPage() {
             _id: a.jobId._id, title: a.jobId.title, location: a.jobId.location,
             pricingAmount: a.jobId.pricingAmount, pricingType: a.jobId.pricingType,
             status: "accepted" as const, postedBy: a.jobId.postedBy, createdAt: a.jobId.createdAt,
+            applicationId: a._id,
           })));
 
         if (pending.status === "fulfilled")
@@ -123,20 +130,73 @@ export default function WorkerDashboardPage() {
     init();
   }, [locale, router]);
 
-  const handleConfirm = async (job: Job) => {
-    if (!job.applicationId) return;
-    await confirmJobCompletion(job.applicationId);
-    setPendingJobs((p) => p.filter((j) => j._id !== job._id));
-    const d = await getWorkerCompletedJobs();
-    setCompletedJobs(d.map((a: any) => ({ _id: a.jobId._id, title: a.jobId.title, location: a.jobId.location, pricingAmount: a.jobId.pricingAmount, pricingType: a.jobId.pricingType, status: "completed" as const, postedBy: a.jobId.postedBy, createdAt: a.jobId.createdAt, applicationId: a._id, paymentStatus: a.paymentStatus, contractorRating: a.contractorRating })));
+  const handleRaiseIssue = (job: Job) => {
+    const params = new URLSearchParams({
+      reason: "Report a safety issue",
+      fullName: job.postedBy?.name ? `${job.postedBy.name} job issue` : "Job issue",
+      email: "",
+      phone: job.postedBy?.phone || "",
+      message: `I want to raise an issue for the job "${job.title}". Job ID: ${job._id}. Please review this and contact me.`,
+    });
+
+    router.push(`/${locale}/help-support?${params.toString()}`);
   };
 
-  const handleReject = async (job: Job) => {
-    if (!job.applicationId) return;
-    await rejectJobCompletion(job.applicationId);
-    setPendingJobs((p) => p.filter((j) => j._id !== job._id));
-    const d = await getWorkerAcceptedJobs();
-    setActiveJobs(d.map((a: any) => ({ _id: a.jobId._id, title: a.jobId.title, location: a.jobId.location, pricingAmount: a.jobId.pricingAmount, pricingType: a.jobId.pricingType, status: "accepted" as const, postedBy: a.jobId.postedBy, createdAt: a.jobId.createdAt })));
+  const handlePaid = async (job: Job) => {
+    if (!job.applicationId || !API_BASE_URL) return;
+
+    setPaymentLoading(job._id);
+    try {
+      await confirmJobCompletion(job.applicationId);
+
+      const res = await fetch(`${API_BASE_URL}/api/jobs/confirm-payment`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ applicationId: job.applicationId, paymentMethod: "other" }),
+      });
+
+      if (res.ok) {
+        setPendingJobs((p) => p.filter((j) => j._id !== job._id));
+        const d = await getWorkerCompletedJobs();
+        setCompletedJobs(d.map((a: any) => ({ _id: a.jobId._id, title: a.jobId.title, location: a.jobId.location, pricingAmount: a.jobId.pricingAmount, pricingType: a.jobId.pricingType, status: "completed" as const, postedBy: a.jobId.postedBy, createdAt: a.jobId.createdAt, applicationId: a._id, paymentStatus: a.paymentStatus, contractorRating: a.contractorRating })));
+        setActiveTab("completed");
+      } else {
+        alert("Failed to confirm payment");
+      }
+    } catch {
+      alert("Error confirming payment");
+    } finally {
+      setPaymentLoading(null);
+    }
+  };
+
+  const handleMarkAsPaid = async (job: Job) => {
+    if (!job.applicationId || !API_BASE_URL) return;
+
+    setPaymentLoading(job._id);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/jobs/confirm-payment`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ applicationId: job.applicationId, paymentMethod: "other" }),
+      });
+
+      if (res.ok) {
+        setActiveJobs((jobs) => jobs.filter((item) => item._id !== job._id));
+        const [active, completed] = await Promise.all([getWorkerAcceptedJobs(), getWorkerCompletedJobs()]);
+        setActiveJobs(active.map((a: any) => ({ _id: a.jobId._id, title: a.jobId.title, location: a.jobId.location, pricingAmount: a.jobId.pricingAmount, pricingType: a.jobId.pricingType, status: "accepted" as const, postedBy: a.jobId.postedBy, createdAt: a.jobId.createdAt, applicationId: a._id })));
+        setCompletedJobs(completed.map((a: any) => ({ _id: a.jobId._id, title: a.jobId.title, location: a.jobId.location, pricingAmount: a.jobId.pricingAmount, pricingType: a.jobId.pricingType, status: "completed" as const, postedBy: a.jobId.postedBy, createdAt: a.jobId.createdAt, applicationId: a._id, paymentStatus: a.paymentStatus, contractorRating: a.contractorRating })));
+        setActiveTab("completed");
+      } else {
+        alert("Failed to mark as paid");
+      }
+    } catch {
+      alert("Error marking as paid");
+    } finally {
+      setPaymentLoading(null);
+    }
   };
 
   const handleConfirmPayment = async (job: Job, method: "cash" | "upi" | "other") => {
@@ -155,7 +215,7 @@ export default function WorkerDashboardPage() {
       } else {
         alert("Failed to confirm payment");
       }
-    } catch (e) {
+    } catch {
       alert("Error confirming payment");
     } finally {
       setPaymentLoading(null);
@@ -178,7 +238,7 @@ export default function WorkerDashboardPage() {
       } else {
         alert("Failed to dispute payment");
       }
-    } catch (e) {
+    } catch {
       alert("Error disputing payment");
     } finally {
       setPaymentLoading(null);
@@ -188,7 +248,7 @@ export default function WorkerDashboardPage() {
   const handleSubmitRating = async (job: Job) => {
     if (!job.applicationId || !API_BASE_URL) return;
     const ratingData = ratingState[job._id];
-    if (!ratingData || !ratingData.score) {
+    if (!ratingData?.score) {
       alert("Please select a rating");
       return;
     }
@@ -203,6 +263,7 @@ export default function WorkerDashboardPage() {
       if (res.ok) {
         const d = await getWorkerCompletedJobs();
         setCompletedJobs(d.map((a: any) => ({ _id: a.jobId._id, title: a.jobId.title, location: a.jobId.location, pricingAmount: a.jobId.pricingAmount, pricingType: a.jobId.pricingType, status: "completed" as const, postedBy: a.jobId.postedBy, createdAt: a.jobId.createdAt, applicationId: a._id, paymentStatus: a.paymentStatus, contractorRating: a.contractorRating })));
+        setActiveTab("completed");
         setRatingState((prev) => {
           const newState = { ...prev };
           delete newState[job._id];
@@ -211,7 +272,7 @@ export default function WorkerDashboardPage() {
       } else {
         alert("Failed to submit rating");
       }
-    } catch (e) {
+    } catch {
       alert("Error submitting rating");
     } finally {
       setRatingState((prev) => ({ ...prev, [job._id]: { ...prev[job._id], submitting: false } }));
@@ -437,13 +498,22 @@ export default function WorkerDashboardPage() {
                       )}
                     </div>
 
-                    {job.status === "completion_pending" ? (
+                    {activeTab === "active" && job.status === "accepted" ? (
                       <div className="flex gap-2">
-                        <Button size="sm" className="h-8 gap-1.5 bg-blue-600 hover:bg-blue-700 text-xs" onClick={() => handleConfirm(job)}>
-                          <CheckCircle className="h-3.5 w-3.5" /> {t("confirm")}
+                        <Button size="sm" className="h-8 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-xs" onClick={() => handleMarkAsPaid(job)} disabled={paymentLoading === job._id}>
+                          <DollarSign className="h-3.5 w-3.5" /> {paymentLoading === job._id ? "..." : t("markAsPaid")}
                         </Button>
-                        <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => handleReject(job)}>
-                          {t("reject")}
+                        <Button size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={() => { setDetailsJobId(job._id); setDetailsJobData(job); }}>
+                          {t("details")} <ChevronRight className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ) : job.status === "completion_pending" ? (
+                      <div className="flex gap-2">
+                        <Button size="sm" className="h-8 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-xs" onClick={() => handlePaid(job)} disabled={paymentLoading === job._id}>
+                          <DollarSign className="h-3.5 w-3.5" /> {paymentLoading === job._id ? "..." : t("markAsPaid")}
+                        </Button>
+                        <Button size="sm" variant="destructive" className="h-8 gap-1 text-xs" onClick={() => handleRaiseIssue(job)} disabled={paymentLoading === job._id}>
+                          <AlertTriangle className="h-3.5 w-3.5" /> {t("raiseIssue")}
                         </Button>
                       </div>
                     ) : job.status === "completed" && job.paymentStatus === "pending" ? (
@@ -460,7 +530,7 @@ export default function WorkerDashboardPage() {
                     ) : job.status === "completed" && job.paymentStatus === "disputed" ? (
                       <Badge variant="destructive">{t("disputed")}</Badge>
                     ) : (
-                      <Button size="sm" variant="outline" className="h-8 gap-1 text-xs">
+                      <Button size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={() => { setDetailsJobId(job._id); setDetailsJobData(job); }}>
                         {t("details")} <ChevronRight className="h-3.5 w-3.5" />
                       </Button>
                     )}
@@ -522,6 +592,13 @@ export default function WorkerDashboardPage() {
           </button>
         </div>
       </div>
+
+      <JobDetailsModal
+        jobId={detailsJobId || ""}
+        isOpen={!!detailsJobId}
+        onClose={() => setDetailsJobId(null)}
+        initialData={detailsJobData || undefined}
+      />
     </div>
   );
 }

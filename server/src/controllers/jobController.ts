@@ -96,7 +96,7 @@ export const listJobs = async (req: Request, res: Response) => {
     const { status } = req.query || {};
     const filter: any = {};
     if (status) filter.status = status as string;
-    const jobs = await Job.find(filter).populate("postedBy", "name email activeRole").sort({ createdAt: -1 });
+    const jobs = await Job.find(filter).populate("postedBy", "name email phone activeRole").sort({ createdAt: -1 });
     return res.json({ jobs });
   } catch (error) {
     console.error("Error fetching jobs:", error);
@@ -214,7 +214,7 @@ export const getRecentApplications = async (req: Request & any, res: Response) =
     // Get recent applications for these jobs
     const applications = await JobApplication.find({ jobId: { $in: jobIds } })
       .populate("jobId", "title status")
-      .populate("workerId", "name email proficiency location workCategory")
+      .populate("workerId", "name email phone proficiency location workCategory")
       .sort({ createdAt: -1 })
       .limit(10);
 
@@ -346,7 +346,14 @@ export const getWorkerApplications = async (req: Request & any, res: Response) =
 
     // Get all applications by this worker with job details
     const applications = await JobApplication.find({ workerId: user._id })
-      .populate("jobId", "_id title description location latitude longitude pricingAmount pricingType category urgency jobDate duration_value duration_unit workersRequired status postedBy")
+      .populate({
+        path: "jobId",
+        select: "_id title description location latitude longitude pricingAmount pricingType category urgency jobDate duration_value duration_unit workersRequired status postedBy",
+        populate: {
+          path: "postedBy",
+          select: "name profilePictureUrl averageRating totalRatings phone",
+        },
+      })
       .sort({ createdAt: -1 });
 
     return res.json({ applications });
@@ -366,7 +373,14 @@ export const getWorkerAcceptedJobs = async (req: Request & any, res: Response) =
       workerId: user._id,
       status: "accepted"
     })
-      .populate("jobId", "_id title description location latitude longitude pricingAmount pricingType category urgency jobDate duration_value duration_unit workersRequired status postedBy createdAt")
+      .populate({
+        path: "jobId",
+        select: "_id title description location latitude longitude pricingAmount pricingType category urgency jobDate duration_value duration_unit workersRequired status postedBy createdAt",
+        populate: {
+          path: "postedBy",
+          select: "name profilePictureUrl averageRating totalRatings phone",
+        },
+      })
       .sort({ createdAt: -1 });
 
     return res.json({ applications });
@@ -440,7 +454,14 @@ export const getWorkerPendingCompletion = async (req: Request & any, res: Respon
       workerId: user._id,
       status: "completion_pending"
     })
-      .populate("jobId", "_id title description location latitude longitude pricingAmount pricingType category urgency jobDate duration_value duration_unit workersRequired status postedBy createdAt")
+      .populate({
+        path: "jobId",
+        select: "_id title description location latitude longitude pricingAmount pricingType category urgency jobDate duration_value duration_unit workersRequired status postedBy createdAt",
+        populate: {
+          path: "postedBy",
+          select: "name profilePictureUrl averageRating totalRatings phone",
+        },
+      })
       .sort({ createdAt: -1 });
 
     return res.json({ applications });
@@ -627,7 +648,14 @@ export const getWorkerCompletedJobs = async (req: Request & any, res: Response) 
       workerId: user._id,
       status: "completed"
     })
-      .populate("jobId", "_id title description location latitude longitude pricingAmount pricingType category urgency jobDate duration_value duration_unit workersRequired status postedBy createdAt")
+      .populate({
+        path: "jobId",
+        select: "_id title description location latitude longitude pricingAmount pricingType category urgency jobDate duration_value duration_unit workersRequired status postedBy createdAt",
+        populate: {
+          path: "postedBy",
+          select: "name profilePictureUrl averageRating totalRatings phone",
+        },
+      })
       .sort({ createdAt: -1 });
 
     return res.json({ applications });
@@ -656,14 +684,22 @@ export const confirmPayment = async (req: Request & any, res: Response) => {
       return res.status(403).json({ success: false, error: "Unauthorized" });
     }
 
-    // Guard: status must be completed
-    if (application.status !== "completed") {
-      return res.status(400).json({ success: false, error: "Job must be completed before confirming payment" });
+    // Allow workers to mark paid from active/confirmation states too.
+    if (!["accepted", "completion_pending", "completed"].includes(application.status)) {
+      return res.status(400).json({ success: false, error: "Job must be active or completed before confirming payment" });
     }
 
     // Guard: paymentStatus must be pending (prevent double confirm)
     if (application.paymentStatus !== "pending") {
       return res.status(400).json({ success: false, error: "Payment already processed" });
+    }
+
+    const wasAlreadyCompleted = application.status === "completed";
+
+    if (!wasAlreadyCompleted) {
+      application.status = "completed";
+      await application.save();
+      await syncJobStatusFromApplications(application.jobId);
     }
 
     // Update payment info
@@ -678,8 +714,10 @@ export const confirmPayment = async (req: Request & any, res: Response) => {
       await createNotification({
         userId: job?.postedBy.toString() as string,
         type: "payment",
-        title: "Payment Confirmed",
-        message: `${user.name || "Worker"} confirmed payment receipt for "${job?.title}"`,
+        title: wasAlreadyCompleted ? "Payment Confirmed" : "Job Marked Paid",
+        message: wasAlreadyCompleted
+          ? `${user.name || "Worker"} confirmed payment receipt for "${job?.title}"`
+          : `${user.name || "Worker"} marked "${job?.title}" as paid and completed from the worker side.`,
         data: {
           jobId: job?._id.toString(),
           applicationId: application._id.toString(),
@@ -859,5 +897,80 @@ export const rateUser = async (req: Request & any, res: Response) => {
     console.error("Rate user error:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return res.status(500).json({ success: false, error: `Failed to rate: ${errorMessage}` });
+  }
+};
+
+export const getWorkerRatings = async (req: Request, res: Response) => {
+  try {
+    const { workerId } = req.params;
+
+    // Check user account type to decide which rating field to read
+    const user = await User.findById(workerId).select("accountType roles").lean();
+    if (!user) return res.status(404).json({ success: false, error: "User not found" });
+
+    // If user is a contractor (or has contractor role), return contractor ratings
+    if (user.accountType === "contractor" || (Array.isArray(user.roles) && user.roles.includes("contractor"))) {
+      // Find jobs posted by this contractor
+      const jobs = await Job.find({ postedBy: workerId }).select("_id").lean();
+      const jobIds = jobs.map((j: any) => j._id);
+
+      const ratings = await JobApplication.find({
+        jobId: { $in: jobIds.length ? jobIds : [null] },
+        status: "completed",
+        "contractorRating.score": { $exists: true },
+      })
+        .populate({ path: "workerId", select: "name profilePictureUrl" })
+        .sort({ "contractorRating.givenAt": -1 });
+
+      console.log(`getWorkerRatings: user ${workerId} is contractor; jobs=${jobIds.length} ratings=${ratings.length}`);
+
+      const formattedRatings = ratings.map((app) => ({
+        _id: app._id,
+        score: app.contractorRating?.score || 0,
+        review: app.contractorRating?.review || "",
+        givenAt: app.contractorRating?.givenAt || new Date(),
+        givenBy: {
+          name: (app as any).workerId?.name || "Anonymous",
+          profilePictureUrl: (app as any).workerId?.profilePictureUrl,
+        },
+      }));
+
+      return res.json({ success: true, ratings: formattedRatings });
+    }
+
+    // Default: treat as worker and return workerRating entries
+    const ratings = await JobApplication.find({
+      workerId: workerId,
+      status: "completed",
+      "workerRating.score": { $exists: true },
+    })
+      .populate({
+        path: "jobId",
+        select: "postedBy",
+        populate: {
+          path: "postedBy",
+          select: "name profilePictureUrl",
+        },
+      })
+      .sort({ "workerRating.givenAt": -1 });
+
+    console.log(`getWorkerRatings: user ${workerId} is worker; ratings=${ratings.length}`);
+    // Format ratings response
+    const formattedRatings = ratings.map((app) => ({
+      _id: app._id,
+      score: app.workerRating?.score || 0,
+      review: app.workerRating?.review || "",
+      givenAt: app.workerRating?.givenAt || new Date(),
+      givenBy: {
+        name: (app as any).jobId?.postedBy?.name || "Anonymous",
+        profilePictureUrl: (app as any).jobId?.postedBy?.profilePictureUrl,
+      },
+    }));
+
+    return res.json({ success: true, ratings: formattedRatings });
+  } catch (error) {
+    console.error("Get worker ratings error:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return res.status(500).json({ success: false, error: `Failed to fetch ratings: ${errorMessage}` });
   }
 };

@@ -31,7 +31,12 @@ export function useNotifications() {
 
   const getAuthToken = useCallback(() => {
     if (globalThis.window === undefined) return null;
-    return localStorage.getItem("token");
+    // Prefer explicit token in localStorage, but fall back to auth cookie if present
+    const token = localStorage.getItem("token") || localStorage.getItem("firebaseToken");
+    if (token) return token;
+    // Check for auth cookie named 'authToken'
+    const match = document.cookie.match(new RegExp('(?:^|; )' + 'authToken' + '=([^;]*)'));
+    return match ? decodeURIComponent(match[1]) : null;
   }, []);
 
   const buildRequestHeaders = useCallback(() => {
@@ -76,7 +81,8 @@ export function useNotifications() {
 
   const fetchNotifications = useCallback(async () => {
     try {
-      if (!API_BASE_URL || !getAuthToken()) return;
+      // Don't require a readable token here: server accepts httpOnly cookie via credentials
+      if (!API_BASE_URL) return;
 
       const response = await requestWithAuthFallback(`${API_BASE_URL}/api/notifications`, {
         method: "GET",
@@ -118,7 +124,8 @@ export function useNotifications() {
 
   const fetchUnreadCount = useCallback(async () => {
     try {
-      if (!API_BASE_URL || !getAuthToken()) return;
+      // Allow cookie-only auth (httpOnly) so don't bail out if token isn't readable
+      if (!API_BASE_URL) return;
 
       const response = await requestWithAuthFallback(`${API_BASE_URL}/api/notifications/unread-count`, {
         method: "GET",

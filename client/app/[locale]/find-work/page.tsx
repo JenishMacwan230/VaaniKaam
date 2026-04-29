@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -17,6 +18,7 @@ import {
   MapPin, IndianRupee, Clock3, Building2, Loader, MessageCircle,
   Search, LocateFixed, SlidersHorizontal, Sparkles, Briefcase,
   CheckCircle, ChevronRight, Star,
+  User,
 } from "lucide-react";
 import ApplyJobButton from "@/components/ApplyJobButton";
 import { getWorkerApplications } from "@/lib/jobApplicationApi";
@@ -49,7 +51,7 @@ type Job = {
   duration_value?: number;
   duration_unit?: "hour" | "day" | "week";
   createdAt?: string;
-  postedBy?: { _id: string; name: string; email: string; activeRole?: string };
+  postedBy?: { _id: string; name: string; email: string; phone?: string; activeRole?: string };
   tab?: JobTab;
   status?: string;
   recommendationScore?: number;
@@ -116,6 +118,16 @@ export default function FindWorkPage() {
   const [sortBy, setSortBy] = useState("nearest");
   const [activeTab, setActiveTab] = useState<JobTab>("live");
   const [sheetOpen, setSheetOpen] = useState(false);
+
+  // Track if component is mounted to avoid hydration mismatch
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const router = useRouter();
+  const currentLocale = typeof window !== 'undefined' ? window.location.pathname.split('/')[1] || 'en' : 'en';
 
   // Temp filter state for sheet
   const [tempDistance, setTempDistance] = useState(distanceFilter);
@@ -240,6 +252,13 @@ export default function FindWorkPage() {
   }, [activeTab, appliedJobs, categoryFilter, distanceFilter, durationFilter, hasDistanceReference, liveJobs, payFilter, payTypeFilter, query, recommendedJobs, sortBy, timingFilter]);
 
   const openChat = (job: Job) => {
+    const phone = job.postedBy?.phone;
+    if (phone) {
+      const phoneNum = phone.replace(/\D/g, '');
+      globalThis.open(`https://wa.me/${phoneNum}`, "_blank", "noopener,noreferrer");
+      return;
+    }
+    
     const email = job.postedBy?.email;
     if (!email) { alert("Chat not available for this job."); return; }
     const subject = encodeURIComponent(`Interested in your job: ${job.title}`);
@@ -355,6 +374,7 @@ export default function FindWorkPage() {
                 </div>
 
                 {/* Filter sheet trigger */}
+                {isMounted && (
                 <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
                   <SheetTrigger asChild>
                     <Button
@@ -414,6 +434,22 @@ export default function FindWorkPage() {
                     </div>
                   </SheetContent>
                 </Sheet>
+                )}
+                {!isMounted && (
+                <Button
+                  type="button"
+                  disabled
+                  className="relative h-11 px-4 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 text-white shadow-md shadow-blue-500/25 font-medium shrink-0"
+                >
+                  <SlidersHorizontal className="h-4 w-4 mr-2" />
+                  {t("filters")}
+                  {activeFilterCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </Button>
+                )}
               </div>
 
               {/* Status chips */}
@@ -555,6 +591,20 @@ export default function FindWorkPage() {
                           >
                             <MessageCircle className="h-3.5 w-3.5 mr-1.5" />
                             {t("chat")}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-9 rounded-xl border-border/60 px-3 font-medium"
+                            onClick={() => {
+                              const workerId = job.postedBy?._id;
+                              if (!workerId) return;
+                              router.push(`/${currentLocale}/helpers/${workerId}`);
+                            }}
+                            disabled={!job.postedBy?._id}
+                          >
+                            <User className="h-3.5 w-3.5 mr-1.5" />
+                            {t("viewProfile")}
                           </Button>
                           <Button
                             size="sm"

@@ -536,3 +536,32 @@ export const getPublicWorkers = async (_req: Request, res: Response) => {
     return res.status(500).json({ message: "Failed to fetch workers" });
   }
 };
+
+export const getWorkerProfile = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Return public profile for any active user (worker or contractor)
+    const user = await User.findOne({ _id: id, isActive: true })
+      .select(
+        "name phone email location profession availability averageRating totalRatings profilePictureUrl latitude longitude skills about languages experienceYears pricingType pricingAmount normalizedLocation accountType roles"
+      )
+      .lean();
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Normalize response shape expected by client
+    return res.json({
+      user: {
+        ...user,
+        id: user._id ? user._id.toString() : undefined,
+        description: (user as any).about,
+      },
+    });
+  } catch (error) {
+    console.error("Get worker profile error:", error);
+    return res.status(500).json({ message: "Failed to fetch user profile" });
+  }
+};

@@ -22,6 +22,7 @@ import {
   confirmPayment,
   disputePayment,
   rateUser,
+  getWorkerRatings,
 } from "../controllers/jobController";
 
 const router = express.Router();
@@ -63,6 +64,9 @@ router.post("/dispute-payment", verifyAuthToken, requireRole("worker") as any, d
 // Rate user (worker rates contractor or contractor rates worker)
 // No role restriction needed - authorization happens in the endpoint based on job assignment
 router.post("/rate", verifyAuthToken, rateUser as any);
+
+// Get ratings for a worker
+router.get("/ratings/:workerId", getWorkerRatings as any);
 
 // Get specific job by ID
 router.get("/:jobId", getJobById as any);

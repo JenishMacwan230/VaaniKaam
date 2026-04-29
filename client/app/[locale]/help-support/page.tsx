@@ -1,19 +1,18 @@
 "use client";
 
-import React, { useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import React, { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft, Mail, MapPin, Phone, Loader2, CheckCircle, AlertCircle,
-  HelpCircle, Shield, MessageCircle, Clock, Users, Zap,
+  HelpCircle, Shield, MessageCircle, Clock, Zap,
 } from "lucide-react";
 
-import { getCurrentLocale } from "@/lib/authClient";
+import { fetchSessionUser } from "@/lib/authClient";
 import { useTranslations } from "next-intl";
 
 export default function HelpSupportPage() {
   const router = useRouter();
-  const pathname = usePathname();
-  const locale = getCurrentLocale(pathname);
+  const searchParams = useSearchParams();
   const t = useTranslations("helpSupport");
   
   const reasons = [
@@ -59,14 +58,36 @@ export default function HelpSupportPage() {
   ];
 
   const [form, setForm] = useState({
-    fullName: "",
-    email: "",
-    phone: "",
-    reason: reasons[0],
-    message: "",
+    fullName: searchParams.get("fullName") || "",
+    email: searchParams.get("email") || "",
+    phone: searchParams.get("phone") || "",
+    reason: searchParams.get("reason") || reasons[0],
+    message: searchParams.get("message") || "",
   });
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    let active = true;
+
+    const hydrateUser = async () => {
+      const sessionUser = await fetchSessionUser();
+      if (!active || !sessionUser) return;
+
+      setForm((prev) => ({
+        ...prev,
+        fullName: prev.fullName || sessionUser.name || "",
+        email: prev.email || sessionUser.email || "",
+        phone: prev.phone || sessionUser.phone || "",
+      }));
+    };
+
+    void hydrateUser();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleChange = (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
@@ -158,7 +179,7 @@ export default function HelpSupportPage() {
             const Icon = option.icon;
             return (
               <div
-                key={idx}
+                key={option.title}
                 className="rounded-xl border border-border/50 bg-card p-4 text-center shadow-sm hover:shadow-md transition"
               >
                 <div className={`mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br ${option.color}`}>
@@ -308,7 +329,7 @@ export default function HelpSupportPage() {
           <div className="grid sm:grid-cols-2 gap-4">
             {faqs.map((item, idx) => (
               <details
-                key={idx}
+                key={item.question}
                 className="group rounded-xl border border-border/50 bg-card p-5 shadow-sm hover:shadow-md transition"
               >
                 <summary className="flex cursor-pointer items-start gap-3 font-semibold text-foreground">

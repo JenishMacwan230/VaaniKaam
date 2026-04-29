@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -531,12 +532,23 @@ export default function WorkersPage() {
 /* ── Worker Card ── */
 function WorkerCard({ worker }: { worker: Worker }) {
   const t = useTranslations("helpers");
+  const router = useRouter();
+  const params = useParams();
+  const locale = params?.locale as string;
+
   const locationLabel = typeof worker.distanceKm === 'number'
     ? `${formatDistance(worker.distanceKm)} · ${worker.location}`
     : worker.location || "";
 
+  const handleViewProfile = () => {
+    router.push(`/${locale}/helpers/${worker.id}`);
+  };
+
   return (
-    <div className="group rounded-2xl border border-border/50 bg-card overflow-hidden hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md hover:shadow-blue-500/10 transition-all duration-200">
+    <div
+      onClick={handleViewProfile}
+      className="group rounded-2xl border border-border/50 bg-card overflow-hidden hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md hover:shadow-blue-500/10 transition-all duration-200 cursor-pointer"
+    >
       <div className="p-4 space-y-3">
         {/* Top row: avatar + name + badge */}
         <div className="flex items-start justify-between gap-3">
@@ -606,6 +618,10 @@ function WorkerCard({ worker }: { worker: Worker }) {
             size="sm"
             variant="outline"
             className="flex-1 h-9 rounded-xl border-border/60 hover:bg-muted/60 font-medium"
+            onClick={() => {
+              const phoneNum = worker.phone.replace(/\D/g, '');
+              window.open(`https://wa.me/${phoneNum}`, "_blank", "noopener,noreferrer");
+            }}
           >
             <MessageCircle className="mr-1.5 h-3.5 w-3.5" />
             {t("chat")}
