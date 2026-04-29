@@ -32,6 +32,7 @@ import {
 } from "./ui/select";
 
 const BlogHeader = () => {
+  const [mounted, setMounted] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
   const isLoggedIn = !!user;
@@ -179,6 +180,7 @@ const BlogHeader = () => {
 
   /* ---------- SCROLL SHRINK ---------- */
   useEffect(() => {
+    setMounted(true);
     const onScroll = () => setIsScrolled(window.scrollY > 10);
     window.addEventListener("scroll", onScroll);
     return () => window.removeEventListener("scroll", onScroll);
@@ -277,24 +279,31 @@ const BlogHeader = () => {
 
             {/* DESKTOP ACTIONS */}
             <div className="hidden lg:flex items-center space-x-2 md:space-x-3">
-              <Select value={currentLocale} onValueChange={handleLanguageChange}>
-                <SelectTrigger className="w-28 md:w-40 rounded-full border border-border/70 bg-white/80 px-2 md:px-3 py-1.5 text-xs md:text-sm font-medium text-gray-700 shadow-sm dark:bg-gray-900/80 dark:text-gray-200">
+              {mounted ? (
+                <Select value={currentLocale} onValueChange={handleLanguageChange}>
+                  <SelectTrigger className="w-28 md:w-40 rounded-full border border-border/70 bg-white/80 px-2 md:px-3 py-1.5 text-xs md:text-sm font-medium text-gray-700 shadow-sm dark:bg-gray-900/80 dark:text-gray-200">
+                    <Globe className="mr-1 md:mr-2 h-3.5 md:h-4 w-3.5 md:w-4 text-gray-500" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="min-w-32 md:min-w-40">
+                    {languages.map((lang) => (
+                      <SelectItem key={lang.code} value={lang.code}>
+                        <div className="flex items-center gap-2">
+                          <span>{lang.label}</span>
+                          {currentLocale === lang.code && (
+                            <Check className="h-4 w-4 text-secondary dark:text-emerald-400" />
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="w-28 md:w-40 flex items-center rounded-full border border-border/70 bg-white/80 px-2 md:px-3 py-1.5 text-xs md:text-sm font-medium text-gray-700 shadow-sm dark:bg-gray-900/80 dark:text-gray-200">
                   <Globe className="mr-1 md:mr-2 h-3.5 md:h-4 w-3.5 md:w-4 text-gray-500" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="min-w-32 md:min-w-40">
-                  {languages.map((lang) => (
-                    <SelectItem key={lang.code} value={lang.code}>
-                      <div className="flex items-center gap-2">
-                        <span>{lang.label}</span>
-                        {currentLocale === lang.code && (
-                          <Check className="h-4 w-4 text-secondary dark:text-emerald-400" />
-                        )}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                  <span>{languages.find((l) => l.code === currentLocale)?.label || "English"}</span>
+                </div>
+              )}
               <button className="p-1.5 md:p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
                 <Search className="h-4 md:h-5 w-4 md:w-5" />
               </button>

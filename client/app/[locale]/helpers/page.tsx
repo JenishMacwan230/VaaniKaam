@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -34,6 +34,9 @@ import {
   Briefcase,
   Sparkles,
 } from "lucide-react";
+import type { Coordinates } from "@/lib/geolocation";
+import { calculateDistance, formatDistance } from "@/lib/distance";
+import { fetchSessionUser } from "@/lib/authClient";
 
 type Worker = {
   id: string;
@@ -41,63 +44,16 @@ type Worker = {
   profession: string;
   rating: number;
   completedJobs: number;
-  distanceKm: number;
+  distanceKm?: number;
   phone: string;
   isAvailable: boolean;
   location: string;
   avatarUrl: string;
+  latitude?: number;
+  longitude?: number;
 };
 
-const workers: Worker[] = [
-  {
-    id: "w-1",
-    name: "Ravi Patel",
-    profession: "Plumber",
-    rating: 4.8,
-    completedJobs: 124,
-    distanceKm: 1.5,
-    phone: "9328135511",
-    isAvailable: true,
-    location: "Bilimora",
-    avatarUrl: "https://i.pravatar.cc/100?img=32",
-  },
-  {
-    id: "w-2",
-    name: "Asha Macwan",
-    profession: "Painter",
-    rating: 4.6,
-    completedJobs: 89,
-    distanceKm: 3.1,
-    phone: "9898123412",
-    isAvailable: false,
-    location: "Navsari",
-    avatarUrl: "https://i.pravatar.cc/100?img=47",
-  },
-  {
-    id: "w-3",
-    name: "Imran Sheikh",
-    profession: "Electrician",
-    rating: 4.9,
-    completedJobs: 170,
-    distanceKm: 5.2,
-    phone: "9016123498",
-    isAvailable: true,
-    location: "Bilimora",
-    avatarUrl: "https://i.pravatar.cc/100?img=12",
-  },
-  {
-    id: "w-4",
-    name: "Sanjay Chauhan",
-    profession: "Mason",
-    rating: 4.3,
-    completedJobs: 52,
-    distanceKm: 7.4,
-    phone: "9978442211",
-    isAvailable: true,
-    location: "Valsad",
-    avatarUrl: "https://i.pravatar.cc/100?img=58",
-  },
-];
+// Static workers removed - using dynamic data from backend
 
 const professionIcons: Record<string, string> = {
   Plumber: "🔧",
@@ -120,23 +76,84 @@ function maskPhone(phone: string): string {
 }
 
 export default function WorkersPage() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [city, setCity] = useState("");
-  const [distanceFilter, setDistanceFilter] = useState("10");
-  const [ratingFilter, setRatingFilter] = useState("0");
-  const [availabilityFilter, setAvailabilityFilter] = useState("all");
+  const [workers, setWorkers] = useState<Worker[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [city, setCity] = useState("");
+  const [distanceFilter, setDistanceFilter] = useState("all");
+  const [ratingFilter, setRatingFilter] = useState("0");
+  const [availabilityFilter, setAvailabilityFilter] = useState("all");
+  const [professionFilter, setProfessionFilter] = useState("all");
+
+  useEffect(() => {
+    const fetchWorkers = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/public-workers`);
+        if (!response.ok) throw new Error("Failed to fetch workers");
+        const data = await response.json();
+        
+        const mappedWorkers = (data.workers || []).map((w: any) => ({
+          id: w.id,
+          name: w.name || "Anonymous",
+          profession: w.profession || "General Worker",
+          rating: w.averageRating || 0,
+          completedJobs: w.totalRatings || 0,
+          distanceKm: undefined,
+          phone: w.phone || "",
+          isAvailable: w.availability !== false,
+          location: w.location || "Unknown",
+          avatarUrl: w.profilePictureUrl || `https://i.pravatar.cc/100?u=${w.id}`,
+          latitude: typeof w.latitude === "number" ? w.latitude : undefined,
+          longitude: typeof w.longitude === "number" ? w.longitude : undefined,
+        }));
+        
+        setWorkers(mappedWorkers);
+      } catch (err) {
+        console.error("Error fetching workers:", err);
+        setError("Failed to load workers. Please try again later.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchWorkers();
+  }, []);
+
+  // user's saved profile coordinates
+  const [profileCoords, setProfileCoords] = useState<Coordinates | null>(null);
+  const [currentCoords, setCurrentCoords] = useState<Coordinates | null>(null);
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      const user = await fetchSessionUser();
+      if (user && typeof user.latitude === "number" && typeof user.longitude === "number") {
+        setProfileCoords({ latitude: user.latitude, longitude: user.longitude });
+      }
+      if (typeof user?.location === "string" && user.location.trim() && !city) {
+        // prefer profile location name when city input empty
+        setCity(user.location);
+      }
+    };
+    void loadProfile();
+  }, []);
 
   // Temp filter state inside sheet (apply on confirm)
   const [tempDistance, setTempDistance] = useState(distanceFilter);
   const [tempRating, setTempRating] = useState(ratingFilter);
   const [tempAvailability, setTempAvailability] = useState(availabilityFilter);
+  const [tempProfession, setTempProfession] = useState(professionFilter);
 
   const openSheet = () => {
     setTempDistance(distanceFilter);
     setTempRating(ratingFilter);
     setTempAvailability(availabilityFilter);
+    setTempProfession(professionFilter);
     setSheetOpen(true);
   };
 
@@ -144,13 +161,15 @@ export default function WorkersPage() {
     setDistanceFilter(tempDistance);
     setRatingFilter(tempRating);
     setAvailabilityFilter(tempAvailability);
+    setProfessionFilter(tempProfession);
     setSheetOpen(false);
   };
 
   const resetFilters = () => {
-    setTempDistance("10");
+    setTempDistance("all");
     setTempRating("0");
     setTempAvailability("all");
+    setTempProfession("all");
   };
 
   const handleLocate = () => {
@@ -168,6 +187,7 @@ export default function WorkersPage() {
               data.address.village ||
               "Current Location"
           );
+          setCurrentCoords({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
         } catch {
           setCity("Current Location");
         } finally {
@@ -182,32 +202,56 @@ export default function WorkersPage() {
   };
 
   const activeFilterCount = [
-    distanceFilter !== "10",
+    distanceFilter !== "all",
     ratingFilter !== "0",
     availabilityFilter !== "all",
+    professionFilter !== "all",
   ].filter(Boolean).length;
 
+  // compute professions list for filter
+  const professions = useMemo(() => {
+    const setP = new Set(workers.map((w) => w.profession).filter(Boolean));
+    return Array.from(setP).sort((a, b) => a.localeCompare(b));
+  }, [workers]);
+
+  // determine reference location: use currentCoords if set, otherwise if user did not enter city use profileCoords
+  const distanceReferenceLocation = currentCoords || (city.trim() ? null : profileCoords);
+  const hasDistanceReference = Boolean(distanceReferenceLocation);
+
+  // attach distances and apply filters + sort nearest first
   const filteredWorkers = useMemo(() => {
-    return workers.filter((worker) => {
-      const bySearch = searchTerm
-        ? `${worker.name} ${worker.profession}`
-            .toLowerCase()
-            .includes(searchTerm.toLowerCase())
-        : true;
-      const byCity = city
-        ? worker.location.toLowerCase().includes(city.toLowerCase())
-        : true;
-      const byDistance = worker.distanceKm <= Number(distanceFilter);
-      const byRating = worker.rating >= Number(ratingFilter);
-      const byAvailability =
-        availabilityFilter === "available"
-          ? worker.isAvailable
-          : availabilityFilter === "unavailable"
-          ? !worker.isAvailable
-          : true;
-      return bySearch && byCity && byDistance && byRating && byAvailability;
+    const selectedDistanceLimit = distanceFilter === "all" ? Number.POSITIVE_INFINITY : Number(distanceFilter);
+
+    const withDistance = workers.map((worker) => {
+      const lat = worker.latitude;
+      const lon = worker.longitude;
+      if (hasDistanceReference && typeof lat === "number" && typeof lon === "number") {
+        return { ...worker, distanceKm: calculateDistance(distanceReferenceLocation as Coordinates, { latitude: lat, longitude: lon }) };
+      }
+      return worker;
     });
-  }, [availabilityFilter, city, distanceFilter, ratingFilter, searchTerm]);
+
+    const results = withDistance.filter((worker) => {
+      const bySearch = searchTerm
+        ? `${worker.name} ${worker.profession}`.toLowerCase().includes(searchTerm.toLowerCase())
+        : true;
+      const byCity = city ? worker.location.toLowerCase().includes(city.toLowerCase()) : true;
+      const byDistance = typeof worker.distanceKm === "number" ? worker.distanceKm <= selectedDistanceLimit : distanceFilter === "all";
+      const byRating = worker.rating >= Number(ratingFilter);
+      const byAvailability = availabilityFilter === "available" ? worker.isAvailable : availabilityFilter === "unavailable" ? !worker.isAvailable : true;
+      const byProfession = professionFilter === "all" ? true : worker.profession === professionFilter;
+      return bySearch && byCity && byDistance && byRating && byAvailability && byProfession;
+    });
+
+    // sort nearest first when distances available
+    results.sort((a, b) => {
+      const da = typeof a.distanceKm === "number" ? a.distanceKm : Number.POSITIVE_INFINITY;
+      const db = typeof b.distanceKm === "number" ? b.distanceKm : Number.POSITIVE_INFINITY;
+      return da - db;
+    });
+
+    return results;
+  }, [availabilityFilter, city, distanceFilter, ratingFilter, searchTerm, workers, hasDistanceReference, professionFilter, distanceReferenceLocation]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -326,10 +370,26 @@ export default function WorkersPage() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent className="rounded-xl">
+                              <SelectItem value="all">Any distance</SelectItem>
                               <SelectItem value="3">Within 3 km</SelectItem>
                               <SelectItem value="5">Within 5 km</SelectItem>
                               <SelectItem value="10">Within 10 km</SelectItem>
                               <SelectItem value="20">Within 20 km</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="rounded-xl border border-border/40 bg-white/70 dark:bg-slate-900/40 p-2">
+                          <p className="text-[11px] font-semibold text-foreground mb-1.5">🧰 Profession</p>
+                          <Select value={tempProfession} onValueChange={setTempProfession}>
+                            <SelectTrigger className="h-9 rounded-lg border-border/60 bg-background/70">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-xl">
+                              <SelectItem value="all">All professions</SelectItem>
+                              {professions.map((p) => (
+                                <SelectItem key={p} value={p}>{p}</SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         </div>
@@ -342,9 +402,14 @@ export default function WorkersPage() {
                             </SelectTrigger>
                             <SelectContent className="rounded-xl">
                               <SelectItem value="0">Any rating</SelectItem>
+                              <SelectItem value="1">1.0 and above</SelectItem>
+                              <SelectItem value="2">2.0 and above</SelectItem>
+                              <SelectItem value="3">3.0 and above</SelectItem>
+                              <SelectItem value="3.5">3.5 and above</SelectItem>
                               <SelectItem value="4">4.0 and above</SelectItem>
                               <SelectItem value="4.5">4.5 and above</SelectItem>
                               <SelectItem value="4.8">4.8 and above</SelectItem>
+                              <SelectItem value="5">5.0</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -388,10 +453,10 @@ export default function WorkersPage() {
             {/* Active Filter Chips */}
             {activeFilterCount > 0 && (
               <div className="flex flex-wrap gap-2">
-                {distanceFilter !== "10" && (
+                {distanceFilter !== "all" && (
                   <FilterChip
                     label={`Within ${distanceFilter} km`}
-                    onRemove={() => setDistanceFilter("10")}
+                    onRemove={() => setDistanceFilter("all")}
                   />
                 )}
                 {ratingFilter !== "0" && (
@@ -405,6 +470,9 @@ export default function WorkersPage() {
                     label={availabilityFilter === "available" ? "Available now" : "Unavailable"}
                     onRemove={() => setAvailabilityFilter("all")}
                   />
+                )}
+                {professionFilter !== "all" && (
+                  <FilterChip label={professionFilter} onRemove={() => setProfessionFilter("all")} />
                 )}
               </div>
             )}
@@ -420,11 +488,26 @@ export default function WorkersPage() {
 
             {/* ── Worker Cards ── */}
             <div className="space-y-3">
-              {filteredWorkers.map((worker) => (
-                <WorkerCard key={worker.id} worker={worker} />
-              ))}
-
-              {filteredWorkers.length === 0 && (
+              {isLoading ? (
+                <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                  <Loader className="h-8 w-8 animate-spin text-blue-500" />
+                  <p className="text-muted-foreground animate-pulse">Finding local talent...</p>
+                </div>
+              ) : error ? (
+                <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-rose-200 bg-rose-50/50 py-12 px-4 text-center">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-100 text-rose-500">
+                    <XCircle className="h-7 w-7" />
+                  </div>
+                  <p className="font-semibold text-rose-900">{error}</p>
+                  <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+                    Try Again
+                  </Button>
+                </div>
+              ) : filteredWorkers.length > 0 ? (
+                filteredWorkers.map((worker) => (
+                  <WorkerCard key={worker.id} worker={worker} />
+                ))
+              ) : (
                 <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border/60 py-12 px-4 text-center">
                   <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/50">
                     <Users className="h-7 w-7 text-muted-foreground" />
@@ -445,6 +528,10 @@ export default function WorkersPage() {
 
 /* ── Worker Card ── */
 function WorkerCard({ worker }: { worker: Worker }) {
+  const locationLabel = typeof worker.distanceKm === 'number'
+    ? `${formatDistance(worker.distanceKm)} · ${worker.location}`
+    : worker.location || "";
+
   return (
     <div className="group rounded-2xl border border-border/50 bg-card overflow-hidden hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md hover:shadow-blue-500/10 transition-all duration-200">
       <div className="p-4 space-y-3">
@@ -491,7 +578,9 @@ function WorkerCard({ worker }: { worker: Worker }) {
         {/* Stats row */}
         <div className="flex flex-wrap gap-x-4 gap-y-1.5">
           <StatPill icon={<Star className="h-3.5 w-3.5 text-amber-500" />} label={`${worker.rating} (${worker.completedJobs} jobs)`} />
-          <StatPill icon={<MapPin className="h-3.5 w-3.5 text-blue-500" />} label={`${worker.distanceKm} km · ${worker.location}`} />
+          {locationLabel ? (
+            <StatPill icon={<MapPin className="h-3.5 w-3.5 text-blue-500" />} label={locationLabel} />
+          ) : null}
           <StatPill icon={<Phone className="h-3.5 w-3.5 text-muted-foreground" />} label={maskPhone(worker.phone)} />
         </div>
 

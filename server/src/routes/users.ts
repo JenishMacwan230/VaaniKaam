@@ -13,12 +13,16 @@ import {
   checkPhoneExists,
   saveProfilePicture,
   deleteProfilePicture,
+  getPublicWorkers,
 } from "../controllers/userController";
 
 const router = express.Router();
 
 // CHECK IF PHONE EXISTS (before sending OTP)
 router.post("/check-phone", checkPhoneExists);
+
+// GET PUBLIC WORKERS
+router.get("/public-workers", getPublicWorkers);
 
 // FIRST TIME: Firebase Phone Authentication + Set password
 // Firebase handles SMS sending, client sends verified Firebase token

@@ -517,3 +517,22 @@ export const deleteProfilePicture = async (req: Request & any, res: Response) =>
   }
 };
 
+// GET PUBLIC WORKERS
+export const getPublicWorkers = async (_req: Request, res: Response) => {
+  try {
+    const workers = await User.find({ roles: "worker", isActive: true })
+      .select("name phone location profession availability averageRating totalRatings profilePictureUrl latitude longitude skills")
+      .lean();
+
+    return res.json({ 
+      success: true,
+      workers: workers.map((w: any) => ({
+        ...w,
+        id: w._id.toString()
+      }))
+    });
+  } catch (error) {
+    console.error("Get public workers error:", error);
+    return res.status(500).json({ message: "Failed to fetch workers" });
+  }
+};

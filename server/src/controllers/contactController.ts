@@ -9,25 +9,52 @@ interface ContactRequest {
   message: string;
 }
 
-// Configure nodemailer transporter
-const getTransporter = () => nodemailer.createTransport({
-  host: "smtp.sendgrid.net",
-  port: 587,
-  auth: {
-    user: "apikey",
-    pass: process.env.SENDGRID_API_KEY,
-  },
-});
+// Send email using SendGrid REST API to bypass SMTP network blocks
+const sendGridEmail = async (options: {from: string, to: string, subject: string, html: string, replyTo?: string}) => {
+  // Parse "Name <email@example.com>" format
+  const emailRegex = /<([^>]+)>/;
+  const match = options.from.match(emailRegex);
+  const fromEmail = match ? match[1] : options.from;
+  const fromName = match ? options.from.replace(emailRegex, "").trim() : undefined;
+
+  const payload: any = {
+    personalizations: [{ to: [{ email: options.to }] }],
+    from: { email: fromEmail, name: fromName },
+    subject: options.subject,
+    content: [{ type: "text/html", value: options.html }],
+  };
+
+  if (options.replyTo) {
+    payload.reply_to = { email: options.replyTo };
+  }
+
+  const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${process.env.SENDGRID_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.text();
+    throw new Error(`SendGrid API Error (${response.status}): ${errorData}`);
+  }
+};
 
 export const sendContactMessage = async (req: Request, res: Response) => {
   try {
-    const transporter = getTransporter();
     const { fullName, email, phone, reason, message }: ContactRequest = req.body;
 
     // Validate required fields
     if (!fullName || !email || !message) {
       return res.status(400).json({ error: "Full name, email, and message are required" });
     }
+
+    // Escape HTML to prevent XSS
+    const escapeHtml = (str: string) =>
+      str ? str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : "";
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -54,7 +81,7 @@ export const sendContactMessage = async (req: Request, res: Response) => {
             <p><strong>Reason:</strong> ${reason}</p>
             <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
             <p><strong>Message:</strong></p>
-            <p style="white-space: pre-wrap; line-height: 1.6;">${message}</p>
+            <p style="white-space: pre-wrap; line-height: 1.6;">${escapeHtml(message)}</p>
           </div>
 
           <p style="color: #666; font-size: 12px; margin-top: 20px;">
@@ -81,7 +108,7 @@ export const sendContactMessage = async (req: Request, res: Response) => {
           <div style="background-color: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
             <p><strong>Your Message Summary:</strong></p>
             <p><strong>Reason:</strong> ${reason}</p>
-            <p style="white-space: pre-wrap; line-height: 1.6;">${message}</p>
+            <p style="white-space: pre-wrap; line-height: 1.6;">${escapeHtml(message)}</p>
           </div>
 
           <p>If your query is urgent, you can reach us at:</p>
@@ -103,21 +130,20 @@ export const sendContactMessage = async (req: Request, res: Response) => {
 
     // Send emails
     try {
-      if (process.env.SENDGRID_API_KEY) {
-        await transporter.sendMail(supportMailOptions);
-        await transporter.sendMail(userMailOptions);
-        console.log("Emails sent successfully via SendGrid for contact form submission");
-      } else {
-        console.log("SendGrid credentials not configured - skipping email sending");
-        console.log("Contact form data:", { fullName, email, phone, reason, message });
+      if (!process.env.SENDGRID_API_KEY) {
+        return res.status(503).json({ 
+          error: "Email service not configured. Please contact support directly." 
+        });
       }
+      await sendGridEmail(supportMailOptions);
+      await sendGridEmail(userMailOptions);
+      console.log("Emails sent successfully via SendGrid REST API for contact form submission");
     } catch (emailError: any) {
-      console.error("Email sending error:", emailError);
-      if (emailError.response) {
-         console.error(emailError.response.body);
-      }
-      // Don't fail the request even if email fails - just log it
-      console.log("Contact form was accepted despite email error");
+      console.error("Email sending error:", emailError.message || emailError);
+      return res.status(500).json({ 
+        error: "Failed to send email. Please verify your SendGrid account and sender identity.",
+        details: emailError.message || "Unknown error"
+      });
     }
 
     res.status(200).json({

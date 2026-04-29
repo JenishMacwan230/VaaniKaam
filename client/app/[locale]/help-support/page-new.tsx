@@ -94,7 +94,15 @@ export default function HelpSupportPage() {
     if (!form.fullName || !form.email || !form.message) {
       setErrorMessage("Please fill in all required fields");
       setStatus("error");
-      setTimeout(() => setStatus("idle"), 3000);
+      setTimeout(() => setStatus("idle"), 5000);
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(form.email)) {
+      setErrorMessage("Please enter a valid email address");
+      setStatus("error");
+      setTimeout(() => setStatus("idle"), 5000);
       return;
     }
 
@@ -102,7 +110,8 @@ export default function HelpSupportPage() {
     setErrorMessage("");
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/contact/send`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      const response = await fetch(`${apiUrl}/api/contact/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
@@ -116,13 +125,13 @@ export default function HelpSupportPage() {
         const errorData = await response.json();
         setErrorMessage(errorData.error || "Failed to send message. Please try again.");
         setStatus("error");
-        setTimeout(() => setStatus("idle"), 3000);
+        setTimeout(() => setStatus("idle"), 5000);
       }
     } catch (error) {
       console.error("Form submission error:", error);
       setErrorMessage("Network error. Please check your connection and try again.");
       setStatus("error");
-      setTimeout(() => setStatus("idle"), 3000);
+      setTimeout(() => setStatus("idle"), 5000);
     }
   };
 
