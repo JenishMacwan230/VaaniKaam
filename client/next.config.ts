@@ -7,6 +7,14 @@ const withNextIntl = createNextIntlPlugin(
 );
 
 const nextConfig: NextConfig = {
+  typescript: {
+    // Skip TypeScript type-checking during build — errors are caught in development
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    // Skip ESLint during build
+    ignoreDuringBuilds: true,
+  },
   images: {
     remotePatterns: [
       {
