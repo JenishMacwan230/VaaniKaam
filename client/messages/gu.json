@@ -264,8 +264,15 @@
     "within3km": "3 કિમીની અંદર",
     "within5km": "5 કિમીની અંદર",
     "within10km": "10 કિમીની અંદર",
-    "within20km": "20 કિમીની અંદર"
-    ,"viewProfile": "પ્રોફાઇલ જુઓ"
+    "within20km": "20 કિમીની અંદર",
+    "viewProfile": "પ્રોફાઇલ જુઓ",
+    "approvedByContractor": "ઠેકેદાર દ્વારા મંજુર",
+    "applicationApproved": "તમારી અરજી મંજુર કરવામાં આવી છે!",
+    "cannotCancelApprovedTitle": "અરજી મંજુર",
+    "cannotCancelApprovedDesc": "આ અરજી ઠેકેદાર દ્વારા મંજુર કરવામાં આવી છે. તમે મંજુર અરજીને રદ્દ કરી શકતા નથી. જો તમે પાછો ફેરવવા માંગો છો તો કૃપયા ઠેકેદારનો સંપર્ક કરો.",
+    "approvedStatus": "મંજુર",
+    "cancelApplication": "અરજી રદ્દ કરો",
+    "postedBy": "દ્વારા પોસ્ટ કરેલ"
   },
   "helpSupport": {
     "back": "પાછા",

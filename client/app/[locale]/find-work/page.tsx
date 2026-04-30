@@ -54,6 +54,7 @@ type Job = {
   postedBy?: { _id: string; name: string; email: string; phone?: string; activeRole?: string };
   tab?: JobTab;
   status?: string;
+  applicationStatus?: "applied" | "accepted" | "rejected";
   recommendationScore?: number;
   recommendationDistanceKm?: number;
 };
@@ -103,6 +104,7 @@ export default function FindWorkPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [approvedJobDialog, setApprovedJobDialog] = useState<Job | null>(null);
   const [query, setQuery] = useState("");
   const [location, setLocation] = useState("");
   const [currentLocation, setCurrentLocation] = useState<Coordinates | null>(null);
@@ -182,8 +184,17 @@ export default function FindWorkPage() {
         }));
         try {
           const applications = await getWorkerApplications();
-          const appliedJobIds = new Set(applications.map((app: any) => app.jobId._id || app.jobId));
-          setJobs(mappedJobs.map((job: Job) => ({ ...job, tab: appliedJobIds.has(job._id) ? "applied" as JobTab : "live" as JobTab })));
+          const applicationMap = new Map(
+            applications.map((app: any) => [app.jobId._id || app.jobId, app.status])
+          );
+          setJobs(mappedJobs.map((job: Job) => {
+            const appStatus = applicationMap.get(job._id);
+            return {
+              ...job,
+              tab: appStatus ? "applied" as JobTab : "live" as JobTab,
+              applicationStatus: appStatus
+            };
+          }));
         } catch { setJobs(mappedJobs); }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load jobs");
@@ -570,6 +581,11 @@ export default function FindWorkPage() {
                               <CheckCircle className="h-3 w-3" /> {t("applied_badge")}
                             </span>
                           )}
+                          {isApplied && job.applicationStatus === "accepted" && (
+                            <span className="rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 px-2 py-0.5 text-[11px] font-medium flex items-center gap-1">
+                              <CheckCircle className="h-3 w-3" /> {t("approvedByContractor")}
+                            </span>
+                          )}
                         </div>
 
                         {/* Stats row */}
@@ -583,7 +599,18 @@ export default function FindWorkPage() {
 
                         {/* Actions */}
                         <div className="flex gap-2">
-                          {isApplied ? (
+                          {isApplied && job.applicationStatus === "accepted" ? (
+                            <Button
+                              size="sm"
+                              disabled
+                              className="h-9 rounded-xl bg-blue-100 text-blue-600 hover:bg-blue-100 font-medium cursor-not-allowed border border-blue-200"
+                              onClick={() => setApprovedJobDialog(job)}
+                              title={t("cannotCancelApprovedDesc")}
+                            >
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              {t("approvedByContractor")}
+                            </Button>
+                          ) : isApplied ? (
                             <Button
                               size="sm"
                               variant="outline"
@@ -592,13 +619,13 @@ export default function FindWorkPage() {
                                 try {
                                   await withdrawApplication(job._id);
                                   // Update local state to move it back to live
-                                  setJobs((prev) => prev.map((j) => j._id === job._id ? { ...j, tab: "live" } : j));
+                                  setJobs((prev) => prev.map((j) => j._id === job._id ? { ...j, tab: "live", applicationStatus: undefined } : j));
                                 } catch (e) {
                                   alert(e instanceof Error ? e.message : "Failed to cancel application");
                                 }
                               }}
                             >
-                              Cancel Application
+                              {t("cancelApplication") || "Cancel Application"}
                             </Button>
                           ) : (
                             <div onClick={() => {
@@ -715,6 +742,60 @@ export default function FindWorkPage() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Approved Application Dialog ── */}
+      <Dialog open={Boolean(approvedJobDialog)} onOpenChange={(open) => !open && setApprovedJobDialog(null)}>
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-lg flex items-center gap-2">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
+                <CheckCircle className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              {t("cannotCancelApprovedTitle")}
+            </DialogTitle>
+            <DialogDescription>
+              {approvedJobDialog?.title}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-4">
+              <p className="text-sm text-blue-900 dark:text-blue-100">
+                {t("cannotCancelApprovedDesc")}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-muted/40 p-4 space-y-2">
+              <p className="text-xs font-semibold text-foreground">{t("postedBy")}</p>
+              <p className="text-sm font-medium text-foreground">{approvedJobDialog?.postedBy?.name || "Unknown"}</p>
+              {approvedJobDialog?.postedBy?.phone && (
+                <p className="text-xs text-muted-foreground">{approvedJobDialog.postedBy.phone}</p>
+              )}
+              {approvedJobDialog?.postedBy?.email && (
+                <p className="text-xs text-muted-foreground">{approvedJobDialog.postedBy.email}</p>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                className="flex-1 h-10 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white font-medium"
+                onClick={() => {
+                  if (approvedJobDialog) {
+                    openChat(approvedJobDialog);
+                    setApprovedJobDialog(null);
+                  }
+                }}
+              >
+                <MessageCircle className="h-4 w-4 mr-1.5" />
+                {t("chat")}
+              </Button>
+              <Button variant="outline" className="flex-1 h-10 rounded-xl border-border/60" onClick={() => setApprovedJobDialog(null)}>
+                {t("close")}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

@@ -264,8 +264,15 @@
     "within3km": "Within 3 km",
     "within5km": "Within 5 km",
     "within10km": "Within 10 km",
-    "within20km": "Within 20 km"
-    ,"viewProfile": "View profile"
+    "within20km": "Within 20 km",
+    "viewProfile": "View profile",
+    "approvedByContractor": "Approved by Contractor",
+    "applicationApproved": "Your application has been approved!",
+    "cannotCancelApprovedTitle": "Application Approved",
+    "cannotCancelApprovedDesc": "This application has been approved by the contractor. You cannot cancel an approved application. Please contact the contractor if you wish to withdraw.",
+    "approvedStatus": "Approved",
+    "cancelApplication": "Cancel Application",
+    "postedBy": "Posted by"
   },
   "helpSupport": {
     "back": "Back",

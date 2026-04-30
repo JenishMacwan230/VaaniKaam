@@ -264,8 +264,15 @@
     "within3km": "3 किमी के भीतर",
     "within5km": "5 किमी के भीतर",
     "within10km": "10 किमी के भीतर",
-    "within20km": "20 किमी के भीतर"
-    ,"viewProfile": "प्रोफ़ाइल देखें"
+    "within20km": "20 किमी के भीतर",
+    "viewProfile": "प्रोफ़ाइल देखें",
+    "approvedByContractor": "ठेकेदार द्वारा मंजूरी दी गई",
+    "applicationApproved": "आपकी आवेदन को मंजूरी दे दी गई है!",
+    "cannotCancelApprovedTitle": "आवेदन मंजूर",
+    "cannotCancelApprovedDesc": "यह आवेदन ठेकेदार द्वारा मंजूरी दे दी गई है। आप एक मंजूरीकृत आवेदन को रद्द नहीं कर सकते। यदि आप वापस लेना चाहते हैं तो कृपया ठेकेदार से संपर्क करें।",
+    "approvedStatus": "मंजूर",
+    "cancelApplication": "आवेदन रद्द करें",
+    "postedBy": "द्वारा पोस्ट किया गया"
   },
   "helpSupport": {
     "back": "वापस",
