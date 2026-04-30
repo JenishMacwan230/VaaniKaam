@@ -210,8 +210,6 @@ VaaniKaam/
 ### Planned Features
 - 📅 Integrated calendar for scheduling
 - 📄 Automatic contract generation
-- 💳 Escrow payment system
-- 🤖 AI-powered job recommendations
 - 🎤 Enhanced voice search with NLP
 - 📹 Video profile verification
 
