@@ -22,6 +22,7 @@ import { useTranslations } from "next-intl";
 import { fetchSessionUser, logoutSession, AuthUser, resolveAccountType } from "@/lib/authClient";
 import Logo from "./ui/logo";
 import { UserMenu } from "./UserMenu";
+import { UserAvatar } from "./UserAvatar";
 import { NotificationBell } from "./NotificationBell";
 import {
   Select,
@@ -330,6 +331,8 @@ const BlogHeader = () => {
             {navLinks.map((link) => {
               const Icon = link.icon;
               const isActive = isLinkActive(link.href);
+              const isUserLink = link.href === "/user";
+              
               return (
                 <button
                   key={link.text}
@@ -339,7 +342,11 @@ const BlogHeader = () => {
                       ? "bg-secondary/15 text-secondary shadow-sm ring-1 ring-secondary/35"
                       : "text-gray-600 hover:bg-gray-100/80 dark:text-gray-300 dark:hover:bg-gray-800/60"}`}
                 >
-                  <Icon className="h-5 w-5" />
+                  {isUserLink && user ? (
+                    <UserAvatar user={user} className="h-5 w-5 border-none shadow-none" />
+                  ) : (
+                    <Icon className="h-5 w-5" />
+                  )}
                   <span className="leading-none text-center">{link.text}</span>
                 </button>
               );

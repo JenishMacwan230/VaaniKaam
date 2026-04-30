@@ -15,6 +15,7 @@ export function UserAvatar({ user, className }: UserAvatarProps) {
     if (!user?.name) return "U";
     return user.name
       .split(" ")
+      .filter(Boolean)
       .map((n) => n[0])
       .join("")
       .toUpperCase()
@@ -22,12 +23,15 @@ export function UserAvatar({ user, className }: UserAvatarProps) {
   };
 
   return (
-    <Avatar className={cn("h-8 w-8", className)}>
+    <Avatar className={cn("h-8 w-8 border border-border shadow-sm", className)}>
       <AvatarImage 
         src={user?.profilePictureUrl || ""} 
         alt={user?.name || "User"} 
+        className="object-cover"
       />
-      <AvatarFallback>{getInitials()}</AvatarFallback>
+      <AvatarFallback className="bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 text-white font-bold text-xs uppercase">
+        {getInitials()}
+      </AvatarFallback>
     </Avatar>
   );
 }
