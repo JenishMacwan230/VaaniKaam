@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { fetchSessionUser, getCurrentLocale, resolveAccountType } from "@/lib/authClient";
+import { fetchSessionUser, getAuthHeaders, getCurrentLocale, resolveAccountType } from "@/lib/authClient";
 import { useTranslations } from "next-intl";
 import {
   Bell, TrendingUp, Briefcase, CheckCircle, AlertCircle,
@@ -57,10 +57,12 @@ export default function ContractorDashboard() {
         }
         if (!API_BASE_URL) { setError("API configuration missing"); setIsLoading(false); return; }
 
+        const authHeaders = getAuthHeaders();
+
         const [jobsRes, statsRes, appsRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/api/jobs/contractor/jobs`, { credentials: "include" }).catch(() => null),
-          fetch(`${API_BASE_URL}/api/jobs/contractor/stats`, { credentials: "include" }).catch(() => null),
-          fetch(`${API_BASE_URL}/api/jobs/contractor/applications`, { credentials: "include" }).catch(() => null),
+          fetch(`${API_BASE_URL}/api/jobs/contractor/jobs`, { credentials: "include", headers: authHeaders }).catch(() => null),
+          fetch(`${API_BASE_URL}/api/jobs/contractor/stats`, { credentials: "include", headers: authHeaders }).catch(() => null),
+          fetch(`${API_BASE_URL}/api/jobs/contractor/applications`, { credentials: "include", headers: authHeaders }).catch(() => null),
         ]);
 
         if (jobsRes?.ok) { const d = await jobsRes.json(); setJobs(d.jobs || []); }

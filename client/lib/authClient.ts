@@ -60,11 +60,7 @@ export async function fetchSessionUser(): Promise<AuthUser | null> {
   if (!API_BASE_URL) return null;
 
   try {
-    const headers: Record<string, string> = {};
-    if (typeof window !== "undefined") {
-      const token = localStorage.getItem("authToken");
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-    }
+    const headers = getAuthHeaders();
 
     const response = await fetch(`${API_BASE_URL}/api/users/me`, {
       method: "GET",
@@ -81,6 +77,21 @@ export async function fetchSessionUser(): Promise<AuthUser | null> {
   }
 }
 
+export function getAuthHeaders(includeContentType = false): Record<string, string> {
+  const headers: Record<string, string> = {};
+
+  if (includeContentType) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  const token = globalThis.window?.localStorage.getItem("authToken") ?? null;
+  if (token) {
+    headers["Authorization"] = token.startsWith("Bearer ") ? token : `Bearer ${token}`;
+  }
+
+  return headers;
+}
+
 export async function logoutSession(): Promise<void> {
   if (!API_BASE_URL) return;
 
@@ -89,9 +100,7 @@ export async function logoutSession(): Promise<void> {
       method: "POST",
       credentials: "include",
     });
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("authToken");
-    }
+    globalThis.window?.localStorage.removeItem("authToken");
   } catch {
     // Ignore network failures while clearing client state.
   }

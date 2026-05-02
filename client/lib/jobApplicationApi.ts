@@ -2,6 +2,8 @@
  * Job application API utilities
  */
 
+import { getAuthHeaders } from "@/lib/authClient";
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 interface ApiResponse<T> {
@@ -44,22 +46,9 @@ export async function applyToJob(jobId: string): Promise<JobApplicationData> {
     throw new Error("API configuration missing");
   }
 
-  const token =
-    typeof window !== "undefined"
-      ? localStorage.getItem("authToken")
-      : null;
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  if (token) {
-    headers["Authorization"] = token.startsWith("Bearer ") ? token : `Bearer ${token}`;
-  }
-
   const response = await fetch(`${API_BASE_URL}/api/jobs/apply`, {
     method: "POST",
-    headers,
+    headers: getAuthHeaders(true),
     credentials: "include",
     body: JSON.stringify({ jobId }),
   });
@@ -86,22 +75,9 @@ export async function withdrawApplication(jobId: string): Promise<void> {
     throw new Error("API configuration missing");
   }
 
-  const token =
-    typeof window !== "undefined"
-      ? localStorage.getItem("authToken")
-      : null;
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  if (token) {
-    headers["Authorization"] = token.startsWith("Bearer ") ? token : `Bearer ${token}`;
-  }
-
   const response = await fetch(`${API_BASE_URL}/api/jobs/withdraw`, {
     method: "POST",
-    headers,
+    headers: getAuthHeaders(true),
     credentials: "include",
     body: JSON.stringify({ jobId }),
   });
@@ -120,22 +96,9 @@ export async function getContractorJobApplicants(): Promise<ApplicantData[]> {
     throw new Error("API configuration missing");
   }
 
-  const token =
-    typeof window !== "undefined"
-      ? localStorage.getItem("authToken")
-      : null;
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  if (token) {
-    headers["Authorization"] = token.startsWith("Bearer ") ? token : `Bearer ${token}`;
-  }
-
   const response = await fetch(`${API_BASE_URL}/api/jobs/contractor/applications`, {
     method: "GET",
-    headers,
+    headers: getAuthHeaders(),
     credentials: "include",
   });
 
@@ -158,22 +121,9 @@ export async function getJobApplicants(
     throw new Error("API configuration missing");
   }
 
-  const token =
-    typeof window !== "undefined"
-      ? localStorage.getItem("authToken")
-      : null;
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  if (token) {
-    headers["Authorization"] = token.startsWith("Bearer ") ? token : `Bearer ${token}`;
-  }
-
   const response = await fetch(`${API_BASE_URL}/api/jobs/${jobId}`, {
     method: "GET",
-    headers,
+    headers: getAuthHeaders(),
     credentials: "include",
   });
 
@@ -205,24 +155,11 @@ export async function updateApplicationStatus(
     throw new Error("API configuration missing");
   }
 
-  const token =
-    typeof window !== "undefined"
-      ? localStorage.getItem("authToken")
-      : null;
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  if (token) {
-    headers["Authorization"] = token.startsWith("Bearer ") ? token : `Bearer ${token}`;
-  }
-
   const response = await fetch(
     `${API_BASE_URL}/api/jobs/applications/${applicationId}/${action}`,
     {
       method: "PATCH",
-      headers,
+      headers: getAuthHeaders(true),
       credentials: "include",
     }
   );
@@ -275,18 +212,7 @@ export async function getWorkerApplications(): Promise<
     throw new Error("API configuration missing");
   }
 
-  const token =
-    typeof window !== "undefined"
-      ? localStorage.getItem("authToken")
-      : null;
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  if (token) {
-    headers["Authorization"] = token.startsWith("Bearer ") ? token : `Bearer ${token}`;
-  }
+  const headers = getAuthHeaders(true);
 
   const response = await fetch(`${API_BASE_URL}/api/jobs/worker/applications`, {
     method: "GET",
@@ -341,18 +267,7 @@ export async function getWorkerAcceptedJobs(): Promise<
     throw new Error("API configuration missing");
   }
 
-  const token =
-    typeof window !== "undefined"
-      ? localStorage.getItem("authToken")
-      : null;
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  if (token) {
-    headers["Authorization"] = token.startsWith("Bearer ") ? token : `Bearer ${token}`;
-  }
+  const headers = getAuthHeaders(true);
 
   const response = await fetch(`${API_BASE_URL}/api/jobs/worker/accepted-jobs`, {
     method: "GET",
@@ -377,18 +292,7 @@ export async function markJobComplete(applicationId: string): Promise<JobApplica
     throw new Error("API configuration missing");
   }
 
-  const token =
-    typeof window !== "undefined"
-      ? localStorage.getItem("authToken")
-      : null;
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  if (token) {
-    headers["Authorization"] = token.startsWith("Bearer ") ? token : `Bearer ${token}`;
-  }
+  const headers = getAuthHeaders(true);
 
   try {
     const response = await fetch(`${API_BASE_URL}/api/jobs/mark-complete`, {
@@ -451,18 +355,7 @@ export async function getWorkerPendingCompletion(): Promise<
     throw new Error("API configuration missing");
   }
 
-  const token =
-    typeof window !== "undefined"
-      ? localStorage.getItem("authToken")
-      : null;
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  if (token) {
-    headers["Authorization"] = token.startsWith("Bearer ") ? token : `Bearer ${token}`;
-  }
+  const headers = getAuthHeaders(true);
 
   const response = await fetch(`${API_BASE_URL}/api/jobs/worker/pending-completion`, {
     method: "GET",
@@ -487,18 +380,7 @@ export async function confirmJobCompletion(applicationId: string): Promise<JobAp
     throw new Error("API configuration missing");
   }
 
-  const token =
-    typeof window !== "undefined"
-      ? localStorage.getItem("authToken")
-      : null;
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  if (token) {
-    headers["Authorization"] = token.startsWith("Bearer ") ? token : `Bearer ${token}`;
-  }
+  const headers = getAuthHeaders(true);
 
   try {
     const response = await fetch(`${API_BASE_URL}/api/jobs/confirm-completion`, {
@@ -540,18 +422,7 @@ export async function rejectJobCompletion(applicationId: string): Promise<JobApp
     throw new Error("API configuration missing");
   }
 
-  const token =
-    typeof window !== "undefined"
-      ? localStorage.getItem("authToken")
-      : null;
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  if (token) {
-    headers["Authorization"] = token.startsWith("Bearer ") ? token : `Bearer ${token}`;
-  }
+  const headers = getAuthHeaders(true);
 
   try {
     const response = await fetch(`${API_BASE_URL}/api/jobs/reject-completion`, {
@@ -614,18 +485,7 @@ export async function getWorkerCompletedJobs(): Promise<
     throw new Error("API configuration missing");
   }
 
-  const token =
-    typeof window !== "undefined"
-      ? localStorage.getItem("authToken")
-      : null;
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  if (token) {
-    headers["Authorization"] = token.startsWith("Bearer ") ? token : `Bearer ${token}`;
-  }
+  const headers = getAuthHeaders(true);
 
   const response = await fetch(`${API_BASE_URL}/api/jobs/worker/completed-jobs`, {
     method: "GET",
