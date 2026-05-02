@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState } from "react";
+import React, { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Loader2, ShieldCheck } from "lucide-react";
 
-export default function VerifyCodePage() {
+function VerifyCodeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const phone = searchParams.get("phone") ?? "";
@@ -64,7 +64,7 @@ export default function VerifyCodePage() {
               <input
                 type="text"
                 inputMode="numeric"
-                pattern="^\\d{6}$"
+                pattern="^\d{6}$"
                 maxLength={6}
                 title="Enter the 6 digit code"
                 placeholder="000000"
@@ -101,5 +101,13 @@ export default function VerifyCodePage() {
         </div>
       </section>
     </main>
+  );
+}
+
+export default function VerifyCodePage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-[80vh] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+      <VerifyCodeContent />
+    </Suspense>
   );
 }

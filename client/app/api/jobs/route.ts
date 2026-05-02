@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
+export const dynamic = "force-static";
+export const revalidate = false;
+
 const SERVER_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
 export async function GET(request: NextRequest) {

@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState, use } from "react";
-import { useRouter, usePathname } from "next/navigation";
-import { fetchSessionUser, getCurrentLocale } from "@/lib/authClient";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { fetchSessionUser, getCurrentLocale, getAuthHeaders } from "@/lib/authClient";
 import ApplicantsList from "@/components/ApplicantsList";
 import {
   ArrowLeft, MapPin, DollarSign, Clock, Users, CheckCircle,
@@ -48,15 +48,12 @@ interface JobApplication {
   };
 }
 
-export default function JobDetailsPage({
-  params,
-}: {
-  readonly params: Promise<{ readonly locale: string; readonly jobId: string }>;
-}) {
-  const resolvedParams = use(params);
+export default function JobDetailsPage() {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const locale = getCurrentLocale(pathname);
+  const jobId = searchParams?.get("jobId") || "";
 
   const [job, setJob] = useState<JobDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -65,7 +62,10 @@ export default function JobDetailsPage({
   const [ratingState, setRatingState] = useState<Record<string, { score: number; review: string; submitting: boolean }>>({});
 
   const refreshJob = async () => {
-    const res = await fetch(`${API_BASE_URL}/api/jobs/${resolvedParams.jobId}`, { credentials: "include" });
+    const res = await fetch(`${API_BASE_URL}/api/jobs/${jobId}`, { 
+      headers: getAuthHeaders(),
+      credentials: "include" 
+    });
     if (res.ok) { const d = await res.json(); setJob(d.job); }
   };
 
@@ -75,14 +75,17 @@ export default function JobDetailsPage({
         const currentUser = await fetchSessionUser();
         if (!currentUser) { router.push(`/${locale}/login`); return; }
         if (!API_BASE_URL) { setError("API configuration missing"); setIsLoading(false); return; }
-        const res = await fetch(`${API_BASE_URL}/api/jobs/${resolvedParams.jobId}`, { credentials: "include" });
+        const res = await fetch(`${API_BASE_URL}/api/jobs/${jobId}`, { 
+          headers: getAuthHeaders(),
+          credentials: "include" 
+        });
         if (res.ok) { const d = await res.json(); setJob(d.job); }
         else setError("Failed to load job details");
       } catch { setError("Error loading job details"); }
       finally { setIsLoading(false); }
     };
-    loadData();
-  }, [resolvedParams.jobId, pathname, router, locale]);
+    if (jobId) loadData();
+  }, [jobId, pathname, router, locale]);
 
   const handleMarkJobComplete = async () => {
     if (!job) return;
@@ -93,8 +96,8 @@ export default function JobDetailsPage({
     try {
       const res = await fetch(`${API_BASE_URL}/api/jobs/mark-all-complete`, {
         method: "POST", credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobId: resolvedParams.jobId }),
+        headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId }),
       });
       if (!res.ok) { alert("Failed to mark complete"); setActionLoading(null); return; }
       await refreshJob();
@@ -106,8 +109,10 @@ export default function JobDetailsPage({
     if (!confirm("Delete this job? This cannot be undone.")) return;
     setActionLoading("delete");
     try {
-      const res = await fetch(`${API_BASE_URL}/api/jobs/${resolvedParams.jobId}`, {
-        method: "DELETE", credentials: "include",
+      const res = await fetch(`${API_BASE_URL}/api/jobs/${jobId}`, {
+        method: "DELETE", 
+        headers: getAuthHeaders(),
+        credentials: "include",
       });
       if (res.ok) router.push(`/${locale}/dashboard/contractor/projects`);
       else alert("Failed to delete job");
@@ -127,7 +132,7 @@ export default function JobDetailsPage({
       const res = await fetch(`${API_BASE_URL}/api/jobs/rate`, {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
         body: JSON.stringify({ applicationId, score: ratingData.score, review: ratingData.review || "" }),
       });
       if (res.ok) {
@@ -385,7 +390,7 @@ export default function JobDetailsPage({
           <div className="flex flex-wrap gap-2">
             {job.status === "open" && (
               <Button variant="outline" size="sm" className="gap-1.5"
-                onClick={() => router.push(`/${locale}/add-works?jobId=${resolvedParams.jobId}`)}>
+                onClick={() => router.push(`/${locale}/add-works?jobId=${jobId}`)}>
                 <Edit className="h-3.5 w-3.5" /> Edit Job
               </Button>
             )}
@@ -399,7 +404,7 @@ export default function JobDetailsPage({
             <Button variant="outline" size="sm" className="gap-1.5"
               onClick={() => {
                 if (typeof globalThis !== "undefined" && globalThis.location) {
-                  const url = `${globalThis.location.protocol}//${globalThis.location.host}/${locale}/projects/${resolvedParams.jobId}`;
+                  const url = `${globalThis.location.protocol}//${globalThis.location.host}/${locale}/projects/${jobId}`;
                   navigator.clipboard.writeText(url);
                   alert("Job link copied!");
                 }

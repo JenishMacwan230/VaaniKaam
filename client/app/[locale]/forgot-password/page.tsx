@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from "react";
+import React, { useState, Suspense } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import VoiceTextInput from "@/components/VoiceTextInput";
@@ -14,7 +14,7 @@ const getVoiceLanguage = (locale: string): string => {
     gu: "gu",
   };
   return mapping[locale] || "en";
-};
+}
 
 const getOtpHint = (locale: string) => {
   switch(locale) {
@@ -40,7 +40,7 @@ const getConfirmPasswordHint = (locale: string) => {
   }
 };
 
-export default function ForgotPasswordPage() {
+function ForgotPasswordContent() {
   const params = useParams();
   const voiceLanguage = getVoiceLanguage((params?.locale as string) || "en");
   const router = useRouter();
@@ -274,5 +274,13 @@ export default function ForgotPasswordPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+export default function ForgotPasswordPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>}>
+      <ForgotPasswordContent />
+    </Suspense>
   );
 }

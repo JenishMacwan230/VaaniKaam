@@ -11,13 +11,25 @@ const nextConfig: NextConfig = {
     // Skip TypeScript type-checking during build — errors are caught in development
     ignoreBuildErrors: true,
   },
+  // Static export required for Capacitor Android/iOS packaging.
+  // Remove this line to restore server-side rendering for the web deployment.
+  output: 'export',
+  trailingSlash: true,
+
+  // Next.js image optimization is not available in static export mode.
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
         hostname: 'res.cloudinary.com',
       },
     ],
+  },
+
+  // Disable RSC manifest generation for static export
+  experimental: {
+    optimizePackageImports: ['@radix-ui/react-slot'],
   },
 };
 

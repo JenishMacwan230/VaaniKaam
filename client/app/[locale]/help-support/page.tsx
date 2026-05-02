@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft, Mail, MapPin, Phone, Loader2, CheckCircle, AlertCircle,
@@ -10,7 +10,7 @@ import {
 import { fetchSessionUser } from "@/lib/authClient";
 import { useTranslations } from "next-intl";
 
-export default function HelpSupportPage() {
+function HelpSupportContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const t = useTranslations("helpSupport");
@@ -378,5 +378,16 @@ export default function HelpSupportPage() {
         </div>
       </section>
     </main>
+  );
+}
+
+export default function HelpSupportPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center flex-col gap-3">
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+        <p className="text-sm text-muted-foreground">Loading help center…</p>
+      </div>}>
+      <HelpSupportContent />
+    </Suspense>
   );
 }

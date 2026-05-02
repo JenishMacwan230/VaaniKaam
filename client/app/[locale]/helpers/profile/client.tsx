@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -46,10 +46,10 @@ interface Rating {
 }
 
 export default function WorkerProfilePage() {
-  const params = useParams();
+  const searchParams = useSearchParams();
+  const workerId = searchParams?.get('workerId') || '';
   const router = useRouter();
   const t = useTranslations('helpers');
-  const workerId = params?.workerId as string;
 
   const [worker, setWorker] = useState<WorkerProfile | null>(null);
   const [ratings, setRatings] = useState<Rating[]>([]);

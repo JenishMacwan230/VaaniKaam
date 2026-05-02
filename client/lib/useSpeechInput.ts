@@ -26,6 +26,8 @@ export interface UseSpeechInputResult {
   isListening: boolean;
   isSpeaking: boolean;
   isSupported: boolean;
+  supportsSpeechRecognition: boolean;
+  supportsSpeechSynthesis: boolean;
   transcribedText: string;
   error: string | null;
   startListening: () => Promise<void>;
@@ -50,7 +52,8 @@ export const useSpeechInput = (
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcribedText, setTranscribedText] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [isSupported, setIsSupported] = useState(false);
+  const [supportsSpeechRecognition, setSupportsSpeechRecognition] = useState(false);
+  const [supportsSpeechSynthesis, setSupportsSpeechSynthesis] = useState(false);
   const [globalListening, setGlobalListening] = useState(false);
   const mountedRef = useRef(true);
   const finalProcessedRef = useRef(false);
@@ -80,7 +83,8 @@ export const useSpeechInput = (
   // Detect browser speech API support only after mount to avoid SSR/client hydration mismatch.
   useEffect(() => {
     const apiAvailability = isSpeechAPIAvailable();
-    setIsSupported(apiAvailability.speechRecognition && apiAvailability.speechSynthesis);
+    setSupportsSpeechRecognition(apiAvailability.speechRecognition);
+    setSupportsSpeechSynthesis(apiAvailability.speechSynthesis);
 
     const handleStart = () => setGlobalListening(true);
     const handleStop = () => setGlobalListening(false);
@@ -96,7 +100,7 @@ export const useSpeechInput = (
 
   const speak = useCallback(
     async (text: string) => {
-      if (!isSupported) {
+      if (!supportsSpeechSynthesis) {
         console.warn("Text-to-Speech not supported");
         return;
       }
@@ -134,7 +138,7 @@ export const useSpeechInput = (
         }
       }
     },
-    [isSupported, languageCode]
+    [supportsSpeechSynthesis, languageCode]
   );
 
   // Keep speak ref in sync
@@ -144,11 +148,11 @@ export const useSpeechInput = (
 
   // Auto-speak greeting on mount (only once)
   useEffect(() => {
-    if (autoSpeakOnMount && isSupported && mountedRef.current && !greetingSpokenRef.current) {
+    if (autoSpeakOnMount && supportsSpeechSynthesis && mountedRef.current && !greetingSpokenRef.current) {
       greetingSpokenRef.current = true;
       speak(initialGreeting);
     }
-  }, [autoSpeakOnMount, isSupported, initialGreeting, speak]);
+  }, [autoSpeakOnMount, supportsSpeechSynthesis, initialGreeting, speak]);
 
   const processFinalResult = useCallback(
     (text: string) => {
@@ -188,7 +192,7 @@ export const useSpeechInput = (
   );
 
   const startListening = useCallback(async () => {
-    if (!isSupported) {
+    if (!supportsSpeechRecognition) {
       setError("Speech recognition not supported in this browser");
       return;
     }
@@ -248,7 +252,7 @@ export const useSpeechInput = (
         setIsListening(false);
       }
     }
-  }, [isSupported, languageCode, processFinalResult]);
+  }, [supportsSpeechRecognition, languageCode, processFinalResult]);
 
   const stopListening = useCallback(() => {
     try {
@@ -267,7 +271,9 @@ export const useSpeechInput = (
   return {
     isListening,
     isSpeaking,
-    isSupported,
+    isSupported: supportsSpeechRecognition || supportsSpeechSynthesis,
+    supportsSpeechRecognition,
+    supportsSpeechSynthesis,
     transcribedText,
     error,
     startListening,
