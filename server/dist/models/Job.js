@@ -38,23 +38,42 @@ const jobSchema = new mongoose_1.Schema({
     title: { type: String, required: true, trim: true },
     description: { type: String, trim: true },
     skillRequired: { type: [String], default: [] },
-    location: { type: String, trim: true },
+    location: { type: String, trim: true }, // Original location as entered by user
+    normalizedLocation: { type: String, trim: true }, // Standardized format for matching
+    isLocationNormalized: { type: Boolean, default: false }, // Track if API normalization succeeded
+    latitude: { type: Number }, // GPS coordinates
+    longitude: { type: Number },
     wage: { type: Number },
+    pricingAmount: { type: Number }, // Payment amount (₹)
     date: { type: Date },
     category: { type: String, trim: true },
     pricingType: {
         type: String,
-        enum: ["hour", "day", "job"],
-        default: "day",
+        enum: ["per_hour", "per_day", "per_job", "hour", "day", "job"],
+        default: "per_day",
     },
     urgency: {
         type: String,
         enum: ["Immediate", "Today", "Flexible"],
         default: "Flexible",
     },
+    // Structured duration fields
+    duration_value: { type: Number, default: 1 }, // e.g., 1, 8, 5
+    duration_unit: {
+        type: String,
+        enum: ["hour", "day", "week"],
+        default: "day",
+    },
+    workersRequired: { type: Number, default: 1 }, // Number of workers needed
+    jobDate: {
+        type: String,
+        enum: ["today", "tomorrow", "pick", "flexible"],
+        default: "today",
+    },
+    selectedDate: { type: String }, // ISO date string when jobDate is "pick"
     status: {
         type: String,
-        enum: ["open", "assigned", "completed", "cancelled"],
+        enum: ["open", "assigned", "in_progress", "completion_pending", "completed", "cancelled"],
         default: "open",
     },
     postedBy: { type: mongoose_1.Schema.Types.ObjectId, ref: "User", required: true },

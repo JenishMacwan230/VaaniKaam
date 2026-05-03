@@ -17,6 +17,7 @@ import {
   User,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { getAuthHeaders } from '@/lib/authClient';
 
 interface WorkerProfile {
   _id: string;
@@ -64,16 +65,13 @@ export default function WorkerProfilePage() {
 
         const token =
           typeof window !== 'undefined'
-            ? localStorage.getItem('firebaseToken') || localStorage.getItem('token')
+            ? localStorage.getItem('authToken')
             : null;
 
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
+          ...getAuthHeaders(),
         };
-
-        if (token) {
-          headers['Authorization'] = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
-        }
 
         // Fetch worker profile
         const workerRes = await fetch(

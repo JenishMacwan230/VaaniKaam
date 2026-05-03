@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getCurrentLocale } from "@/lib/authClient";
+import { getCurrentLocale, getAuthHeaders } from "@/lib/authClient";
 import { useTranslations } from "next-intl";
 import {
   AlertCircle,
@@ -242,7 +242,7 @@ export default function AddWorksPage() {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/jobs`, {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(true),
         body: JSON.stringify(payload),
       });
       if (!response.ok) {

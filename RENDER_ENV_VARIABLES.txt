@@ -1,0 +1,45 @@
+================================================================================
+COPY-PASTE THESE INTO RENDER ENVIRONMENT VARIABLES
+================================================================================
+
+FIREBASE_PROJECT_ID=vaanikaam-firebase
+
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk-fbsvc@vaanikaam-firebase.iam.gserviceaccount.com
+
+FIREBASE_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDFwsSxLlDok7Sw\naTYg9dS1HDFridEWSwmVbcUWoqHEICzM57F+ZlKdAayS5HXlQPQd+GQq+ej5PiFS\n4f9240uizqekdDG+ojGuUD1JLfj07nMMB26qTvIrlnzzy+lMmuxUyWgOMuvgkFqt\nKNBXVBRo16XFX6vHu1pGHw0FvuZmLDn5qW7hK9m0xP/LRgoOTFi+/TOJMc1c3KOX\nLd54E3jn2NNF3EBWRFy0l/dfc6vMwhijeoBUDF6peIIvw23hC7ATfA/O77SD37Af\nZTF/IsnIdexc32eRADYXmVzuN1avHb04WKO0E+cpXTdeEQpFOVW/NQR1TQt8MxyC\ngB0R+oQZAgMBAAECggEAEXWJ46oXAMd8h+gL/DIz2Jbv+oJg7BbNFm0J3b8XKL9d\n8Suh2QrLz5p0m8XRbj9TJfu2TTCBy9JbQwvaf8qelHWp6XwMIbxERlNFa9rkDCyq\nicT0tVKxsN0w9B2cH9QcGfqrhfhjKHDaHog4R4Nv51clhpS1D9W3qTHn1oplYR7t\nwG3tEpHp4vOfnpGOw7ODK6wYnJMZiS8z/RicDTEZL6t8aRHJJxOA5m2J2HZat++Z\ntwqwTKTIerrGMXa7SUrQ+QRsXwHM/k6Z3sr6mhgBnhRryFjANyG1UAPAV/3+vS6c\nz/518WIQ0xZbUWyJYx907Q67UiTaciAcXwhqhQ8wMQKBgQD5md0hJFafaFEuidxe\nMK1HactWEKfIqT7yNBilMZ1e87FUpsTaBzmUUefCwRb5FqfRojcEE+iGLQpf22t3\ny+OFDwvzSR7KkAMO7B6/0IA6tpkk3kPTypq/6wS3aQ3uUgtRqftfr6qLs8CSPcmL\n9x1jHqy7bby4s08jVd7RhjQRSQKBgQDK1K0dq5845ll6Hb+all42+OAb0Qg/FRFO\nBSaHQB3TWQ3x2Ie8MhwOZAeKOnrMnYsRzHosrTO1MxZZOlMuxuMk5CHS2H4aP1zo\nG9N7Wid1QQ9O87JpKoLX3UGhnw13pIH1TgeyhEUntRMF49oECqyyAtsbhdgkJpVy\nzg2iRMSsUQKBgHOzMgDJ4ml0JqWG/CKhN8FxtfLIN65ZXbdSFNaGYCeCmQHfaEKU\ntMkfCmqJrQd7zADty8jVHaUMvdFfWbqnRWkJZ4W3sFE/XluNcleB497Tg7vGV/SV\n5xPtcjs+tFlzqJGLVN2vBURK54oioAmEXBf1QSaEoMWRQK7lgCrppbsZAoGBAJGj\nDb59KXGArISrcZV9HJ8aKkiu2d35sZg0yIpatk+35PRfRm8SB+UpW+SbwurCwEWC\nbcNAhh04VnaxE2NF+XjWuZacTkdocbxTppEulaBym5xUDSnIFXUL8IEtJE1g+NN7\nOLmskb9GHCehiDxYsdGLjWoAu8aRUcPCQjXebN1RAoGAJJMRIP+V3/yhOim8Cz1Q\niKWBOQ+cth6rX52HUpxiTVO2dSu0/uAgnuyFii1wslhj4UDBeaveC1V3yKoGNHgJ\ndHc+YFeweZ/yGmSwuWeA92OXkC4e3pe5T8YaowyKoI9KXcOGeze9nxQetMiFnJg9\nC9YzMshULWWoGz9Hk5G+OC8=\n-----END PRIVATE KEY-----\n
+
+================================================================================
+HOW TO ADD TO RENDER:
+================================================================================
+
+1. Go to: https://dashboard.render.com/
+2. Select your service (vaanikaam backend)
+3. Click "Environment" on the left sidebar
+4. Click "Add Environment Variable"
+5. For each variable above:
+   - Copy the name (e.g., FIREBASE_PROJECT_ID)
+   - Paste it in the "Key" field
+   - Copy the value (e.g., vaanikaam-firebase)
+   - Paste it in the "Value" field
+   - Click "Save"
+
+6. After adding all 3 variables, click "Deploy" button to restart your service
+
+================================================================================
+IMPORTANT NOTES:
+================================================================================
+
+✓ The FIREBASE_PRIVATE_KEY is the complete value - copy it ALL including the
+  backslash-n characters (\n) - Render will interpret these correctly
+
+✓ Make sure there are NO extra spaces or quotes around the values
+
+✓ After saving, your service will automatically redeploy with the new env vars
+
+✓ Check your server logs to confirm Firebase initialized successfully:
+  Look for: "✅ Firebase initialized with environment variables for project: vaanikaam-firebase"
+
+✓ If you see errors, check that:
+  - All 3 variables are set
+  - The private key includes \n between lines
+  - No trailing spaces in any value

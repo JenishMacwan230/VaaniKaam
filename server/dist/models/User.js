@@ -41,6 +41,9 @@ const userSchema = new mongoose_1.Schema({
     email: { type: String, lowercase: true, trim: true },
     phone: { type: String, trim: true, required: true, unique: true },
     location: { type: String, trim: true },
+    normalizedLocation: { type: String, trim: true },
+    latitude: { type: Number },
+    longitude: { type: Number },
     accountType: { type: String, enum: ["worker", "contractor"] },
     passwordHash: { type: String },
     roles: { type: [String], enum: exports.allowedRoles, default: [] },
@@ -57,6 +60,8 @@ const userSchema = new mongoose_1.Schema({
     availability: { type: Boolean, default: true },
     languages: { type: [String], default: [] },
     about: { type: String, trim: true, maxlength: 500 },
+    averageRating: { type: Number, default: 0 },
+    totalRatings: { type: Number, default: 0 },
 }, { timestamps: true });
 userSchema.index({ email: 1 }, { unique: true, sparse: true });
 exports.default = mongoose_1.default.model("User", userSchema);

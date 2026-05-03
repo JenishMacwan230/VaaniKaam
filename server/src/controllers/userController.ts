@@ -43,13 +43,15 @@ const clearAuthCookie = (res: Response) => {
   });
 };
 
-// FIRST TIME: Firebase Phone Verification + Set Password
 export const firebaseAuth = async (req: Request, res: Response) => {
   try {
     const { firebaseToken, name, email, password, location, accountType } = req.body || {};
     
     if (!firebaseToken) {
-      return res.status(400).json({ message: "Firebase token is required" });
+      console.warn("⚠️ Registration attempted without Firebase token");
+      return res.status(400).json({ 
+        message: "Firebase token is required. Please complete phone verification." 
+      });
     }
 
     if (!password || password.length < 6) {
@@ -68,22 +70,31 @@ export const firebaseAuth = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Valid account type is required" });
     }
 
+    console.log("📝 Attempting Firebase token verification for registration...");
     const decodedToken = await verifyFirebaseToken(firebaseToken);
     
     if (!decodedToken) {
-      return res.status(401).json({ message: "Invalid Firebase token" });
+      console.error("❌ Firebase token verification failed - token invalid or Firebase not configured");
+      return res.status(401).json({ 
+        message: "Phone verification failed. Please request a new SMS code and try again.",
+        error: "FIREBASE_TOKEN_INVALID"
+      });
     }
 
     const phone = decodedToken.phone_number;
     
     if (!phone) {
-      return res.status(400).json({ message: "Phone number not found in token" });
+      console.error("❌ Phone number not found in Firebase token");
+      return res.status(400).json({ message: "Phone number not found in verification token" });
     }
+
+    console.log("✅ Firebase token verified. Phone:", phone);
 
     // Check if user already exists
     let user = await User.findOne({ phone });
 
     if (user) {
+      console.log("⚠️ User already exists with phone:", phone);
       return res.status(409).json({ 
         message: "Phone number already registered. Please login with password.", 
         shouldUsePasswordLogin: true 
@@ -109,13 +120,15 @@ export const firebaseAuth = async (req: Request, res: Response) => {
     const token = createToken(user);
     setAuthCookie(res, token);
 
+    console.log("✅ New user registered successfully. Phone:", phone);
+
     return res.json({
       message: "Registration successful",
       user: formatUserResponse(user),
       token,
     });
   } catch (error) {
-    console.error("Firebase auth error:", error);
+    console.error("❌ Firebase auth error:", error);
     return res.status(500).json({
       message: "Failed to authenticate with Firebase",
       error: error instanceof Error ? error.message : "Unknown error",

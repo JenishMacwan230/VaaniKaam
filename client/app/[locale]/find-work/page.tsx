@@ -169,7 +169,7 @@ export default function FindWorkPage() {
         setIsLoading(true); setError(null);
         if (!API_BASE_URL) throw new Error("API configuration missing");
         const token = globalThis.window === undefined ? null
-          : localStorage.getItem("firebaseToken") || localStorage.getItem("token");
+          : localStorage.getItem("authToken");
         const headers: Record<string, string> = { "Content-Type": "application/json" };
         if (token) headers["Authorization"] = token.startsWith("Bearer ") ? token : `Bearer ${token}`;
         const response = await fetch(`${API_BASE_URL}/api/jobs`, { method: "GET", headers, credentials: "include" });

@@ -138,7 +138,7 @@ function ForgotPasswordContent() {
       }
 
       // Store token
-      localStorage.setItem("token", data.token);
+      localStorage.setItem("authToken", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
       sessionStorage.removeItem("forgot_phone"); // Clear session storage
 

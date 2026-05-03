@@ -36,11 +36,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteProfilePicture = exports.saveProfilePicture = exports.checkPhoneExists = exports.logout = exports.updateProfile = exports.getMe = exports.switchRole = exports.addRole = exports.resetPasswordWithOtp = exports.requestPasswordResetOtp = exports.loginWithPassword = exports.firebaseAuth = void 0;
+exports.getPublicStats = exports.getWorkerProfile = exports.getPublicWorkers = exports.deleteProfilePicture = exports.saveProfilePicture = exports.checkPhoneExists = exports.logout = exports.updateProfile = exports.getMe = exports.switchRole = exports.addRole = exports.resetPasswordWithOtp = exports.requestPasswordResetOtp = exports.loginWithPassword = exports.firebaseAuth = void 0;
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const node_crypto_1 = __importDefault(require("node:crypto"));
 const User_1 = __importStar(require("../models/User"));
+const Job_1 = __importDefault(require("../models/Job"));
 const OtpCode_1 = __importDefault(require("../models/OtpCode"));
 const firebase_1 = require("../config/firebase");
 const AUTH_COOKIE_NAME = "authToken";
@@ -75,15 +76,20 @@ const clearAuthCookie = (res) => {
         path: "/",
     });
 };
-// FIRST TIME: Firebase Phone Verification + Set Password
 const firebaseAuth = async (req, res) => {
     try {
         const { firebaseToken, name, email, password, location, accountType } = req.body || {};
         if (!firebaseToken) {
-            return res.status(400).json({ message: "Firebase token is required" });
+            console.warn("⚠️ Registration attempted without Firebase token");
+            return res.status(400).json({
+                message: "Firebase token is required. Please complete phone verification."
+            });
         }
         if (!password || password.length < 6) {
             return res.status(400).json({ message: "Password is required and must be at least 6 characters" });
+        }
+        if (/\s/.test(password)) {
+            return res.status(400).json({ message: "Password must not contain spaces" });
         }
         if (!location || typeof location !== "string" || !location.trim()) {
             return res.status(400).json({ message: "Location is required" });
@@ -91,17 +97,25 @@ const firebaseAuth = async (req, res) => {
         if (accountType !== "worker" && accountType !== "contractor") {
             return res.status(400).json({ message: "Valid account type is required" });
         }
+        console.log("📝 Attempting Firebase token verification for registration...");
         const decodedToken = await (0, firebase_1.verifyFirebaseToken)(firebaseToken);
         if (!decodedToken) {
-            return res.status(401).json({ message: "Invalid Firebase token" });
+            console.error("❌ Firebase token verification failed - token invalid or Firebase not configured");
+            return res.status(401).json({
+                message: "Phone verification failed. Please request a new SMS code and try again.",
+                error: "FIREBASE_TOKEN_INVALID"
+            });
         }
         const phone = decodedToken.phone_number;
         if (!phone) {
-            return res.status(400).json({ message: "Phone number not found in token" });
+            console.error("❌ Phone number not found in Firebase token");
+            return res.status(400).json({ message: "Phone number not found in verification token" });
         }
+        console.log("✅ Firebase token verified. Phone:", phone);
         // Check if user already exists
         let user = await User_1.default.findOne({ phone });
         if (user) {
+            console.log("⚠️ User already exists with phone:", phone);
             return res.status(409).json({
                 message: "Phone number already registered. Please login with password.",
                 shouldUsePasswordLogin: true
@@ -123,6 +137,7 @@ const firebaseAuth = async (req, res) => {
         });
         const token = createToken(user);
         setAuthCookie(res, token);
+        console.log("✅ New user registered successfully. Phone:", phone);
         return res.json({
             message: "Registration successful",
             user: formatUserResponse(user),
@@ -130,7 +145,7 @@ const firebaseAuth = async (req, res) => {
         });
     }
     catch (error) {
-        console.error("Firebase auth error:", error);
+        console.error("❌ Firebase auth error:", error);
         return res.status(500).json({
             message: "Failed to authenticate with Firebase",
             error: error instanceof Error ? error.message : "Unknown error",
@@ -144,6 +159,9 @@ const loginWithPassword = async (req, res) => {
         const { phone, password } = req.body || {};
         if (!phone || !password) {
             return res.status(400).json({ message: "Phone and password are required" });
+        }
+        if (/\s/.test(password)) {
+            return res.status(400).json({ message: "Password must not contain spaces" });
         }
         const user = await User_1.default.findOne({ phone });
         if (!user) {
@@ -221,6 +239,9 @@ const resetPasswordWithOtp = async (req, res) => {
         }
         if (newPassword.length < 6) {
             return res.status(400).json({ message: "Password must be at least 6 characters" });
+        }
+        if (/\s/.test(newPassword)) {
+            return res.status(400).json({ message: "Password must not contain spaces" });
         }
         const otpRecord = await OtpCode_1.default.findOne({ phone, purpose: "password-reset" });
         if (!otpRecord || otpRecord.expiresAt < new Date()) {
@@ -308,11 +329,27 @@ const updateProfile = async (req, res) => {
         const user = req.user;
         if (!user)
             return res.status(401).json({ message: "Unauthorized" });
-        const { name, location, profession, skills, experienceYears, pricingType, pricingAmount, availability, languages, about, } = req.body || {};
+        const { name, location, normalizedLocation, latitude, longitude, profession, skills, experienceYears, pricingType, pricingAmount, availability, languages, about, } = req.body || {};
         if (typeof name === "string")
             user.name = name.trim();
         if (typeof location === "string")
             user.location = location.trim();
+        if (typeof normalizedLocation === "string")
+            user.normalizedLocation = normalizedLocation.trim();
+        if (latitude !== undefined && latitude !== null) {
+            const parsedLatitude = Number(latitude);
+            if (Number.isNaN(parsedLatitude) || parsedLatitude < -90 || parsedLatitude > 90) {
+                return res.status(400).json({ message: "Invalid latitude" });
+            }
+            user.latitude = parsedLatitude;
+        }
+        if (longitude !== undefined && longitude !== null) {
+            const parsedLongitude = Number(longitude);
+            if (Number.isNaN(parsedLongitude) || parsedLongitude < -180 || parsedLongitude > 180) {
+                return res.status(400).json({ message: "Invalid longitude" });
+            }
+            user.longitude = parsedLongitude;
+        }
         if (typeof profession === "string")
             user.profession = profession.trim();
         if (Array.isArray(skills)) {
@@ -464,3 +501,73 @@ const deleteProfilePicture = async (req, res) => {
     }
 };
 exports.deleteProfilePicture = deleteProfilePicture;
+// GET PUBLIC WORKERS
+const getPublicWorkers = async (_req, res) => {
+    try {
+        const workers = await User_1.default.find({ roles: "worker", isActive: true })
+            .select("name phone location profession availability averageRating totalRatings profilePictureUrl latitude longitude skills")
+            .lean();
+        return res.json({
+            success: true,
+            workers: workers.map((w) => ({
+                ...w,
+                id: w._id.toString()
+            }))
+        });
+    }
+    catch (error) {
+        console.error("Get public workers error:", error);
+        return res.status(500).json({ message: "Failed to fetch workers" });
+    }
+};
+exports.getPublicWorkers = getPublicWorkers;
+const getWorkerProfile = async (req, res) => {
+    try {
+        const { id } = req.params;
+        // Return public profile for any active user (worker or contractor)
+        const user = await User_1.default.findOne({ _id: id, isActive: true })
+            .select("name phone email location profession availability averageRating totalRatings profilePictureUrl latitude longitude skills about languages experienceYears pricingType pricingAmount normalizedLocation accountType roles")
+            .lean();
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        // Normalize response shape expected by client
+        return res.json({
+            user: {
+                ...user,
+                id: user._id ? user._id.toString() : undefined,
+                description: user.about,
+            },
+        });
+    }
+    catch (error) {
+        console.error("Get worker profile error:", error);
+        return res.status(500).json({ message: "Failed to fetch user profile" });
+    }
+};
+exports.getWorkerProfile = getWorkerProfile;
+// GET PUBLIC STATS
+const getPublicStats = async (_req, res) => {
+    try {
+        const totalUsers = await User_1.default.countDocuments({ isActive: true });
+        const totalJobs = await Job_1.default.countDocuments();
+        const usersWithRatings = await User_1.default.aggregate([
+            { $match: { totalRatings: { $gt: 0 } } },
+            { $group: { _id: null, avgRating: { $avg: "$averageRating" } } }
+        ]);
+        const avgRating = usersWithRatings.length > 0 ? Number(usersWithRatings[0].avgRating.toFixed(1)) : 4.8;
+        return res.json({
+            success: true,
+            stats: {
+                totalUsers,
+                totalJobs,
+                avgRating
+            }
+        });
+    }
+    catch (error) {
+        console.error("Get public stats error:", error);
+        return res.status(500).json({ message: "Failed to fetch stats" });
+    }
+};
+exports.getPublicStats = getPublicStats;

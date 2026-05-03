@@ -35,19 +35,29 @@ const initializeFirebase = () => {
         const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
         const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
         if (projectId && clientEmail && privateKey) {
-            firebase_admin_1.default.initializeApp({
-                credential: firebase_admin_1.default.credential.cert({
-                    projectId,
-                    clientEmail,
-                    privateKey,
-                }),
-            });
-            firebaseInitialized = true;
-            console.log("Firebase initialized with environment variables");
+            try {
+                firebase_admin_1.default.initializeApp({
+                    credential: firebase_admin_1.default.credential.cert({
+                        projectId,
+                        clientEmail,
+                        privateKey,
+                    }),
+                });
+                firebaseInitialized = true;
+                console.log("✅ Firebase initialized with environment variables for project:", projectId);
+            }
+            catch (initError) {
+                console.error("❌ Failed to initialize Firebase with env vars:", initError);
+            }
             return;
         }
-        console.warn("Firebase Admin credentials not found. SMS sending will be in debug mode only.");
-        console.warn("To enable SMS: Get service account from Firebase Console → Project Settings → Service Accounts");
+        console.warn("⚠️ Firebase Admin credentials not found.");
+        console.warn("Missing env vars:", {
+            has_FIREBASE_PROJECT_ID: !!projectId,
+            has_FIREBASE_CLIENT_EMAIL: !!clientEmail,
+            has_FIREBASE_PRIVATE_KEY: !!privateKey,
+        });
+        console.warn("To enable Firebase: Set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY");
     }
     catch (error) {
         console.error("Failed to initialize Firebase:", error);
@@ -58,13 +68,16 @@ exports.initializeFirebase = initializeFirebase;
 const verifyFirebaseToken = async (idToken) => {
     try {
         if (!firebaseInitialized) {
+            console.error("❌ Firebase not initialized. Cannot verify token.");
+            console.error("Check that FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY are set.");
             throw new Error("Firebase not initialized");
         }
         const decodedToken = await firebase_admin_1.default.auth().verifyIdToken(idToken);
+        console.log("✅ Firebase token verified for phone:", decodedToken.phone_number);
         return decodedToken;
     }
     catch (error) {
-        console.error("Failed to verify Firebase token:", error);
+        console.error("❌ Failed to verify Firebase token:", error instanceof Error ? error.message : error);
         return null;
     }
 };

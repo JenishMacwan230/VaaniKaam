@@ -3,19 +3,41 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getRecentApplications = exports.getContractorStats = exports.getContractorJobs = exports.applyToJob = exports.listJobs = exports.createJob = void 0;
+exports.getWorkerRatings = exports.rateUser = exports.disputePayment = exports.confirmPayment = exports.getWorkerCompletedJobs = exports.markAllJobsComplete = exports.rejectJobCompletion = exports.confirmJobCompletion = exports.getWorkerPendingCompletion = exports.markJobComplete = exports.getWorkerAcceptedJobs = exports.getWorkerApplications = exports.deleteJob = exports.updateApplicationStatus = exports.getJobById = exports.getRecentApplications = exports.getContractorStats = exports.getContractorJobs = exports.withdrawApplication = exports.applyToJob = exports.listJobs = exports.createJob = void 0;
 const Job_1 = __importDefault(require("../models/Job"));
 const JobApplication_1 = __importDefault(require("../models/JobApplication"));
+const User_1 = __importDefault(require("../models/User"));
+const Notification_1 = require("../models/Notification");
+const notificationHelper_1 = require("../utils/notificationHelper");
+const syncJobStatusFromApplications = async (jobId) => {
+    const job = await Job_1.default.findById(jobId);
+    if (!job)
+        return;
+    const applications = await JobApplication_1.default.find({ jobId: job._id });
+    const hasCompletionPending = applications.some((app) => app.status === "completion_pending");
+    const hasAccepted = applications.some((app) => app.status === "accepted");
+    const hasCompleted = applications.some((app) => app.status === "completed");
+    let nextStatus = "open";
+    if (hasCompletionPending) {
+        nextStatus = "completion_pending";
+    }
+    else if (hasAccepted) {
+        nextStatus = "in_progress";
+    }
+    else if (hasCompleted) {
+        nextStatus = "completed";
+    }
+    await Job_1.default.findByIdAndUpdate(job._id, { status: nextStatus });
+};
 const createJob = async (req, res) => {
     try {
         // Support both field name formats
-        const { title, description, skillRequired, location, wage, date, 
-        // New format from add-works form
-        category, pricingType, pricingAmount, urgency, } = req.body || {};
+        const { title, description, skillRequired, location, normalizedLocation, isLocationNormalized, latitude, longitude, wage, date, category, pricingType, pricingAmount, urgency, 
+        // Structured duration fields
+        duration_value, duration_unit, workersRequired, jobDate, selectedDate, } = req.body || {};
         const user = req.user;
         if (!user)
             return res.status(401).json({ message: "Unauthorized" });
-        // Map new field names to old ones if provided
         const finalWage = wage || pricingAmount;
         const finalSkills = skillRequired || (category ? [category] : []);
         const job = await Job_1.default.create({
@@ -23,11 +45,22 @@ const createJob = async (req, res) => {
             description,
             skillRequired: Array.isArray(finalSkills) ? finalSkills : [],
             location,
+            normalizedLocation,
+            isLocationNormalized: isLocationNormalized || false,
+            latitude,
+            longitude,
             wage: finalWage,
+            pricingAmount: pricingAmount || finalWage,
             date,
             category,
             pricingType,
             urgency,
+            // Structured duration fields
+            duration_value: duration_value || 1,
+            duration_unit: duration_unit || "day",
+            workersRequired: workersRequired || 1,
+            jobDate: jobDate || "today",
+            selectedDate,
             postedBy: user._id,
         });
         return res.status(201).json({ job });
@@ -44,11 +77,16 @@ const listJobs = async (req, res) => {
         const filter = {};
         if (status)
             filter.status = status;
-        const jobs = await Job_1.default.find(filter).populate("postedBy", "name email activeRole").sort({ createdAt: -1 });
+        const jobs = await Job_1.default.find(filter).populate("postedBy", "name email phone activeRole").sort({ createdAt: -1 });
         return res.json({ jobs });
     }
     catch (error) {
-        return res.status(500).json({ message: "Failed to fetch jobs" });
+        console.error("Error fetching jobs:", error);
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        return res.status(500).json({
+            message: "Failed to fetch jobs",
+            error: errorMessage,
+        });
     }
 };
 exports.listJobs = listJobs;
@@ -65,6 +103,24 @@ const applyToJob = async (req, res) => {
         if (existing)
             return res.status(409).json({ message: "Already applied" });
         const application = await JobApplication_1.default.create({ jobId, workerId: user._id, status: "applied" });
+        // 📬 Create notification for job poster
+        try {
+            await (0, notificationHelper_1.createNotification)({
+                userId: job.postedBy.toString(),
+                type: "application",
+                title: "New Application Received",
+                message: `${user.name || "Someone"} applied for "${job.title}"`,
+                data: {
+                    jobId: job._id.toString(),
+                    applicationId: application._id.toString(),
+                    workerId: user._id.toString(),
+                },
+            });
+        }
+        catch (notifError) {
+            console.error("Failed to create notification:", notifError);
+            // Don't fail the request if notification creation fails
+        }
         return res.status(201).json({ application });
     }
     catch (error) {
@@ -74,6 +130,29 @@ const applyToJob = async (req, res) => {
     }
 };
 exports.applyToJob = applyToJob;
+const withdrawApplication = async (req, res) => {
+    try {
+        const { jobId } = req.body || {};
+        const user = req.user;
+        if (!user)
+            return res.status(401).json({ message: "Unauthorized" });
+        // Only allow withdrawing if it's still 'applied' (not accepted or completed)
+        const application = await JobApplication_1.default.findOneAndDelete({
+            jobId,
+            workerId: user._id,
+            status: "applied"
+        });
+        if (!application) {
+            return res.status(404).json({ message: "Application not found or cannot be withdrawn" });
+        }
+        return res.json({ message: "Application withdrawn successfully" });
+    }
+    catch (error) {
+        console.error("Withdraw application error:", error);
+        return res.status(500).json({ message: "Failed to withdraw application" });
+    }
+};
+exports.withdrawApplication = withdrawApplication;
 const getContractorJobs = async (req, res) => {
     try {
         const user = req.user;
@@ -138,7 +217,7 @@ const getRecentApplications = async (req, res) => {
         // Get recent applications for these jobs
         const applications = await JobApplication_1.default.find({ jobId: { $in: jobIds } })
             .populate("jobId", "title status")
-            .populate("workerId", "name email proficiency location workCategory")
+            .populate("workerId", "name email phone proficiency location workCategory")
             .sort({ createdAt: -1 })
             .limit(10);
         return res.json({ applications });
@@ -148,3 +227,697 @@ const getRecentApplications = async (req, res) => {
     }
 };
 exports.getRecentApplications = getRecentApplications;
+const getJobById = async (req, res) => {
+    try {
+        const { jobId } = req.params;
+        const job = await Job_1.default.findById(jobId)
+            .populate("postedBy", "name email");
+        if (!job) {
+            return res.status(404).json({ message: "Job not found" });
+        }
+        // Get all applications for this job with worker details
+        const applications = await JobApplication_1.default.find({ jobId: job._id })
+            .populate("workerId", "name email phone proficiency location")
+            .sort({ createdAt: -1 });
+        return res.json({
+            job: {
+                ...job.toObject(),
+                applications: applications,
+            },
+        });
+    }
+    catch (error) {
+        console.error("Get job error:", error);
+        return res.status(500).json({ message: "Failed to fetch job details" });
+    }
+};
+exports.getJobById = getJobById;
+const updateApplicationStatus = async (req, res) => {
+    try {
+        const { applicationId, action } = req.params;
+        const user = req.user;
+        if (!user)
+            return res.status(401).json({ message: "Unauthorized" });
+        // Get the application
+        const application = await JobApplication_1.default.findById(applicationId);
+        if (!application) {
+            return res.status(404).json({ message: "Application not found" });
+        }
+        // Verify the job belongs to the user
+        const job = await Job_1.default.findById(application.jobId);
+        const jobPostedById = job?.postedBy?.toString();
+        const userId = user._id?.toString();
+        if (!job || jobPostedById !== userId) {
+            return res.status(403).json({ message: "Unauthorized" });
+        }
+        // Update application status
+        let newStatus = "applied";
+        if (action === "accept") {
+            newStatus = "accepted";
+        }
+        else if (action === "reject") {
+            newStatus = "rejected";
+        }
+        application.status = newStatus;
+        await application.save();
+        await syncJobStatusFromApplications(application.jobId);
+        // 📬 Create notification when application is accepted
+        if (action === "accept") {
+            try {
+                const worker = await User_1.default.findById(application.workerId);
+                await (0, notificationHelper_1.createNotification)({
+                    userId: application.workerId.toString(),
+                    type: "job_update",
+                    title: "Application Accepted!",
+                    message: `Your application for "${job.title}" has been accepted. You can now start the work.`,
+                    data: {
+                        jobId: job._id.toString(),
+                        applicationId: application._id.toString(),
+                    },
+                });
+            }
+            catch (notifError) {
+                console.error("Failed to create notification:", notifError);
+            }
+        }
+        return res.json({ application });
+    }
+    catch (error) {
+        console.error("Update application error:", error);
+        return res.status(500).json({ message: "Failed to update application" });
+    }
+};
+exports.updateApplicationStatus = updateApplicationStatus;
+const deleteJob = async (req, res) => {
+    try {
+        const { jobId } = req.params;
+        const user = req.user;
+        if (!user)
+            return res.status(401).json({ message: "Unauthorized" });
+        // Get the job
+        const job = await Job_1.default.findById(jobId);
+        if (!job) {
+            return res.status(404).json({ message: "Job not found" });
+        }
+        // Verify job belongs to user
+        const jobPostedById = job.postedBy?.toString();
+        const userId = user._id?.toString();
+        if (jobPostedById !== userId) {
+            return res.status(403).json({ message: "Unauthorized" });
+        }
+        // Delete job and its applications
+        await Job_1.default.findByIdAndDelete(jobId);
+        await JobApplication_1.default.deleteMany({ jobId: jobId });
+        return res.json({ message: "Job deleted successfully" });
+    }
+    catch (error) {
+        console.error("Delete job error:", error);
+        return res.status(500).json({ message: "Failed to delete job" });
+    }
+};
+exports.deleteJob = deleteJob;
+const getWorkerApplications = async (req, res) => {
+    try {
+        const user = req.user;
+        if (!user)
+            return res.status(401).json({ message: "Unauthorized" });
+        // Get all applications by this worker with job details
+        const applications = await JobApplication_1.default.find({ workerId: user._id })
+            .populate({
+            path: "jobId",
+            select: "_id title description location latitude longitude pricingAmount pricingType category urgency jobDate duration_value duration_unit workersRequired status postedBy",
+            populate: {
+                path: "postedBy",
+                select: "name profilePictureUrl averageRating totalRatings phone",
+            },
+        })
+            .sort({ createdAt: -1 });
+        return res.json({ applications });
+    }
+    catch (error) {
+        console.error("Get worker applications error:", error);
+        return res.status(500).json({ message: "Failed to fetch applications" });
+    }
+};
+exports.getWorkerApplications = getWorkerApplications;
+const getWorkerAcceptedJobs = async (req, res) => {
+    try {
+        const user = req.user;
+        if (!user)
+            return res.status(401).json({ message: "Unauthorized" });
+        // Get all ACCEPTED applications by this worker with job details
+        const applications = await JobApplication_1.default.find({
+            workerId: user._id,
+            status: "accepted"
+        })
+            .populate({
+            path: "jobId",
+            select: "_id title description location latitude longitude pricingAmount pricingType category urgency jobDate duration_value duration_unit workersRequired status postedBy createdAt",
+            populate: {
+                path: "postedBy",
+                select: "name profilePictureUrl averageRating totalRatings phone",
+            },
+        })
+            .sort({ createdAt: -1 });
+        return res.json({ applications });
+    }
+    catch (error) {
+        console.error("Get worker accepted jobs error:", error);
+        return res.status(500).json({ message: "Failed to fetch accepted jobs" });
+    }
+};
+exports.getWorkerAcceptedJobs = getWorkerAcceptedJobs;
+const markJobComplete = async (req, res) => {
+    try {
+        const { applicationId } = req.body;
+        const user = req.user;
+        if (!user)
+            return res.status(401).json({ message: "Unauthorized" });
+        // Get the application
+        const application = await JobApplication_1.default.findById(applicationId);
+        if (!application) {
+            return res.status(404).json({ message: "Application not found" });
+        }
+        // Verify the job belongs to the user (contractor)
+        const job = await Job_1.default.findById(application.jobId);
+        const jobPostedById = job?.postedBy?.toString();
+        const userId = user._id?.toString();
+        if (!job || jobPostedById !== userId) {
+            return res.status(403).json({ message: "Unauthorized" });
+        }
+        // Update status to completion_pending
+        if (application.status !== "accepted") {
+            return res.status(400).json({ message: "Only accepted jobs can be marked complete" });
+        }
+        application.status = "completion_pending";
+        await application.save();
+        await syncJobStatusFromApplications(application.jobId);
+        // 📬 Create notification for worker to confirm completion
+        try {
+            await (0, notificationHelper_1.createNotification)({
+                userId: application.workerId.toString(),
+                type: "job_update",
+                title: "Job Completion Review",
+                message: `${user.name || "Contractor"} marked "${job.title}" as complete. Please confirm the work is done.`,
+                data: {
+                    jobId: job._id.toString(),
+                    applicationId: application._id.toString(),
+                },
+            });
+        }
+        catch (notifError) {
+            console.error("Failed to create notification:", notifError);
+        }
+        return res.json({ application });
+    }
+    catch (error) {
+        console.error("Mark job complete error:", error);
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        return res.status(500).json({ message: `Failed to mark job complete: ${errorMessage}` });
+    }
+};
+exports.markJobComplete = markJobComplete;
+const getWorkerPendingCompletion = async (req, res) => {
+    try {
+        const user = req.user;
+        if (!user)
+            return res.status(401).json({ message: "Unauthorized" });
+        // Get all COMPLETION_PENDING applications by this worker with job details
+        const applications = await JobApplication_1.default.find({
+            workerId: user._id,
+            status: "completion_pending"
+        })
+            .populate({
+            path: "jobId",
+            select: "_id title description location latitude longitude pricingAmount pricingType category urgency jobDate duration_value duration_unit workersRequired status postedBy createdAt",
+            populate: {
+                path: "postedBy",
+                select: "name profilePictureUrl averageRating totalRatings phone",
+            },
+        })
+            .sort({ createdAt: -1 });
+        return res.json({ applications });
+    }
+    catch (error) {
+        console.error("Get worker pending completion error:", error);
+        return res.status(500).json({ message: "Failed to fetch pending completion jobs" });
+    }
+};
+exports.getWorkerPendingCompletion = getWorkerPendingCompletion;
+const confirmJobCompletion = async (req, res) => {
+    try {
+        const { applicationId } = req.body;
+        const user = req.user;
+        if (!user)
+            return res.status(401).json({ message: "Unauthorized" });
+        // Get the application
+        const application = await JobApplication_1.default.findById(applicationId);
+        if (!application) {
+            return res.status(404).json({ message: "Application not found" });
+        }
+        // Verify the worker owns this application
+        const workerId = application.workerId?.toString();
+        const userId = user._id?.toString();
+        if (workerId !== userId) {
+            return res.status(403).json({ message: "Unauthorized" });
+        }
+        // Update status to completed
+        if (application.status !== "completion_pending") {
+            return res.status(400).json({ message: "Only completion_pending jobs can be confirmed" });
+        }
+        application.status = "completed";
+        await application.save();
+        await syncJobStatusFromApplications(application.jobId);
+        // 📬 Create notification for contractor - job is completed
+        try {
+            const job = await Job_1.default.findById(application.jobId);
+            const contractor = await User_1.default.findById(job?.postedBy);
+            await (0, notificationHelper_1.createNotification)({
+                userId: job?.postedBy.toString(),
+                type: "job_update",
+                title: "Job Completed ✓",
+                message: `${user.name || "Worker"} confirmed completion of "${job?.title}". Payment can now be processed.`,
+                data: {
+                    jobId: job?._id.toString(),
+                    applicationId: application._id.toString(),
+                    workerId: user._id.toString(),
+                },
+            });
+        }
+        catch (notifError) {
+            console.error("Failed to create notification:", notifError);
+        }
+        return res.json({ application });
+    }
+    catch (error) {
+        console.error("Confirm job completion error:", error);
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        return res.status(500).json({ message: `Failed to confirm completion: ${errorMessage}` });
+    }
+};
+exports.confirmJobCompletion = confirmJobCompletion;
+const rejectJobCompletion = async (req, res) => {
+    try {
+        const { applicationId } = req.body;
+        const user = req.user;
+        if (!user)
+            return res.status(401).json({ message: "Unauthorized" });
+        // Get the application
+        const application = await JobApplication_1.default.findById(applicationId);
+        if (!application) {
+            return res.status(404).json({ message: "Application not found" });
+        }
+        // Verify the worker owns this application
+        const workerId = application.workerId?.toString();
+        const userId = user._id?.toString();
+        if (workerId !== userId) {
+            return res.status(403).json({ message: "Unauthorized" });
+        }
+        // Update status back to accepted
+        if (application.status !== "completion_pending") {
+            return res.status(400).json({ message: "Only completion_pending jobs can be rejected" });
+        }
+        application.status = "accepted";
+        await application.save();
+        await syncJobStatusFromApplications(application.jobId);
+        return res.json({ application });
+    }
+    catch (error) {
+        console.error("Reject job completion error:", error);
+        return res.status(500).json({ message: "Failed to reject job completion" });
+    }
+};
+exports.rejectJobCompletion = rejectJobCompletion;
+const markAllJobsComplete = async (req, res) => {
+    try {
+        const { jobId } = req.body;
+        const user = req.user;
+        if (!user)
+            return res.status(401).json({ message: "Unauthorized" });
+        // Verify the job exists and belongs to the contractor
+        const job = await Job_1.default.findById(jobId);
+        if (!job)
+            return res.status(404).json({ message: "Job not found" });
+        const jobPostedById = job.postedBy?.toString();
+        const userId = user._id?.toString();
+        if (jobPostedById !== userId) {
+            return res.status(403).json({ message: "Unauthorized" });
+        }
+        // Find all accepted applications for this job
+        const acceptedApplications = await JobApplication_1.default.find({
+            jobId,
+            status: "accepted"
+        }).populate("workerId", "name");
+        if (acceptedApplications.length === 0) {
+            return res.status(400).json({ message: "No accepted applications to mark complete" });
+        }
+        // Atomic updateMany: update all accepted applications to completion_pending
+        const updateResult = await JobApplication_1.default.updateMany({ jobId, status: "accepted" }, { $set: { status: "completion_pending" } });
+        if (updateResult.modifiedCount === 0) {
+            return res.status(500).json({ message: "Failed to update applications" });
+        }
+        // Sync job status after bulk update
+        await syncJobStatusFromApplications(jobId);
+        // Create notifications for all affected workers (bulk insert)
+        const notifications = acceptedApplications.map((app) => ({
+            userId: app.workerId._id.toString(),
+            type: "job_update",
+            title: "Job Completion Review",
+            message: `${user.name || "Contractor"} marked "${job.title}" as complete. Please confirm the work is done.`,
+            data: {
+                jobId: job._id.toString(),
+                applicationId: app._id.toString(),
+            },
+            read: false,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        }));
+        try {
+            await Notification_1.Notification.insertMany(notifications);
+        }
+        catch (notifError) {
+            console.error("Failed to create notifications:", notifError);
+            // Don't fail the request if notification creation fails
+        }
+        return res.json({
+            success: true,
+            data: {
+                updatedCount: updateResult.modifiedCount,
+                message: `Marked ${updateResult.modifiedCount} application(s) as complete`,
+            },
+        });
+    }
+    catch (error) {
+        console.error("Mark all jobs complete error:", error);
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        return res.status(500).json({ message: `Failed to mark jobs complete: ${errorMessage}` });
+    }
+};
+exports.markAllJobsComplete = markAllJobsComplete;
+const getWorkerCompletedJobs = async (req, res) => {
+    try {
+        const user = req.user;
+        if (!user)
+            return res.status(401).json({ message: "Unauthorized" });
+        // Get all COMPLETED applications by this worker with job details
+        const applications = await JobApplication_1.default.find({
+            workerId: user._id,
+            status: "completed"
+        })
+            .populate({
+            path: "jobId",
+            select: "_id title description location latitude longitude pricingAmount pricingType category urgency jobDate duration_value duration_unit workersRequired status postedBy createdAt",
+            populate: {
+                path: "postedBy",
+                select: "name profilePictureUrl averageRating totalRatings phone",
+            },
+        })
+            .sort({ createdAt: -1 });
+        return res.json({ applications });
+    }
+    catch (error) {
+        console.error("Get worker completed jobs error:", error);
+        return res.status(500).json({ message: "Failed to fetch completed jobs" });
+    }
+};
+exports.getWorkerCompletedJobs = getWorkerCompletedJobs;
+const confirmPayment = async (req, res) => {
+    try {
+        const { applicationId, paymentMethod } = req.body;
+        const user = req.user;
+        if (!user)
+            return res.status(401).json({ message: "Unauthorized" });
+        // Get the application
+        const application = await JobApplication_1.default.findById(applicationId);
+        if (!application) {
+            return res.status(404).json({ success: false, error: "Application not found" });
+        }
+        // Verify the worker owns this application
+        const workerId = application.workerId?.toString();
+        const userId = user._id?.toString();
+        if (workerId !== userId) {
+            return res.status(403).json({ success: false, error: "Unauthorized" });
+        }
+        // Allow workers to mark paid from active/confirmation states too.
+        if (!["accepted", "completion_pending", "completed"].includes(application.status)) {
+            return res.status(400).json({ success: false, error: "Job must be active or completed before confirming payment" });
+        }
+        // Guard: paymentStatus must be pending (prevent double confirm)
+        if (application.paymentStatus !== "pending") {
+            return res.status(400).json({ success: false, error: "Payment already processed" });
+        }
+        const wasAlreadyCompleted = application.status === "completed";
+        if (!wasAlreadyCompleted) {
+            application.status = "completed";
+            await application.save();
+            await syncJobStatusFromApplications(application.jobId);
+        }
+        // Update payment info
+        application.paymentStatus = "confirmed_paid";
+        application.paymentMethod = paymentMethod;
+        application.paidAt = new Date();
+        await application.save();
+        // Send notification to contractor
+        try {
+            const job = await Job_1.default.findById(application.jobId);
+            await (0, notificationHelper_1.createNotification)({
+                userId: job?.postedBy.toString(),
+                type: "payment",
+                title: wasAlreadyCompleted ? "Payment Confirmed" : "Job Marked Paid",
+                message: wasAlreadyCompleted
+                    ? `${user.name || "Worker"} confirmed payment receipt for "${job?.title}"`
+                    : `${user.name || "Worker"} marked "${job?.title}" as paid and completed from the worker side.`,
+                data: {
+                    jobId: job?._id.toString(),
+                    applicationId: application._id.toString(),
+                    workerId: user._id.toString(),
+                },
+            });
+        }
+        catch (notifError) {
+            console.error("Failed to create notification:", notifError);
+        }
+        return res.json({ success: true, data: application });
+    }
+    catch (error) {
+        console.error("Confirm payment error:", error);
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        return res.status(500).json({ success: false, error: `Failed to confirm payment: ${errorMessage}` });
+    }
+};
+exports.confirmPayment = confirmPayment;
+const disputePayment = async (req, res) => {
+    try {
+        const { applicationId } = req.body;
+        const user = req.user;
+        if (!user)
+            return res.status(401).json({ message: "Unauthorized" });
+        // Get the application
+        const application = await JobApplication_1.default.findById(applicationId);
+        if (!application) {
+            return res.status(404).json({ success: false, error: "Application not found" });
+        }
+        // Verify the worker owns this application
+        const workerId = application.workerId?.toString();
+        const userId = user._id?.toString();
+        if (workerId !== userId) {
+            return res.status(403).json({ success: false, error: "Unauthorized" });
+        }
+        // Guard: status must be completed
+        if (application.status !== "completed") {
+            return res.status(400).json({ success: false, error: "Job must be completed before disputing payment" });
+        }
+        // Guard: paymentStatus must be pending (prevent double dispute)
+        if (application.paymentStatus !== "pending") {
+            return res.status(400).json({ success: false, error: "Payment already processed" });
+        }
+        // Update payment status to disputed
+        application.paymentStatus = "disputed";
+        await application.save();
+        // Send notification to contractor
+        try {
+            const job = await Job_1.default.findById(application.jobId);
+            await (0, notificationHelper_1.createNotification)({
+                userId: job?.postedBy.toString(),
+                type: "payment",
+                title: "Payment Dispute Reported",
+                message: `${user.name || "Worker"} reported a payment issue for "${job?.title}"`,
+                data: {
+                    jobId: job?._id.toString(),
+                    applicationId: application._id.toString(),
+                    workerId: user._id.toString(),
+                },
+            });
+        }
+        catch (notifError) {
+            console.error("Failed to create notification:", notifError);
+        }
+        return res.json({ success: true, data: application });
+    }
+    catch (error) {
+        console.error("Dispute payment error:", error);
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        return res.status(500).json({ success: false, error: `Failed to dispute payment: ${errorMessage}` });
+    }
+};
+exports.disputePayment = disputePayment;
+const rateUser = async (req, res) => {
+    try {
+        const { applicationId, score, review } = req.body;
+        const user = req.user;
+        if (!user)
+            return res.status(401).json({ message: "Unauthorized" });
+        // Validate score
+        if (typeof score !== "number" || score < 1 || score > 5) {
+            return res.status(400).json({ success: false, error: "Score must be between 1 and 5" });
+        }
+        // Validate review length
+        if (review && typeof review === "string" && review.length > 200) {
+            return res.status(400).json({ success: false, error: "Review must be 200 characters or less" });
+        }
+        // Get the application
+        const application = await JobApplication_1.default.findById(applicationId);
+        if (!application) {
+            return res.status(404).json({ success: false, error: "Application not found" });
+        }
+        // Guard: paymentStatus must be "confirmed_paid"
+        if (application.paymentStatus !== "confirmed_paid") {
+            return res.status(400).json({ success: false, error: "Can only rate after payment is confirmed" });
+        }
+        // Guard: status must be completed
+        if (application.status !== "completed") {
+            return res.status(400).json({ success: false, error: "Can only rate completed jobs" });
+        }
+        // Determine if caller is worker or contractor
+        const userIdStr = user._id?.toString();
+        const workerIdStr = application.workerId?.toString();
+        const isWorker = userIdStr === workerIdStr;
+        // Get job to find contractor
+        const job = await Job_1.default.findById(application.jobId);
+        if (!job) {
+            return res.status(404).json({ success: false, error: "Job not found" });
+        }
+        const contractorIdStr = job.postedBy?.toString();
+        const isContractor = userIdStr === contractorIdStr;
+        if (!isWorker && !isContractor) {
+            return res.status(403).json({ success: false, error: "You are not part of this job" });
+        }
+        // Determine which rating to update
+        if (isWorker) {
+            // Worker is rating the contractor
+            if (application.contractorRating?.givenAt) {
+                return res.status(400).json({ success: false, error: "You have already rated this contractor" });
+            }
+            application.contractorRating = {
+                score,
+                review: review || "",
+                givenAt: new Date(),
+            };
+            // Update contractor's average rating
+            const contractor = await User_1.default.findById(contractorIdStr);
+            if (contractor) {
+                const newAvg = ((contractor.averageRating || 0) * (contractor.totalRatings || 0) + score) /
+                    ((contractor.totalRatings || 0) + 1);
+                contractor.averageRating = Math.round(newAvg * 10) / 10;
+                contractor.totalRatings = (contractor.totalRatings || 0) + 1;
+                await contractor.save();
+            }
+        }
+        else {
+            // Contractor is rating the worker
+            if (application.workerRating?.givenAt) {
+                return res.status(400).json({ success: false, error: "You have already rated this worker" });
+            }
+            application.workerRating = {
+                score,
+                review: review || "",
+                givenAt: new Date(),
+            };
+            // Update worker's average rating
+            const worker = await User_1.default.findById(workerIdStr);
+            if (worker) {
+                const newAvg = ((worker.averageRating || 0) * (worker.totalRatings || 0) + score) /
+                    ((worker.totalRatings || 0) + 1);
+                worker.averageRating = Math.round(newAvg * 10) / 10;
+                worker.totalRatings = (worker.totalRatings || 0) + 1;
+                await worker.save();
+            }
+        }
+        await application.save();
+        return res.json({ success: true, data: application });
+    }
+    catch (error) {
+        console.error("Rate user error:", error);
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        return res.status(500).json({ success: false, error: `Failed to rate: ${errorMessage}` });
+    }
+};
+exports.rateUser = rateUser;
+const getWorkerRatings = async (req, res) => {
+    try {
+        const { workerId } = req.params;
+        // Check user account type to decide which rating field to read
+        const user = await User_1.default.findById(workerId).select("accountType roles").lean();
+        if (!user)
+            return res.status(404).json({ success: false, error: "User not found" });
+        // If user is a contractor (or has contractor role), return contractor ratings
+        if (user.accountType === "contractor" || (Array.isArray(user.roles) && user.roles.includes("contractor"))) {
+            // Find jobs posted by this contractor
+            const jobs = await Job_1.default.find({ postedBy: workerId }).select("_id").lean();
+            const jobIds = jobs.map((j) => j._id);
+            const ratings = await JobApplication_1.default.find({
+                jobId: { $in: jobIds.length ? jobIds : [null] },
+                status: "completed",
+                "contractorRating.score": { $exists: true },
+            })
+                .populate({ path: "workerId", select: "name profilePictureUrl" })
+                .sort({ "contractorRating.givenAt": -1 });
+            console.log(`getWorkerRatings: user ${workerId} is contractor; jobs=${jobIds.length} ratings=${ratings.length}`);
+            const formattedRatings = ratings.map((app) => ({
+                _id: app._id,
+                score: app.contractorRating?.score || 0,
+                review: app.contractorRating?.review || "",
+                givenAt: app.contractorRating?.givenAt || new Date(),
+                givenBy: {
+                    name: app.workerId?.name || "Anonymous",
+                    profilePictureUrl: app.workerId?.profilePictureUrl,
+                },
+            }));
+            return res.json({ success: true, ratings: formattedRatings });
+        }
+        // Default: treat as worker and return workerRating entries
+        const ratings = await JobApplication_1.default.find({
+            workerId: workerId,
+            status: "completed",
+            "workerRating.score": { $exists: true },
+        })
+            .populate({
+            path: "jobId",
+            select: "postedBy",
+            populate: {
+                path: "postedBy",
+                select: "name profilePictureUrl",
+            },
+        })
+            .sort({ "workerRating.givenAt": -1 });
+        console.log(`getWorkerRatings: user ${workerId} is worker; ratings=${ratings.length}`);
+        // Format ratings response
+        const formattedRatings = ratings.map((app) => ({
+            _id: app._id,
+            score: app.workerRating?.score || 0,
+            review: app.workerRating?.review || "",
+            givenAt: app.workerRating?.givenAt || new Date(),
+            givenBy: {
+                name: app.jobId?.postedBy?.name || "Anonymous",
+                profilePictureUrl: app.jobId?.postedBy?.profilePictureUrl,
+            },
+        }));
+        return res.json({ success: true, ratings: formattedRatings });
+    }
+    catch (error) {
+        console.error("Get worker ratings error:", error);
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        return res.status(500).json({ success: false, error: `Failed to fetch ratings: ${errorMessage}` });
+    }
+};
+exports.getWorkerRatings = getWorkerRatings;

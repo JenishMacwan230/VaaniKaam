@@ -9,6 +9,12 @@ const userController_1 = require("../controllers/userController");
 const router = express_1.default.Router();
 // CHECK IF PHONE EXISTS (before sending OTP)
 router.post("/check-phone", userController_1.checkPhoneExists);
+// GET PUBLIC WORKERS
+router.get("/public-workers", userController_1.getPublicWorkers);
+// GET PUBLIC WORKER PROFILE
+router.get("/:id([0-9a-fA-F]{24})", userController_1.getWorkerProfile);
+// GET PUBLIC STATS
+router.get("/public-stats", userController_1.getPublicStats);
 // FIRST TIME: Firebase Phone Authentication + Set password
 // Firebase handles SMS sending, client sends verified Firebase token
 router.post("/register", userController_1.firebaseAuth);

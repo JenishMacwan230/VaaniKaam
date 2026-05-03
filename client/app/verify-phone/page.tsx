@@ -220,7 +220,7 @@ export default function VerifyPhonePage() {
       }
 
       // Store token and redirect
-      localStorage.setItem("token", data.token);
+      localStorage.setItem("authToken", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
 
       setSuccess("Registration successful! Redirecting...");

@@ -13,12 +13,12 @@ const nextConfig: NextConfig = {
   },
   // Static export required for Capacitor Android/iOS packaging.
   // Remove this line to restore server-side rendering for the web deployment.
-  output: 'export',
+  // output: 'export',
   trailingSlash: true,
 
   // Next.js image optimization is not available in static export mode.
   images: {
-    unoptimized: true,
+    // unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',

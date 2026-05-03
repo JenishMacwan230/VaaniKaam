@@ -38,7 +38,10 @@ const workerProfileSchema = new mongoose_1.Schema({
     userId: { type: mongoose_1.Schema.Types.ObjectId, ref: "User", required: true },
     skills: { type: [String], default: [] },
     expectedWage: { type: Number },
-    location: { type: String, trim: true },
+    location: { type: String, trim: true }, // Original location
+    normalizedLocation: { type: String, trim: true }, // Standardized format
+    latitude: { type: Number }, // GPS coordinates
+    longitude: { type: Number },
     availability: { type: String, trim: true },
 }, { timestamps: true });
 exports.default = mongoose_1.default.model("WorkerProfile", workerProfileSchema);

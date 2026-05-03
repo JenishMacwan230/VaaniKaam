@@ -5,6 +5,7 @@ import { X, MapPin, IndianRupee, User, Calendar, AlertCircle, CheckCircle, Clock
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useTranslations } from 'next-intl';
+import { getAuthHeaders } from '@/lib/authClient';
 
 interface JobDetailsModalProps {
   jobId: string;
@@ -66,18 +67,10 @@ export default function JobDetailsModal({
       setError(null);
 
       try {
-        const token =
-          typeof window !== 'undefined'
-            ? localStorage.getItem('firebaseToken') || localStorage.getItem('token')
-            : null;
-
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
+          ...getAuthHeaders(),
         };
-
-        if (token) {
-          headers['Authorization'] = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
-        }
 
         const response = await fetch(
           `${process.env.NEXT_PUBLIC_API_URL}/api/jobs/${jobId}`,

@@ -292,6 +292,12 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
 
       const firebaseToken = localStorage.getItem("firebaseToken");
 
+      if (!firebaseToken) {
+        setError("Phone verification failed. Please request a new SMS code.");
+        setLoading(false);
+        return;
+      }
+
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/users/register`,
         {
@@ -313,13 +319,20 @@ export default function PhoneAuthCard({ onStepChange }: PhoneAuthCardProps) {
       const data = await response.json();
 
       if (!response.ok) {
-        if (data.shouldLogin) {
+        if (data.error === "FIREBASE_TOKEN_INVALID") {
+          setError("Verification token expired. Please request a new SMS code.");
+          localStorage.removeItem("firebaseToken");
+        } else if (data.shouldLogin) {
           throw new Error(t("alreadyRegistered"));
+        } else {
+          throw new Error(data.message || "Registration failed");
         }
-        throw new Error(data.message || "Registration failed");
+        setLoading(false);
+        return;
       }
 
       localStorage.setItem("user", JSON.stringify(data.user));
+      localStorage.setItem("authToken", data.token);
       globalThis.window.dispatchEvent(new Event("auth-changed"));
       localStorage.removeItem("firebaseToken");
       sessionStorage.removeItem("reg_phone");
